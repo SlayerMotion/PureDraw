@@ -17,8 +17,6 @@ It provides a "Virtual PostScript Machine" API compatible with CoreGraphics (Qua
 - **No Foundation requirements** in the core library target
 - **Cross-platform build gates** for macOS, Linux, Windows, and WebAssembly (WASI)
 
-It is a sibling project to [PureXML](https://github.com/mihaelamj/PureXML) and [PureYAML](https://github.com/mihaelamj/PureYAML).
-
 ---
 
 ## Preview
