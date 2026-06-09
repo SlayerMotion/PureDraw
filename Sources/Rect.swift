@@ -1,27 +1,7 @@
 //
-//  Geometry.swift
+//  Rect.swift
 //  PureDraw
 //
-
-/// A point in a two-dimensional coordinate system.
-public struct Point: Equatable, Sendable, Validatable {
-    public var x: Double
-    public var y: Double
-    
-    public static let zero = Point(x: 0, y: 0)
-    
-    public init(x: Double, y: Double) {
-        self.x = x
-        self.y = y
-    }
-    
-    /// Applies an affine transformation to the point.
-    public func applying(_ t: AffineTransform) -> Point {
-        let newX = t.a * x + t.c * y + t.tx
-        let newY = t.b * x + t.d * y + t.ty
-        return Point(x: newX, y: newY)
-    }
-}
 
 /// A rectangle in a two-dimensional coordinate system.
 public struct Rect: Equatable, Sendable, Validatable {
@@ -29,7 +9,7 @@ public struct Rect: Equatable, Sendable, Validatable {
     public var width: Double
     public var height: Double
     
-    public static let zero = Rect(x: 0, y: 0, width: 0, height: 0)
+    public static let zero = Rect(origin: Point.zero, width: 0, height: 0)
     
     public init(origin: Point, width: Double, height: Double) {
         self.origin = origin
