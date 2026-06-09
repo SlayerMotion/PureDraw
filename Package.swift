@@ -31,21 +31,21 @@ let targets: [Target] = {
     let geometryTarget = Target.target(
         name: "Geometry",
         dependencies: ["Validation"],
-        path: "Sources/Geometry",
+        path: "Sources/Geometry"
     )
     let geometryTestsTarget = Target.testTarget(
         name: "GeometryTests",
         dependencies: ["Geometry"],
-        path: "Tests/GeometryTests",
+        path: "Tests/GeometryTests"
     )
     let validationTarget = Target.target(
         name: "Validation",
-        path: "Sources/Validation",
+        path: "Sources/Validation"
     )
     let foundationTargets = [
         geometryTarget,
         geometryTestsTarget,
-        validationTarget,
+        validationTarget
     ]
 
     // ---------- Core Layer ----------
@@ -53,29 +53,29 @@ let targets: [Target] = {
         name: "Core",
         dependencies: [
             "Geometry",
-            "Validation",
+            "Validation"
         ],
-        path: "Sources/Core",
+        path: "Sources/Core"
     )
     let coreTestsTarget = Target.testTarget(
         name: "CoreTests",
         dependencies: [
             "Geometry",
             "Validation",
-            "Core",
+            "Core"
         ],
-        path: "Tests/CoreTests",
+        path: "Tests/CoreTests"
     )
     let coreTargets = [
         coreTarget,
-        coreTestsTarget,
+        coreTestsTarget
     ]
 
     // ---------- Infrastructure Layer (Renderers) ----------
     let renderersTarget = Target.target(
         name: "Renderers",
         dependencies: ["Core"],
-        path: "Sources/Renderers",
+        path: "Sources/Renderers"
     )
     let renderersTestsTarget = Target.testTarget(
         name: "RenderersTests",
@@ -83,13 +83,13 @@ let targets: [Target] = {
             "Geometry",
             "Validation",
             "Core",
-            "Renderers",
+            "Renderers"
         ],
-        path: "Tests/RenderersTests",
+        path: "Tests/RenderersTests"
     )
     let rendererTargets = [
         renderersTarget,
-        renderersTestsTarget,
+        renderersTestsTarget
     ]
 
     // ---------- Front-Door Layer (Umbrella Target) ----------
@@ -99,12 +99,12 @@ let targets: [Target] = {
             "Geometry",
             "Validation",
             "Core",
-            "Renderers",
+            "Renderers"
         ],
-        path: "Sources/PureDraw",
+        path: "Sources/PureDraw"
     )
     let frontDoorTargets = [
-        pureDrawTarget,
+        pureDrawTarget
     ]
 
     return foundationTargets + coreTargets + rendererTargets + frontDoorTargets
@@ -114,7 +114,7 @@ let package = Package(
     name: "PureDraw",
     products: allProducts,
     dependencies: deps,
-    targets: targets,
+    targets: targets
 )
 
 /// Helper extension
