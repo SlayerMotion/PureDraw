@@ -97,7 +97,7 @@ public struct CanvasRenderer: Renderer {
                 let gradVarName = "radialGrad_\(opIndex)"
                 js
                     .append(
-                        "const \(gradVarName) = \(contextName).createRadialGradient(\(startCenter.x), \(startCenter.y), \(startRadius), \(endCenter.x), \(endCenter.y), \(endRadius));",
+                        "const \(gradVarName) = \(contextName).createRadialGradient(\(startCenter.x), \(startCenter.y), \(startRadius), \(endCenter.x), \(endCenter.y), \(endRadius));"
                     )
                 for stop in grad.stops {
                     js.append("\(gradVarName).addColorStop(\(stop.location), '\(rgbaColor(stop.color))');")

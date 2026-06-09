@@ -68,7 +68,7 @@ public struct Path: Equatable, Sendable, Validatable {
                 .cubicCurve(
                     to: to.applying(transform),
                     control1: control1.applying(transform),
-                    control2: control2.applying(transform),
+                    control2: control2.applying(transform)
                 )
             case .close:
                 .close
@@ -91,7 +91,7 @@ public struct Path: Equatable, Sendable, Validatable {
                 .cubicCurve(
                     to: to.applying(transform),
                     control1: control1.applying(transform),
-                    control2: control2.applying(transform),
+                    control2: control2.applying(transform)
                 )
             case .close:
                 .close
@@ -119,25 +119,25 @@ public struct Path: Equatable, Sendable, Validatable {
         addCurve(
             to: Point(x: cx, y: cy + ry),
             control1: Point(x: cx + rx, y: cy + ry * kappa),
-            control2: Point(x: cx + rx * kappa, y: cy + ry),
+            control2: Point(x: cx + rx * kappa, y: cy + ry)
         )
 
         addCurve(
             to: Point(x: cx - rx, y: cy),
             control1: Point(x: cx - rx * kappa, y: cy + ry),
-            control2: Point(x: cx - rx, y: cy + ry * kappa),
+            control2: Point(x: cx - rx, y: cy + ry * kappa)
         )
 
         addCurve(
             to: Point(x: cx, y: cy - ry),
             control1: Point(x: cx - rx, y: cy - ry * kappa),
-            control2: Point(x: cx - rx * kappa, y: cy - ry),
+            control2: Point(x: cx - rx * kappa, y: cy - ry)
         )
 
         addCurve(
             to: Point(x: cx + rx, y: cy),
             control1: Point(x: cx + rx * kappa, y: cy - ry),
-            control2: Point(x: cx + rx, y: cy - ry * kappa),
+            control2: Point(x: cx + rx, y: cy - ry * kappa)
         )
 
         closeSubpath()
@@ -166,7 +166,7 @@ public struct Path: Equatable, Sendable, Validatable {
         addCurve(
             to: Point(x: rect.maxX, y: rect.minY + ry),
             control1: Point(x: rect.maxX - rx + rx * kappa, y: rect.minY),
-            control2: Point(x: rect.maxX, y: rect.minY + ry - ry * kappa),
+            control2: Point(x: rect.maxX, y: rect.minY + ry - ry * kappa)
         )
 
         addLine(to: Point(x: rect.maxX, y: rect.maxY - ry))
@@ -174,7 +174,7 @@ public struct Path: Equatable, Sendable, Validatable {
         addCurve(
             to: Point(x: rect.maxX - rx, y: rect.maxY),
             control1: Point(x: rect.maxX, y: rect.maxY - ry + ry * kappa),
-            control2: Point(x: rect.maxX - rx + rx * kappa, y: rect.maxY),
+            control2: Point(x: rect.maxX - rx + rx * kappa, y: rect.maxY)
         )
 
         addLine(to: Point(x: rect.minX + rx, y: rect.maxY))
@@ -182,7 +182,7 @@ public struct Path: Equatable, Sendable, Validatable {
         addCurve(
             to: Point(x: rect.minX, y: rect.maxY - ry),
             control1: Point(x: rect.minX + rx - rx * kappa, y: rect.maxY),
-            control2: Point(x: rect.minX, y: rect.maxY - ry + ry * kappa),
+            control2: Point(x: rect.minX, y: rect.maxY - ry + ry * kappa)
         )
 
         addLine(to: Point(x: rect.minX, y: rect.minY + ry))
@@ -190,7 +190,7 @@ public struct Path: Equatable, Sendable, Validatable {
         addCurve(
             to: Point(x: rect.minX + rx, y: rect.minY),
             control1: Point(x: rect.minX, y: rect.minY + ry - ry * kappa),
-            control2: Point(x: rect.minX + rx - rx * kappa, y: rect.minY),
+            control2: Point(x: rect.minX + rx - rx * kappa, y: rect.minY)
         )
 
         closeSubpath()
@@ -202,7 +202,7 @@ public struct Path: Equatable, Sendable, Validatable {
         radius: Double,
         startAngle: Double,
         endAngle: Double,
-        clockwise: Bool,
+        clockwise: Bool
     ) {
         var sweep = endAngle - startAngle
         let twoPi = 2.0 * .pi
@@ -223,7 +223,7 @@ public struct Path: Equatable, Sendable, Validatable {
 
         let startPt = Point(
             x: center.x + radius * cos(startAngle),
-            y: center.y + radius * sin(startAngle),
+            y: center.y + radius * sin(startAngle)
         )
 
         if !isEmpty {
@@ -273,14 +273,14 @@ public struct Path: Equatable, Sendable, Validatable {
         center: Point,
         radius: Double,
         startAngle: Double,
-        delta: Double,
+        delta: Double
     ) {
         addArc(
             center: center,
             radius: radius,
             startAngle: startAngle,
             endAngle: startAngle + delta,
-            clockwise: delta >= 0,
+            clockwise: delta >= 0
         )
     }
 
@@ -382,7 +382,7 @@ public struct Path: Equatable, Sendable, Validatable {
                 .cubicCurve(
                     to: transform(to),
                     control1: transform(control1),
-                    control2: transform(control2),
+                    control2: transform(control2)
                 )
             case .close:
                 .close

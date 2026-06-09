@@ -82,7 +82,7 @@ public struct Rect: Equatable, Sendable, Validatable {
             x: std.origin.x + dx,
             y: std.origin.y + dy,
             width: max(0.0, std.width - 2.0 * dx),
-            height: max(0.0, std.height - 2.0 * dy),
+            height: max(0.0, std.height - 2.0 * dy)
         )
     }
 
@@ -90,7 +90,7 @@ public struct Rect: Equatable, Sendable, Validatable {
         Rect(
             origin: Point(x: origin.x + dx, y: origin.y + dy),
             width: width,
-            height: height,
+            height: height
         )
     }
 

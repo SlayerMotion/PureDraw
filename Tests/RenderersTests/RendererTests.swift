@@ -77,7 +77,7 @@ struct RendererTests {
                 bitsPerComponent: 8,
                 bytesPerRow: 0,
                 space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
             ) else {
                 Issue.record("Failed to create offscreen CGContext")
                 return
@@ -189,7 +189,7 @@ struct RendererTests {
                 bitsPerComponent: 8,
                 bytesPerRow: 0,
                 space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
             ) {
                 let renderer = CoreGraphicsRenderer(context: cgContext)
                 #expect(throws: Never.self) {
@@ -293,7 +293,7 @@ struct RendererTests {
                 return Point3D(
                     x: x * cosA - z * sinA,
                     y: y,
-                    z: x * sinA + z * cosA,
+                    z: x * sinA + z * cosA
                 )
             }
 
@@ -303,7 +303,7 @@ struct RendererTests {
                 return Point3D(
                     x: x,
                     y: y * cosA - z * sinA,
-                    z: y * sinA + z * cosA,
+                    z: y * sinA + z * cosA
                 )
             }
 
@@ -697,7 +697,7 @@ struct RendererTests {
                     bitsPerComponent: 8,
                     bytesPerRow: 0,
                     space: colorSpace,
-                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue,
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
                 ) {
                     try CoreGraphicsRenderer(context: cgContext).render(context)
                 } else {

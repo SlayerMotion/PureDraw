@@ -117,7 +117,7 @@ public extension AffineTransform {
             c: -c / det,
             d: a / det,
             tx: (c * ty - d * tx) / det,
-            ty: (b * tx - a * ty) / det,
+            ty: (b * tx - a * ty) / det
         )
     }
 

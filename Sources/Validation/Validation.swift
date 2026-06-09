@@ -15,7 +15,7 @@ public struct Validation<Document: Sendable, Subject: Sendable>: Sendable {
     public init(
         description: String? = nil,
         check: @escaping @Sendable (ValidationContext<Document, Subject>) -> [ValidationError],
-        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool = { _ in true },
+        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool = { _ in true }
     ) {
         self.description = description ?? ""
         self.check = check
@@ -27,7 +27,7 @@ public struct Validation<Document: Sendable, Subject: Sendable>: Sendable {
     public init(
         description: String,
         check: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool,
-        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool = { _ in true },
+        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool = { _ in true }
     ) {
         self.description = description
         self.check = { context in

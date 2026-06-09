@@ -22,7 +22,7 @@ public struct CrumpleDeformer: Sendable {
         center: Point,
         radius: Double,
         pinchStrength: Double = 0.35,
-        wrinkleStrength: Double = 1.0,
+        wrinkleStrength: Double = 1.0
     ) {
         self.center = center
         self.radius = radius

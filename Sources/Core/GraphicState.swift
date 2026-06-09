@@ -60,7 +60,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         alpha: Double = 1.0,
         blendMode: BlendMode = .normal,
         clipPath: Path? = nil,
-        shadow: Shadow? = nil,
+        shadow: Shadow? = nil
     ) {
         self.transform = transform
         self.strokeColor = strokeColor

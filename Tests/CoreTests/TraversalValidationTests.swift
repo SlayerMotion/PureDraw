@@ -157,9 +157,9 @@ struct TraversalValidationTests {
                 Gradient(stops: [GradientStop(color: .white, location: 0.0), GradientStop(color: .black, location: 1.0)]),
                 start: Point(x: 10, y: 10),
                 end: Point(x: 10, y: 10),
-                options: [],
+                options: []
             ),
-            state: GraphicState(),
+            state: GraphicState()
         )
         do {
             try singularLinearOp.validate()
@@ -179,9 +179,9 @@ struct TraversalValidationTests {
                 startRadius: -5.0,
                 endCenter: Point(x: 0, y: 0),
                 endRadius: 5.0,
-                options: [],
+                options: []
             ),
-            state: GraphicState(),
+            state: GraphicState()
         )
         do {
             try badRadialOp.validate()
@@ -200,9 +200,9 @@ struct TraversalValidationTests {
                 startRadius: 10.0,
                 endCenter: Point(x: 5, y: 5),
                 endRadius: 10.0,
-                options: [],
+                options: []
             ),
-            state: GraphicState(),
+            state: GraphicState()
         )
         do {
             try identicalRadialOp.validate()

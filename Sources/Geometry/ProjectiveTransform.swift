@@ -30,13 +30,13 @@ public struct ProjectiveTransform: Equatable, Sendable, Validatable {
     public static let identity = ProjectiveTransform(
         m11: 1.0, m12: 0.0, m13: 0.0,
         m21: 0.0, m22: 1.0, m23: 0.0,
-        m31: 0.0, m32: 0.0, m33: 1.0,
+        m31: 0.0, m32: 0.0, m33: 1.0
     )
 
     public init(
         m11: Double, m12: Double, m13: Double,
         m21: Double, m22: Double, m23: Double,
-        m31: Double, m32: Double, m33: Double,
+        m31: Double, m32: Double, m33: Double
     ) {
         self.m11 = m11
         self.m12 = m12
@@ -101,7 +101,7 @@ public struct ProjectiveTransform: Equatable, Sendable, Validatable {
         return ProjectiveTransform(
             m11: a, m12: b, m13: g,
             m21: c, m22: d, m23: h,
-            m31: e, m32: f, m33: 1.0,
+            m31: e, m32: f, m33: 1.0
         )
     }
 
@@ -121,7 +121,7 @@ public struct ProjectiveTransform: Equatable, Sendable, Validatable {
             a: scaleX, b: 0.0,
             c: 0.0, d: scaleY,
             tx: -rect.origin.x * scaleX,
-            ty: -rect.origin.y * scaleY,
+            ty: -rect.origin.y * scaleY
         )
 
         let unitToQuad = unitSquareToQuad(p0: p0, p1: p1, p2: p2, p3: p3)
@@ -141,7 +141,7 @@ public struct ProjectiveTransform: Equatable, Sendable, Validatable {
 
             m31: m31 * t2.m11 + m32 * t2.m21 + m33 * t2.m31,
             m32: m31 * t2.m12 + m32 * t2.m22 + m33 * t2.m32,
-            m33: m31 * t2.m13 + m32 * t2.m23 + m33 * t2.m33,
+            m33: m31 * t2.m13 + m32 * t2.m23 + m33 * t2.m33
         )
     }
 
@@ -177,7 +177,7 @@ public struct ProjectiveTransform: Equatable, Sendable, Validatable {
         return ProjectiveTransform(
             m11: c11 / det, m12: c21 / det, m13: c31 / det,
             m21: c12 / det, m22: c22 / det, m23: c32 / det,
-            m31: c13 / det, m32: c23 / det, m33: c33 / det,
+            m31: c13 / det, m32: c23 / det, m33: c33 / det
         )
     }
 

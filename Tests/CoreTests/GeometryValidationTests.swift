@@ -31,7 +31,7 @@ struct GeometryValidationTests {
         let validResult = Validation<Void, Geometry.AffineTransform>.matrixIsReversible.apply(
             to: validTransform,
             at: [StringKey("test"), StringKey("transform")],
-            in: (),
+            in: ()
         )
         #expect(validResult.isEmpty, "Valid matrix should produce no errors")
 
@@ -40,7 +40,7 @@ struct GeometryValidationTests {
         let invalidResult = Validation<Void, Geometry.AffineTransform>.matrixIsReversible.apply(
             to: singularTransform,
             at: [StringKey("test"), StringKey("transform")],
-            in: (),
+            in: ()
         )
 
         #expect(invalidResult.count == 1)
@@ -54,7 +54,7 @@ struct GeometryValidationTests {
         let validResult = Validation<Void, Rect>.rectHasValidDimensions.apply(
             to: validRect,
             at: [StringKey("rect")],
-            in: (),
+            in: ()
         )
         #expect(validResult.isEmpty)
 
@@ -63,7 +63,7 @@ struct GeometryValidationTests {
         let invalidResult = Validation<Void, Rect>.rectHasValidDimensions.apply(
             to: invalidRect,
             at: [StringKey("rect")],
-            in: (),
+            in: ()
         )
         #expect(invalidResult.count == 1)
         #expect(invalidResult.first?.description == "Failed to satisfy: Rectangle width and height are positive at path: .rect")
@@ -74,7 +74,7 @@ struct GeometryValidationTests {
         let validResult = Validation<Void, Point>.pointIsFinite.apply(
             to: validPoint,
             at: [],
-            in: (),
+            in: ()
         )
         #expect(validResult.isEmpty)
 
@@ -82,7 +82,7 @@ struct GeometryValidationTests {
         let invalidResult = Validation<Void, Point>.pointIsFinite.apply(
             to: infinitePoint,
             at: [],
-            in: (),
+            in: ()
         )
         #expect(invalidResult.count == 1)
         #expect(invalidResult.first?.description == "Failed to satisfy: Point coordinates are finite (not NaN or Infinity) at root of document")

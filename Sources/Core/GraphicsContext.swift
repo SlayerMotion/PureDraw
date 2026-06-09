@@ -170,14 +170,14 @@ public struct GraphicsContext: Sendable, Validatable {
         radius: Double,
         startAngle: Double,
         endAngle: Double,
-        clockwise: Bool,
+        clockwise: Bool
     ) {
         currentPath.addArc(
             center: center,
             radius: radius,
             startAngle: startAngle,
             endAngle: endAngle,
-            clockwise: clockwise,
+            clockwise: clockwise
         )
     }
 
@@ -186,13 +186,13 @@ public struct GraphicsContext: Sendable, Validatable {
         center: Point,
         radius: Double,
         startAngle: Double,
-        delta: Double,
+        delta: Double
     ) {
         currentPath.addRelativeArc(
             center: center,
             radius: radius,
             startAngle: startAngle,
-            delta: delta,
+            delta: delta
         )
     }
 
@@ -219,13 +219,13 @@ public struct GraphicsContext: Sendable, Validatable {
         _ gradient: Gradient,
         start: Point,
         end: Point,
-        options: GradientDrawingOptions = [],
+        options: GradientDrawingOptions = []
     ) {
         commands.append(
             DrawOperation(
                 kind: .drawLinearGradient(gradient, start: start, end: end, options: options),
-                state: currentState,
-            ),
+                state: currentState
+            )
         )
     }
 
@@ -237,7 +237,7 @@ public struct GraphicsContext: Sendable, Validatable {
         startRadius: Double,
         endCenter: Point,
         endRadius: Double,
-        options: GradientDrawingOptions = [],
+        options: GradientDrawingOptions = []
     ) {
         commands.append(
             DrawOperation(
@@ -247,10 +247,10 @@ public struct GraphicsContext: Sendable, Validatable {
                     startRadius: startRadius,
                     endCenter: endCenter,
                     endRadius: endRadius,
-                    options: options,
+                    options: options
                 ),
-                state: currentState,
-            ),
+                state: currentState
+            )
         )
     }
 

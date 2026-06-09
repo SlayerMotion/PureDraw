@@ -17,7 +17,7 @@ public extension Validation {
                     (0.0 ... 1.0).contains(c.green) &&
                     (0.0 ... 1.0).contains(c.blue) &&
                     (0.0 ... 1.0).contains(c.alpha)
-            },
+            }
         )
     }
 
@@ -32,21 +32,21 @@ public extension Validation {
                 if s.lineWidth < 0 {
                     errors.append(ValidationError(
                         reason: "lineWidth cannot be negative",
-                        at: context.codingPath + [ValidationCodingKey("lineWidth")],
+                        at: context.codingPath + [ValidationCodingKey("lineWidth")]
                     ))
                 }
 
                 if s.miterLimit < 0 {
                     errors.append(ValidationError(
                         reason: "miterLimit cannot be negative",
-                        at: context.codingPath + [ValidationCodingKey("miterLimit")],
+                        at: context.codingPath + [ValidationCodingKey("miterLimit")]
                     ))
                 }
 
                 if !(0.0 ... 1.0).contains(s.alpha) {
                     errors.append(ValidationError(
                         reason: "alpha must be between 0.0 and 1.0",
-                        at: context.codingPath + [ValidationCodingKey("alpha")],
+                        at: context.codingPath + [ValidationCodingKey("alpha")]
                     ))
                 }
 
@@ -54,7 +54,7 @@ public extension Validation {
                     if dash < 0 {
                         errors.append(ValidationError(
                             reason: "dashPattern element at index \(index) cannot be negative",
-                            at: context.codingPath + [ValidationCodingKey("dashPattern"), ValidationCodingKey(index)],
+                            at: context.codingPath + [ValidationCodingKey("dashPattern"), ValidationCodingKey(index)]
                         ))
                     }
                 }
@@ -64,7 +64,7 @@ public extension Validation {
                     if sum <= 0 {
                         errors.append(ValidationError(
                             reason: "dashPattern cannot consist of only zero lengths",
-                            at: context.codingPath + [ValidationCodingKey("dashPattern")],
+                            at: context.codingPath + [ValidationCodingKey("dashPattern")]
                         ))
                     }
                 }
@@ -73,7 +73,7 @@ public extension Validation {
                 if s.transform.determinant == 0 {
                     errors.append(ValidationError(
                         reason: "Transform matrix is singular (non-invertible)",
-                        at: context.codingPath + [ValidationCodingKey("transform")],
+                        at: context.codingPath + [ValidationCodingKey("transform")]
                     ))
                 }
 
@@ -85,7 +85,7 @@ public extension Validation {
                 if !strokeColorValid {
                     errors.append(ValidationError(
                         reason: "strokeColor components must be between 0.0 and 1.0",
-                        at: context.codingPath + [ValidationCodingKey("strokeColor")],
+                        at: context.codingPath + [ValidationCodingKey("strokeColor")]
                     ))
                 }
 
@@ -96,12 +96,12 @@ public extension Validation {
                 if !fillColorValid {
                     errors.append(ValidationError(
                         reason: "fillColor components must be between 0.0 and 1.0",
-                        at: context.codingPath + [ValidationCodingKey("fillColor")],
+                        at: context.codingPath + [ValidationCodingKey("fillColor")]
                     ))
                 }
 
                 return errors
-            },
+            }
         )
     }
 
@@ -111,7 +111,7 @@ public extension Validation {
             description: "Gradient stop location is between 0.0 and 1.0",
             check: { context in
                 (0.0 ... 1.0).contains(context.subject.location)
-            },
+            }
         )
     }
 
@@ -121,7 +121,7 @@ public extension Validation {
             description: "Gradient contains at least two stops",
             check: { context in
                 context.subject.stops.count >= 2
-            },
+            }
         )
     }
 
@@ -131,7 +131,7 @@ public extension Validation {
             description: "Shadow blur radius is non-negative",
             check: { context in
                 context.subject.blur >= 0
-            },
+            }
         )
     }
 
@@ -145,14 +145,14 @@ public extension Validation {
                     if path.isEmpty {
                         return [ValidationError(
                             reason: "Drawing path cannot be empty",
-                            at: context.codingPath + [ValidationCodingKey("kind")],
+                            at: context.codingPath + [ValidationCodingKey("kind")]
                         )]
                     }
                 case .drawLinearGradient, .drawRadialGradient:
                     break
                 }
                 return []
-            },
+            }
         )
     }
 
@@ -165,12 +165,12 @@ public extension Validation {
                     if start == end {
                         return [ValidationError(
                             reason: "Linear gradient start and end points cannot be identical",
-                            at: context.codingPath + [ValidationCodingKey("kind")],
+                            at: context.codingPath + [ValidationCodingKey("kind")]
                         )]
                     }
                 }
                 return []
-            },
+            }
         )
     }
 
@@ -184,25 +184,25 @@ public extension Validation {
                     if startRadius < 0 {
                         errors.append(ValidationError(
                             reason: "Radial gradient start radius cannot be negative",
-                            at: context.codingPath + [ValidationCodingKey("kind"), ValidationCodingKey("startRadius")],
+                            at: context.codingPath + [ValidationCodingKey("kind"), ValidationCodingKey("startRadius")]
                         ))
                     }
                     if endRadius < 0 {
                         errors.append(ValidationError(
                             reason: "Radial gradient end radius cannot be negative",
-                            at: context.codingPath + [ValidationCodingKey("kind"), ValidationCodingKey("endRadius")],
+                            at: context.codingPath + [ValidationCodingKey("kind"), ValidationCodingKey("endRadius")]
                         ))
                     }
                     if startCenter == endCenter, startRadius == endRadius {
                         errors.append(ValidationError(
                             reason: "Radial gradient start and end circles cannot be identical",
-                            at: context.codingPath + [ValidationCodingKey("kind")],
+                            at: context.codingPath + [ValidationCodingKey("kind")]
                         ))
                     }
                     return errors
                 }
                 return []
-            },
+            }
         )
     }
 }

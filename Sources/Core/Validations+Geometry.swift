@@ -27,7 +27,7 @@ public extension Validation {
                 } else {
                     errors.append(ValidationError(
                         reason: "Path must start with a move operation",
-                        at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(0)],
+                        at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(0)]
                     ))
                 }
 
@@ -43,7 +43,7 @@ public extension Validation {
                         if currentPoint == nil {
                             errors.append(ValidationError(
                                 reason: "Line operation at index \(index) occurs before any move operation",
-                                at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)],
+                                at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)]
                             ))
                         }
                         currentPoint = to
@@ -52,13 +52,13 @@ public extension Validation {
                             if start == to, start == control {
                                 errors.append(ValidationError(
                                     reason: "Quadratic curve at index \(index) is singular (all control points and endpoints are identical)",
-                                    at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)],
+                                    at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)]
                                 ))
                             }
                         } else {
                             errors.append(ValidationError(
                                 reason: "Quadratic curve operation at index \(index) occurs before any move operation",
-                                at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)],
+                                at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)]
                             ))
                         }
                         currentPoint = to
@@ -67,13 +67,13 @@ public extension Validation {
                             if start == to, start == control1, start == control2 {
                                 errors.append(ValidationError(
                                     reason: "Cubic curve at index \(index) is singular (all control points and endpoints are identical)",
-                                    at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)],
+                                    at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)]
                                 ))
                             }
                         } else {
                             errors.append(ValidationError(
                                 reason: "Cubic curve operation at index \(index) occurs before any move operation",
-                                at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)],
+                                at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)]
                             ))
                         }
                         currentPoint = to
@@ -81,7 +81,7 @@ public extension Validation {
                         if currentPoint == nil {
                             errors.append(ValidationError(
                                 reason: "Close operation at index \(index) occurs before any move operation",
-                                at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)],
+                                at: context.codingPath + [ValidationCodingKey("elements"), ValidationCodingKey(index)]
                             ))
                         }
                         currentPoint = subpathStart
@@ -89,7 +89,7 @@ public extension Validation {
                 }
 
                 return errors
-            },
+            }
         )
     }
 }

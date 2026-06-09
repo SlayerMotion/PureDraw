@@ -27,14 +27,14 @@ public struct Validator<Document: Sendable>: Sendable {
     public func validating<Subject>(
         _ description: String,
         check: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool,
-        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool = { _ in true },
+        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool = { _ in true }
     ) -> Validator<Document> {
         validating(Validation(description: description, check: check, when: predicate))
     }
 
     /// Adds a validation closure that returns multiple validation errors.
     public func validating<Subject>(
-        _ validate: @escaping @Sendable (ValidationContext<Document, Subject>) -> [ValidationError],
+        _ validate: @escaping @Sendable (ValidationContext<Document, Subject>) -> [ValidationError]
     ) -> Validator<Document> {
         validating(Validation(check: validate, when: { _ in true }))
     }
@@ -42,7 +42,7 @@ public struct Validator<Document: Sendable>: Sendable {
     /// Adds a validation closure and predicate that returns multiple validation errors.
     public func validating<Subject>(
         _ validate: @escaping @Sendable (ValidationContext<Document, Subject>) -> [ValidationError],
-        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool,
+        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool
     ) -> Validator<Document> {
         validating(Validation(check: validate, when: predicate))
     }

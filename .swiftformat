@@ -4,7 +4,7 @@
 # `swiftformat . --config .swiftformat --lint` plus build plus test ships with
 # the engine package. Run `swiftformat . --config .swiftformat` before committing.
 
---swiftversion 6.1
+--swiftversion 5.9
 
 # House style.
 --indent 4

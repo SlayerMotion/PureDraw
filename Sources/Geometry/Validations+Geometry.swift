@@ -13,7 +13,7 @@ public extension Validation {
             description: "Transform matrix determinant is non-zero (matrix is invertible)",
             check: { context in
                 context.subject.determinant != 0
-            },
+            }
         )
     }
 
@@ -24,7 +24,7 @@ public extension Validation {
             check: { context in
                 let t = context.subject
                 return t.a.isFinite && t.b.isFinite && t.c.isFinite && t.d.isFinite && t.tx.isFinite && t.ty.isFinite
-            },
+            }
         )
     }
 
@@ -34,7 +34,7 @@ public extension Validation {
             description: "Projective transform matrix determinant is non-zero (matrix is invertible)",
             check: { context in
                 context.subject.determinant != 0
-            },
+            }
         )
     }
 
@@ -47,7 +47,7 @@ public extension Validation {
                 return t.m11.isFinite && t.m12.isFinite && t.m13.isFinite &&
                     t.m21.isFinite && t.m22.isFinite && t.m23.isFinite &&
                     t.m31.isFinite && t.m32.isFinite && t.m33.isFinite
-            },
+            }
         )
     }
 
@@ -58,7 +58,7 @@ public extension Validation {
             description: "Rectangle width and height are positive",
             check: { context in
                 context.subject.width >= 0 && context.subject.height >= 0
-            },
+            }
         )
     }
 
@@ -68,7 +68,7 @@ public extension Validation {
             description: "Rectangle dimensions are finite",
             check: { context in
                 context.subject.width.isFinite && context.subject.height.isFinite
-            },
+            }
         )
     }
 
@@ -78,7 +78,7 @@ public extension Validation {
             description: "Point coordinates are finite (not NaN or Infinity)",
             check: { context in
                 context.subject.x.isFinite && context.subject.y.isFinite
-            },
+            }
         )
     }
 }

@@ -109,7 +109,7 @@ public struct SVGRenderer: Renderer {
             defs.append("    <filter id=\"shadow-\(index)\">")
             defs
                 .append(
-                    "      <feDropShadow dx=\"\(shadow.offset.x)\" dy=\"\(shadow.offset.y)\" stdDeviation=\"\(shadow.blur / 2.0)\" flood-color=\"\(floodHex)\" flood-opacity=\"\(floodAlpha)\" />",
+                    "      <feDropShadow dx=\"\(shadow.offset.x)\" dy=\"\(shadow.offset.y)\" stdDeviation=\"\(shadow.blur / 2.0)\" flood-color=\"\(floodHex)\" flood-opacity=\"\(floodAlpha)\" />"
                 )
             defs.append("    </filter>")
         }
@@ -118,7 +118,7 @@ public struct SVGRenderer: Renderer {
             case let .drawLinearGradient(grad, start, end, _):
                 defs
                     .append(
-                        "    <linearGradient id=\"grad-\(opIndex)\" x1=\"\(start.x)\" y1=\"\(start.y)\" x2=\"\(end.x)\" y2=\"\(end.y)\" gradientUnits=\"userSpaceOnUse\" spreadMethod=\"pad\">",
+                        "    <linearGradient id=\"grad-\(opIndex)\" x1=\"\(start.x)\" y1=\"\(start.y)\" x2=\"\(end.x)\" y2=\"\(end.y)\" gradientUnits=\"userSpaceOnUse\" spreadMethod=\"pad\">"
                     )
                 for stop in grad.stops {
                     let colorHex = hexColor(stop.color)
@@ -128,7 +128,7 @@ public struct SVGRenderer: Renderer {
             case let .drawRadialGradient(grad, startCenter, startRadius, endCenter, endRadius, _):
                 defs
                     .append(
-                        "    <radialGradient id=\"grad-\(opIndex)\" cx=\"\(endCenter.x)\" cy=\"\(endCenter.y)\" r=\"\(endRadius)\" fx=\"\(startCenter.x)\" fy=\"\(startCenter.y)\" fr=\"\(startRadius)\" gradientUnits=\"userSpaceOnUse\" spreadMethod=\"pad\">",
+                        "    <radialGradient id=\"grad-\(opIndex)\" cx=\"\(endCenter.x)\" cy=\"\(endCenter.y)\" r=\"\(endRadius)\" fx=\"\(startCenter.x)\" fy=\"\(startCenter.y)\" fr=\"\(startRadius)\" gradientUnits=\"userSpaceOnUse\" spreadMethod=\"pad\">"
                     )
                 for stop in grad.stops {
                     let colorHex = hexColor(stop.color)
@@ -178,7 +178,7 @@ public struct SVGRenderer: Renderer {
 
         svg
             .append(
-                "<svg width=\"\(finalWidth)\" height=\"\(finalHeight)\" viewBox=\"\(viewBoxMinX) \(viewBoxMinY) \(viewBoxWidth) \(viewBoxHeight)\" xmlns=\"http://www.w3.org/2000/svg\">",
+                "<svg width=\"\(finalWidth)\" height=\"\(finalHeight)\" viewBox=\"\(viewBoxMinX) \(viewBoxMinY) \(viewBoxWidth) \(viewBoxHeight)\" xmlns=\"http://www.w3.org/2000/svg\">"
             )
 
         if !defs.isEmpty {
@@ -226,7 +226,7 @@ public struct SVGRenderer: Renderer {
         hasFill: Bool,
         fillRule: FillRule?,
         uniqueClipPaths: [Path],
-        uniqueShadows: [Shadow],
+        uniqueShadows: [Shadow]
     ) -> [String] {
         var attrs: [String] = []
 

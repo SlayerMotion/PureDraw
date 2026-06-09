@@ -32,7 +32,7 @@
                     c: CGFloat(t.c),
                     d: CGFloat(t.d),
                     tx: CGFloat(t.tx),
-                    ty: CGFloat(t.ty),
+                    ty: CGFloat(t.ty)
                 ))
                 targetContext.setAlpha(CGFloat(operation.state.alpha))
                 targetContext.setBlendMode(CGBlendMode(from: operation.state.blendMode))
@@ -46,7 +46,7 @@
                 if !operation.state.dashPattern.isEmpty {
                     targetContext.setLineDash(
                         phase: CGFloat(operation.state.dashPhase),
-                        lengths: operation.state.dashPattern.map { CGFloat($0) },
+                        lengths: operation.state.dashPattern.map { CGFloat($0) }
                     )
                 }
 
@@ -63,7 +63,7 @@
                         targetContext.setShadow(
                             offset: CGSize(width: CGFloat(shadow.offset.x), height: CGFloat(shadow.offset.y)),
                             blur: CGFloat(shadow.blur),
-                            color: cgColor,
+                            color: cgColor
                         )
                     }
                 }
@@ -87,7 +87,7 @@
                         red: CGFloat(fillCol.red),
                         green: CGFloat(fillCol.green),
                         blue: CGFloat(fillCol.blue),
-                        alpha: CGFloat(fillCol.alpha),
+                        alpha: CGFloat(fillCol.alpha)
                     )
                     targetContext.fillPath(using: cgFillRule)
 
@@ -100,7 +100,7 @@
                         red: CGFloat(strokeCol.red),
                         green: CGFloat(strokeCol.green),
                         blue: CGFloat(strokeCol.blue),
-                        alpha: CGFloat(strokeCol.alpha),
+                        alpha: CGFloat(strokeCol.alpha)
                     )
                     targetContext.strokePath()
 
@@ -117,7 +117,7 @@
                         cgGradient,
                         start: CGPoint(x: CGFloat(start.x), y: CGFloat(start.y)),
                         end: CGPoint(x: CGFloat(end.x), y: CGFloat(end.y)),
-                        options: cgOptions,
+                        options: cgOptions
                     )
 
                 case let .drawRadialGradient(grad, startCenter, startRadius, endCenter, endRadius, options):
@@ -135,7 +135,7 @@
                         startRadius: CGFloat(startRadius),
                         endCenter: CGPoint(x: CGFloat(endCenter.x), y: CGFloat(endCenter.y)),
                         endRadius: CGFloat(endRadius),
-                        options: cgOptions,
+                        options: cgOptions
                     )
                 }
 
@@ -163,7 +163,7 @@
             guard let cgGradient = CGGradient(
                 colorsSpace: colorSpace,
                 colors: cgColors as CFArray,
-                locations: locations,
+                locations: locations
             ) else {
                 throw RenderingError.cannotCreateGradient
             }
@@ -181,13 +181,13 @@
                 case let .quadCurve(to, control):
                     mutablePath.addQuadCurve(
                         to: CGPoint(x: CGFloat(to.x), y: CGFloat(to.y)),
-                        control: CGPoint(x: CGFloat(control.x), y: CGFloat(control.y)),
+                        control: CGPoint(x: CGFloat(control.x), y: CGFloat(control.y))
                     )
                 case let .cubicCurve(to, control1, control2):
                     mutablePath.addCurve(
                         to: CGPoint(x: CGFloat(to.x), y: CGFloat(to.y)),
                         control1: CGPoint(x: CGFloat(control1.x), y: CGFloat(control1.y)),
-                        control2: CGPoint(x: CGFloat(control2.x), y: CGFloat(control2.y)),
+                        control2: CGPoint(x: CGFloat(control2.x), y: CGFloat(control2.y))
                     )
                 case .close:
                     mutablePath.closeSubpath()

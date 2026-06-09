@@ -46,13 +46,13 @@ extension Path {
                 for t in extremaX {
                     updateBounds(with: Point(
                         x: evaluateQuadratic(t: t, p0: currentPoint.x, p1: control.x, p2: to.x),
-                        y: evaluateQuadratic(t: t, p0: currentPoint.y, p1: control.y, p2: to.y),
+                        y: evaluateQuadratic(t: t, p0: currentPoint.y, p1: control.y, p2: to.y)
                     ))
                 }
                 for t in extremaY {
                     updateBounds(with: Point(
                         x: evaluateQuadratic(t: t, p0: currentPoint.x, p1: control.x, p2: to.x),
-                        y: evaluateQuadratic(t: t, p0: currentPoint.y, p1: control.y, p2: to.y),
+                        y: evaluateQuadratic(t: t, p0: currentPoint.y, p1: control.y, p2: to.y)
                     ))
                 }
                 updateBounds(with: to)
@@ -65,13 +65,13 @@ extension Path {
                 for t in extremaX {
                     updateBounds(with: Point(
                         x: evaluateCubic(t: t, p0: currentPoint.x, p1: control1.x, p2: control2.x, p3: to.x),
-                        y: evaluateCubic(t: t, p0: currentPoint.y, p1: control1.y, p2: control2.y, p3: to.y),
+                        y: evaluateCubic(t: t, p0: currentPoint.y, p1: control1.y, p2: control2.y, p3: to.y)
                     ))
                 }
                 for t in extremaY {
                     updateBounds(with: Point(
                         x: evaluateCubic(t: t, p0: currentPoint.x, p1: control1.x, p2: control2.x, p3: to.x),
-                        y: evaluateCubic(t: t, p0: currentPoint.y, p1: control1.y, p2: control2.y, p3: to.y),
+                        y: evaluateCubic(t: t, p0: currentPoint.y, p1: control1.y, p2: control2.y, p3: to.y)
                     ))
                 }
                 updateBounds(with: to)

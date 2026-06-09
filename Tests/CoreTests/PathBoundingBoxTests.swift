@@ -54,7 +54,7 @@ struct PathBoundingBoxTests {
         path.addCurve(
             to: Point(x: 100, y: 0),
             control1: Point(x: 25, y: 100),
-            control2: Point(x: 75, y: -100),
+            control2: Point(x: 75, y: -100)
         )
 
         let bounds = path.boundingBox

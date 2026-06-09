@@ -53,7 +53,7 @@ struct ProjectiveTransformTests {
         let t2 = ProjectiveTransform(
             m11: 1.0, m12: 0.2, m13: 0.005,
             m21: 0.1, m22: 1.2, m23: 0.002,
-            m31: 5.0, m32: 2.0, m33: 1.0,
+            m31: 5.0, m32: 2.0, m33: 1.0
         )
 
         let t3 = ProjectiveTransform(AffineTransform.scale(x: 2.0, y: 3.0))
@@ -99,7 +99,7 @@ struct ProjectiveTransformTests {
         let t = ProjectiveTransform(
             m11: 1.0, m12: 0.2, m13: 0.005,
             m21: 0.1, m22: 1.2, m23: 0.002,
-            m31: 5.0, m32: 2.0, m33: 1.0,
+            m31: 5.0, m32: 2.0, m33: 1.0
         )
 
         let inv = t.inverted()
@@ -110,13 +110,13 @@ struct ProjectiveTransformTests {
         let norm1 = ProjectiveTransform(
             m11: identity1.m11 / identity1.m33, m12: identity1.m12 / identity1.m33, m13: identity1.m13 / identity1.m33,
             m21: identity1.m21 / identity1.m33, m22: identity1.m22 / identity1.m33, m23: identity1.m23 / identity1.m33,
-            m31: identity1.m31 / identity1.m33, m32: identity1.m32 / identity1.m33, m33: 1.0,
+            m31: identity1.m31 / identity1.m33, m32: identity1.m32 / identity1.m33, m33: 1.0
         )
 
         let norm2 = ProjectiveTransform(
             m11: identity2.m11 / identity2.m33, m12: identity2.m12 / identity2.m33, m13: identity2.m13 / identity2.m33,
             m21: identity2.m21 / identity2.m33, m22: identity2.m22 / identity2.m33, m23: identity2.m23 / identity2.m33,
-            m31: identity2.m31 / identity2.m33, m32: identity2.m32 / identity2.m33, m33: 1.0,
+            m31: identity2.m31 / identity2.m33, m32: identity2.m32 / identity2.m33, m33: 1.0
         )
 
         #expect(isAlmostEqual(norm1, ProjectiveTransform.identity))
@@ -128,7 +128,7 @@ struct ProjectiveTransformTests {
         let singular = ProjectiveTransform(
             m11: 0, m12: 0, m13: 0,
             m21: 0, m22: 0, m23: 0,
-            m31: 0, m32: 0, m33: 0,
+            m31: 0, m32: 0, m33: 0
         )
         #expect(singular.determinant == 0.0)
 
@@ -146,7 +146,7 @@ struct ProjectiveTransformTests {
         let invalid1 = ProjectiveTransform(
             m11: .infinity, m12: 0, m13: 0,
             m21: 0, m22: 1, m23: 0,
-            m31: 0, m32: 0, m33: 1,
+            m31: 0, m32: 0, m33: 1
         )
 
         do {
@@ -163,7 +163,7 @@ struct ProjectiveTransformTests {
         let invalid2 = ProjectiveTransform(
             m11: 0, m12: 0, m13: 0,
             m21: 0, m22: 0, m23: 0,
-            m31: 0, m32: 0, m33: 1,
+            m31: 0, m32: 0, m33: 1
         )
         do {
             try invalid2.validate()
