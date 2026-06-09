@@ -26,87 +26,119 @@ public struct CanvasRenderer: Renderer {
         for (opIndex, op) in context.commands.enumerated() {
             js.append("")
             js.append("// Operation \(opIndex)")
-            js.append("\(contextName).save();")
 
-            // 1. Apply CTM
-            let t = op.state.transform
-            if t != .identity {
-                js.append("\(contextName).transform(\(t.a), \(t.b), \(t.c), \(t.d), \(t.tx), \(t.ty));")
-            }
-
-            // 2. Alpha & Blend Mode
-            if op.state.alpha != 1.0 {
-                js.append("\(contextName).globalAlpha = \(op.state.alpha);")
-            }
-            if op.state.blendMode != .normal {
-                js.append("\(contextName).globalCompositeOperation = '\(canvasBlendMode(op.state.blendMode))';")
-            }
-
-            // 3. Stroke Styles
-            js.append("\(contextName).lineWidth = \(op.state.lineWidth);")
-            js.append("\(contextName).lineCap = '\(op.state.lineCap.rawValue)';")
-            js.append("\(contextName).lineJoin = '\(op.state.lineJoin.rawValue)';")
-            js.append("\(contextName).miterLimit = \(op.state.miterLimit);")
-
-            if !op.state.dashPattern.isEmpty {
-                let patternStr = op.state.dashPattern.map { String($0) }.joined(separator: ", ")
-                js.append("\(contextName).setLineDash([\(patternStr)]);")
-                js.append("\(contextName).lineDashOffset = \(op.state.dashPhase);")
-            }
-
-            // 4. Shadow Styles
-            if let shadow = op.state.shadow {
-                js.append("\(contextName).shadowOffsetX = \(shadow.offset.x);")
-                js.append("\(contextName).shadowOffsetY = \(shadow.offset.y);")
-                js.append("\(contextName).shadowBlur = \(shadow.blur);")
-                js.append("\(contextName).shadowColor = '\(rgbaColor(shadow.color))';")
-            }
-
-            // 5. Clip Path
-            if let clip = op.state.clipPath {
-                js.append("\(contextName).beginPath();")
-                appendPathElements(clip, to: &js)
-                js.append("\(contextName).clip();")
-            }
-
-            // 6. Draw Operation
             switch op.kind {
-            case let .fill(path, rule):
-                js.append("\(contextName).fillStyle = '\(rgbaColor(op.state.fillColor))';")
-                js.append("\(contextName).beginPath();")
-                appendPathElements(path, to: &js)
-                let canvasRule = rule == .evenOdd ? "'evenodd'" : "'nonzero'"
-                js.append("\(contextName).fill(\(canvasRule));")
-
-            case let .stroke(path):
-                js.append("\(contextName).strokeStyle = '\(rgbaColor(op.state.strokeColor))';")
-                js.append("\(contextName).beginPath();")
-                appendPathElements(path, to: &js)
-                js.append("\(contextName).stroke();")
-
-            case let .drawLinearGradient(grad, start, end, _):
-                let gradVarName = "linearGrad_\(opIndex)"
-                js.append("const \(gradVarName) = \(contextName).createLinearGradient(\(start.x), \(start.y), \(end.x), \(end.y));")
-                for stop in grad.stops {
-                    js.append("\(gradVarName).addColorStop(\(stop.location), '\(rgbaColor(stop.color))');")
+            case .beginTransparencyLayer:
+                js.append("\(contextName).save();")
+                let t = op.state.transform
+                if t != .identity {
+                    js.append("\(contextName).transform(\(t.a), \(t.b), \(t.c), \(t.d), \(t.tx), \(t.ty));")
                 }
-                js.append("\(contextName).fillStyle = \(gradVarName);")
-                fillContextArea(using: op.state.clipPath, to: &js)
-
-            case let .drawRadialGradient(grad, startCenter, startRadius, endCenter, endRadius, _):
-                let gradVarName = "radialGrad_\(opIndex)"
-                js
-                    .append(
-                        "const \(gradVarName) = \(contextName).createRadialGradient(\(startCenter.x), \(startCenter.y), \(startRadius), \(endCenter.x), \(endCenter.y), \(endRadius));"
-                    )
-                for stop in grad.stops {
-                    js.append("\(gradVarName).addColorStop(\(stop.location), '\(rgbaColor(stop.color))');")
+                if op.state.alpha != 1.0 {
+                    js.append("\(contextName).globalAlpha = \(op.state.alpha);")
                 }
-                js.append("\(contextName).fillStyle = \(gradVarName);")
-                fillContextArea(using: op.state.clipPath, to: &js)
+                if op.state.blendMode != .normal {
+                    js.append("\(contextName).globalCompositeOperation = '\(canvasBlendMode(op.state.blendMode))';")
+                }
+                if let shadow = op.state.shadow {
+                    js.append("\(contextName).shadowOffsetX = \(shadow.offset.x);")
+                    js.append("\(contextName).shadowOffsetY = \(shadow.offset.y);")
+                    js.append("\(contextName).shadowBlur = \(shadow.blur);")
+                    js.append("\(contextName).shadowColor = '\(rgbaColor(shadow.color))';")
+                }
+                if let clip = op.state.clipPath {
+                    js.append("\(contextName).beginPath();")
+                    appendPathElements(clip, to: &js)
+                    js.append("\(contextName).clip();")
+                }
+            case .endTransparencyLayer:
+                js.append("\(contextName).restore();")
+            default:
+                js.append("\(contextName).save();")
+
+                // 1. Apply CTM
+                let t = op.state.transform
+                if t != .identity {
+                    js.append("\(contextName).transform(\(t.a), \(t.b), \(t.c), \(t.d), \(t.tx), \(t.ty));")
+                }
+
+                // 2. Alpha & Blend Mode
+                if op.state.alpha != 1.0 {
+                    js.append("\(contextName).globalAlpha = \(op.state.alpha);")
+                }
+                if op.state.blendMode != .normal {
+                    js.append("\(contextName).globalCompositeOperation = '\(canvasBlendMode(op.state.blendMode))';")
+                }
+
+                // 3. Stroke Styles
+                js.append("\(contextName).lineWidth = \(op.state.lineWidth);")
+                js.append("\(contextName).lineCap = '\(op.state.lineCap.rawValue)';")
+                js.append("\(contextName).lineJoin = '\(op.state.lineJoin.rawValue)';")
+                js.append("\(contextName).miterLimit = \(op.state.miterLimit);")
+
+                if !op.state.dashPattern.isEmpty {
+                    let patternStr = op.state.dashPattern.map { String($0) }.joined(separator: ", ")
+                    js.append("\(contextName).setLineDash([\(patternStr)]);")
+                    js.append("\(contextName).lineDashOffset = \(op.state.dashPhase);")
+                }
+
+                // 4. Shadow Styles
+                if let shadow = op.state.shadow {
+                    js.append("\(contextName).shadowOffsetX = \(shadow.offset.x);")
+                    js.append("\(contextName).shadowOffsetY = \(shadow.offset.y);")
+                    js.append("\(contextName).shadowBlur = \(shadow.blur);")
+                    js.append("\(contextName).shadowColor = '\(rgbaColor(shadow.color))';")
+                }
+
+                // 5. Clip Path
+                if let clip = op.state.clipPath {
+                    js.append("\(contextName).beginPath();")
+                    appendPathElements(clip, to: &js)
+                    js.append("\(contextName).clip();")
+                }
+
+                // 6. Draw Operation
+                switch op.kind {
+                case let .fill(path, rule):
+                    js.append("\(contextName).fillStyle = '\(rgbaColor(op.state.fillColor))';")
+                    js.append("\(contextName).beginPath();")
+                    appendPathElements(path, to: &js)
+                    let canvasRule = rule == .evenOdd ? "'evenodd'" : "'nonzero'"
+                    js.append("\(contextName).fill(\(canvasRule));")
+
+                case let .stroke(path):
+                    js.append("\(contextName).strokeStyle = '\(rgbaColor(op.state.strokeColor))';")
+                    js.append("\(contextName).beginPath();")
+                    appendPathElements(path, to: &js)
+                    js.append("\(contextName).stroke();")
+
+                case let .drawLinearGradient(grad, start, end, _):
+                    let gradVarName = "linearGrad_\(opIndex)"
+                    js.append("const \(gradVarName) = \(contextName).createLinearGradient(\(start.x), \(start.y), \(end.x), \(end.y));")
+                    for stop in grad.stops {
+                        js.append("\(gradVarName).addColorStop(\(stop.location), '\(rgbaColor(stop.color))');")
+                    }
+                    js.append("\(contextName).fillStyle = \(gradVarName);")
+                    fillContextArea(using: op.state.clipPath, to: &js)
+
+                case let .drawRadialGradient(grad, startCenter, startRadius, endCenter, endRadius, _):
+                    let gradVarName = "radialGrad_\(opIndex)"
+                    js
+                        .append(
+                            "const \(gradVarName) = \(contextName).createRadialGradient(\(startCenter.x), \(startCenter.y), \(startRadius), \(endCenter.x), \(endCenter.y), \(endRadius));"
+                        )
+                    for stop in grad.stops {
+                        js.append("\(gradVarName).addColorStop(\(stop.location), '\(rgbaColor(stop.color))');")
+                    }
+                    js.append("\(contextName).fillStyle = \(gradVarName);")
+                    fillContextArea(using: op.state.clipPath, to: &js)
+
+                case .beginTransparencyLayer, .endTransparencyLayer:
+                    break
+                }
+
+                js.append("\(contextName).restore();")
             }
-
-            js.append("\(contextName).restore();")
         }
 
         js.append("\(contextName).restore();")

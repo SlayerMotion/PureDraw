@@ -127,6 +127,8 @@ public struct PDFRenderer: Renderer {
                         contentStream += pathStr
                         contentStream += "f\n"
                     }
+                case .beginTransparencyLayer, .endTransparencyLayer:
+                    break
                 }
                 contentStream += "Q\n"
             }
@@ -187,6 +189,8 @@ public struct PDFRenderer: Renderer {
                     shadings[shadingDict] = shName
                 }
                 contentStream += "/\(shName) sh\n"
+            case .beginTransparencyLayer, .endTransparencyLayer:
+                break
             }
 
             contentStream += "Q\n"

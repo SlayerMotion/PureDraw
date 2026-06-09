@@ -59,6 +59,8 @@ public struct PostScriptRenderer: Renderer {
                     } else {
                         continue
                     }
+                case .beginTransparencyLayer, .endTransparencyLayer:
+                    continue
                 }
 
                 let transformedPath = path.applying(op.state.transform)
@@ -194,6 +196,8 @@ public struct PostScriptRenderer: Renderer {
                 >> shfill
 
                 """
+            case .beginTransparencyLayer, .endTransparencyLayer:
+                break
             }
 
             ps += "grestore\n"

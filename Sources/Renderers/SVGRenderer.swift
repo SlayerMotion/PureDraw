@@ -75,6 +75,8 @@ public struct SVGRenderer: Renderer {
                     } else {
                         continue
                     }
+                case .beginTransparencyLayer, .endTransparencyLayer:
+                    continue
                 }
 
                 let transformedPath = path.applying(op.state.transform)
@@ -168,6 +170,12 @@ public struct SVGRenderer: Renderer {
                     let attrsStr = attrs.joined(separator: " ")
                     elements.append("  <rect \(attrsStr) />")
                 }
+            case .beginTransparencyLayer:
+                let attrs = styleAttributes(for: op.state, hasFill: false, fillRule: nil, uniqueClipPaths: uniqueClipPaths, uniqueShadows: uniqueShadows)
+                let attrsStr = attrs.joined(separator: " ")
+                elements.append("  <g \(attrsStr)>")
+            case .endTransparencyLayer:
+                elements.append("  </g>")
             }
         }
 

@@ -21,127 +21,180 @@
 
         public func render(_ context: GraphicsContext) throws {
             for operation in context.commands {
-                // 1. Push Graphics State
-                targetContext.saveGState()
+                switch operation.kind {
+                case .beginTransparencyLayer:
+                    targetContext.saveGState()
 
-                // 2. Apply CTM & Opacity
-                let t = operation.state.transform
-                targetContext.concatenate(CGAffineTransform(
-                    a: CGFloat(t.a),
-                    b: CGFloat(t.b),
-                    c: CGFloat(t.c),
-                    d: CGFloat(t.d),
-                    tx: CGFloat(t.tx),
-                    ty: CGFloat(t.ty)
-                ))
-                targetContext.setAlpha(CGFloat(operation.state.alpha))
-                targetContext.setBlendMode(CGBlendMode(from: operation.state.blendMode))
+                    // Apply CTM & Opacity & Blend Mode
+                    let t = operation.state.transform
+                    targetContext.concatenate(CGAffineTransform(
+                        a: CGFloat(t.a),
+                        b: CGFloat(t.b),
+                        c: CGFloat(t.c),
+                        d: CGFloat(t.d),
+                        tx: CGFloat(t.tx),
+                        ty: CGFloat(t.ty)
+                    ))
+                    targetContext.setAlpha(CGFloat(operation.state.alpha))
+                    targetContext.setBlendMode(CGBlendMode(from: operation.state.blendMode))
 
-                // 3. Apply Style Parameters
-                targetContext.setLineWidth(CGFloat(operation.state.lineWidth))
-                targetContext.setLineCap(CGLineCap(from: operation.state.lineCap))
-                targetContext.setLineJoin(CGLineJoin(from: operation.state.lineJoin))
-                targetContext.setMiterLimit(CGFloat(operation.state.miterLimit))
-                targetContext.setFlatness(CGFloat(operation.state.flatness))
+                    // Apply Shadow if present
+                    if let shadow = operation.state.shadow {
+                        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+                        let components = [
+                            CGFloat(shadow.color.red),
+                            CGFloat(shadow.color.green),
+                            CGFloat(shadow.color.blue),
+                            CGFloat(shadow.color.alpha),
+                        ]
+                        if let cgColor = CGColor(colorSpace: colorSpace, components: components) {
+                            targetContext.setShadow(
+                                offset: CGSize(width: CGFloat(shadow.offset.x), height: CGFloat(shadow.offset.y)),
+                                blur: CGFloat(shadow.blur),
+                                color: cgColor
+                            )
+                        }
+                    }
 
-                if !operation.state.dashPattern.isEmpty {
-                    targetContext.setLineDash(
-                        phase: CGFloat(operation.state.dashPhase),
-                        lengths: operation.state.dashPattern.map { CGFloat($0) }
-                    )
-                }
+                    // Apply Clip Path (if defined)
+                    if let clip = operation.state.clipPath {
+                        let cgPath = try createCGPath(from: clip)
+                        targetContext.addPath(cgPath)
+                        targetContext.clip()
+                    }
 
-                // Apply Shadow if present
-                if let shadow = operation.state.shadow {
-                    let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
-                    let components = [
-                        CGFloat(shadow.color.red),
-                        CGFloat(shadow.color.green),
-                        CGFloat(shadow.color.blue),
-                        CGFloat(shadow.color.alpha),
-                    ]
-                    if let cgColor = CGColor(colorSpace: colorSpace, components: components) {
-                        targetContext.setShadow(
-                            offset: CGSize(width: CGFloat(shadow.offset.x), height: CGFloat(shadow.offset.y)),
-                            blur: CGFloat(shadow.blur),
-                            color: cgColor
+                    targetContext.beginTransparencyLayer(auxiliaryInfo: nil)
+
+                case .endTransparencyLayer:
+                    targetContext.endTransparencyLayer()
+                    targetContext.restoreGState()
+
+                default:
+                    // 1. Push Graphics State
+                    targetContext.saveGState()
+
+                    // 2. Apply CTM & Opacity
+                    let t = operation.state.transform
+                    targetContext.concatenate(CGAffineTransform(
+                        a: CGFloat(t.a),
+                        b: CGFloat(t.b),
+                        c: CGFloat(t.c),
+                        d: CGFloat(t.d),
+                        tx: CGFloat(t.tx),
+                        ty: CGFloat(t.ty)
+                    ))
+                    targetContext.setAlpha(CGFloat(operation.state.alpha))
+                    targetContext.setBlendMode(CGBlendMode(from: operation.state.blendMode))
+
+                    // 3. Apply Style Parameters
+                    targetContext.setLineWidth(CGFloat(operation.state.lineWidth))
+                    targetContext.setLineCap(CGLineCap(from: operation.state.lineCap))
+                    targetContext.setLineJoin(CGLineJoin(from: operation.state.lineJoin))
+                    targetContext.setMiterLimit(CGFloat(operation.state.miterLimit))
+                    targetContext.setFlatness(CGFloat(operation.state.flatness))
+
+                    if !operation.state.dashPattern.isEmpty {
+                        targetContext.setLineDash(
+                            phase: CGFloat(operation.state.dashPhase),
+                            lengths: operation.state.dashPattern.map { CGFloat($0) }
                         )
                     }
+
+                    // Apply Shadow if present
+                    if let shadow = operation.state.shadow {
+                        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+                        let components = [
+                            CGFloat(shadow.color.red),
+                            CGFloat(shadow.color.green),
+                            CGFloat(shadow.color.blue),
+                            CGFloat(shadow.color.alpha),
+                        ]
+                        if let cgColor = CGColor(colorSpace: colorSpace, components: components) {
+                            targetContext.setShadow(
+                                offset: CGSize(width: CGFloat(shadow.offset.x), height: CGFloat(shadow.offset.y)),
+                                blur: CGFloat(shadow.blur),
+                                color: cgColor
+                            )
+                        }
+                    }
+
+                    // 4. Apply Clip Path (if defined)
+                    if let clip = operation.state.clipPath {
+                        let cgPath = try createCGPath(from: clip)
+                        targetContext.addPath(cgPath)
+                        targetContext.clip()
+                    }
+
+                    // 5. Draw Path Geometry
+                    switch operation.kind {
+                    case let .fill(path, rule):
+                        let cgPath = try createCGPath(from: path)
+                        targetContext.addPath(cgPath)
+                        let cgFillRule = (rule == .evenOdd) ? CGPathFillRule.evenOdd : CGPathFillRule.winding
+
+                        let fillCol = operation.state.fillColor
+                        targetContext.setFillColor(
+                            red: CGFloat(fillCol.red),
+                            green: CGFloat(fillCol.green),
+                            blue: CGFloat(fillCol.blue),
+                            alpha: CGFloat(fillCol.alpha)
+                        )
+                        targetContext.fillPath(using: cgFillRule)
+
+                    case let .stroke(path):
+                        let cgPath = try createCGPath(from: path)
+                        targetContext.addPath(cgPath)
+
+                        let strokeCol = operation.state.strokeColor
+                        targetContext.setStrokeColor(
+                            red: CGFloat(strokeCol.red),
+                            green: CGFloat(strokeCol.green),
+                            blue: CGFloat(strokeCol.blue),
+                            alpha: CGFloat(strokeCol.alpha)
+                        )
+                        targetContext.strokePath()
+
+                    case let .drawLinearGradient(grad, start, end, options):
+                        let cgGradient = try createCGGradient(from: grad)
+                        var cgOptions: CGGradientDrawingOptions = []
+                        if options.contains(.drawsBeforeStartLocation) {
+                            cgOptions.insert(.drawsBeforeStartLocation)
+                        }
+                        if options.contains(.drawsAfterEndLocation) {
+                            cgOptions.insert(.drawsAfterEndLocation)
+                        }
+                        targetContext.drawLinearGradient(
+                            cgGradient,
+                            start: CGPoint(x: CGFloat(start.x), y: CGFloat(start.y)),
+                            end: CGPoint(x: CGFloat(end.x), y: CGFloat(end.y)),
+                            options: cgOptions
+                        )
+
+                    case let .drawRadialGradient(grad, startCenter, startRadius, endCenter, endRadius, options):
+                        let cgGradient = try createCGGradient(from: grad)
+                        var cgOptions: CGGradientDrawingOptions = []
+                        if options.contains(.drawsBeforeStartLocation) {
+                            cgOptions.insert(.drawsBeforeStartLocation)
+                        }
+                        if options.contains(.drawsAfterEndLocation) {
+                            cgOptions.insert(.drawsAfterEndLocation)
+                        }
+                        targetContext.drawRadialGradient(
+                            cgGradient,
+                            startCenter: CGPoint(x: CGFloat(startCenter.x), y: CGFloat(startCenter.y)),
+                            startRadius: CGFloat(startRadius),
+                            endCenter: CGPoint(x: CGFloat(endCenter.x), y: CGFloat(endCenter.y)),
+                            endRadius: CGFloat(endRadius),
+                            options: cgOptions
+                        )
+
+                    case .beginTransparencyLayer, .endTransparencyLayer:
+                        break
+                    }
+
+                    // 6. Pop Graphics State
+                    targetContext.restoreGState()
                 }
-
-                // 4. Apply Clip Path (if defined)
-                if let clip = operation.state.clipPath {
-                    let cgPath = try createCGPath(from: clip)
-                    targetContext.addPath(cgPath)
-                    targetContext.clip()
-                }
-
-                // 5. Draw Path Geometry
-                switch operation.kind {
-                case let .fill(path, rule):
-                    let cgPath = try createCGPath(from: path)
-                    targetContext.addPath(cgPath)
-                    let cgFillRule = (rule == .evenOdd) ? CGPathFillRule.evenOdd : CGPathFillRule.winding
-
-                    let fillCol = operation.state.fillColor
-                    targetContext.setFillColor(
-                        red: CGFloat(fillCol.red),
-                        green: CGFloat(fillCol.green),
-                        blue: CGFloat(fillCol.blue),
-                        alpha: CGFloat(fillCol.alpha)
-                    )
-                    targetContext.fillPath(using: cgFillRule)
-
-                case let .stroke(path):
-                    let cgPath = try createCGPath(from: path)
-                    targetContext.addPath(cgPath)
-
-                    let strokeCol = operation.state.strokeColor
-                    targetContext.setStrokeColor(
-                        red: CGFloat(strokeCol.red),
-                        green: CGFloat(strokeCol.green),
-                        blue: CGFloat(strokeCol.blue),
-                        alpha: CGFloat(strokeCol.alpha)
-                    )
-                    targetContext.strokePath()
-
-                case let .drawLinearGradient(grad, start, end, options):
-                    let cgGradient = try createCGGradient(from: grad)
-                    var cgOptions: CGGradientDrawingOptions = []
-                    if options.contains(.drawsBeforeStartLocation) {
-                        cgOptions.insert(.drawsBeforeStartLocation)
-                    }
-                    if options.contains(.drawsAfterEndLocation) {
-                        cgOptions.insert(.drawsAfterEndLocation)
-                    }
-                    targetContext.drawLinearGradient(
-                        cgGradient,
-                        start: CGPoint(x: CGFloat(start.x), y: CGFloat(start.y)),
-                        end: CGPoint(x: CGFloat(end.x), y: CGFloat(end.y)),
-                        options: cgOptions
-                    )
-
-                case let .drawRadialGradient(grad, startCenter, startRadius, endCenter, endRadius, options):
-                    let cgGradient = try createCGGradient(from: grad)
-                    var cgOptions: CGGradientDrawingOptions = []
-                    if options.contains(.drawsBeforeStartLocation) {
-                        cgOptions.insert(.drawsBeforeStartLocation)
-                    }
-                    if options.contains(.drawsAfterEndLocation) {
-                        cgOptions.insert(.drawsAfterEndLocation)
-                    }
-                    targetContext.drawRadialGradient(
-                        cgGradient,
-                        startCenter: CGPoint(x: CGFloat(startCenter.x), y: CGFloat(startCenter.y)),
-                        startRadius: CGFloat(startRadius),
-                        endCenter: CGPoint(x: CGFloat(endCenter.x), y: CGFloat(endCenter.y)),
-                        endRadius: CGFloat(endRadius),
-                        options: cgOptions
-                    )
-                }
-
-                // 6. Pop Graphics State
-                targetContext.restoreGState()
             }
         }
 

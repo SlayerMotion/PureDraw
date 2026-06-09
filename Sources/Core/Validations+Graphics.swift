@@ -155,7 +155,7 @@ public extension Validation {
                             at: context.codingPath + [ValidationCodingKey("kind")]
                         )]
                     }
-                case .drawLinearGradient, .drawRadialGradient:
+                case .drawLinearGradient, .drawRadialGradient, .beginTransparencyLayer, .endTransparencyLayer:
                     break
                 }
                 return []

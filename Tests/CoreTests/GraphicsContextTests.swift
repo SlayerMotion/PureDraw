@@ -262,4 +262,38 @@ struct GraphicsContextTests {
         context.strokePath()
         #expect(context.currentPoint == Point.zero)
     }
+
+    @Test func transparencyLayers() {
+        var context = GraphicsContext()
+        context.setAlpha(0.6)
+        context.setShadow(offset: Point(x: 2, y: 2), blur: 3.0, color: .black)
+        context.setBlendMode(.multiply)
+
+        context.beginTransparencyLayer()
+
+        // Inside transparency layer: alpha/shadow/blendMode should be temporarily cleared on the context's current state
+        #expect(context.currentState.alpha == 1.0)
+        #expect(context.currentState.shadow == nil)
+        #expect(context.currentState.blendMode == .normal)
+
+        // Draw operations inside transparency layer should capture the cleared state
+        context.stroke(Rect(x: 10, y: 20, width: 30, height: 40))
+        #expect(context.commands.count == 2) // beginTransparencyLayer + stroke
+        #expect(context.commands.last?.state.alpha == 1.0)
+        #expect(context.commands.last?.state.shadow == nil)
+        #expect(context.commands.last?.state.blendMode == .normal)
+
+        context.endTransparencyLayer()
+
+        // Outside transparency layer: original state should be restored
+        #expect(context.currentState.alpha == 0.6)
+        #expect(context.currentState.shadow?.blur == 3.0)
+        #expect(context.currentState.blendMode == .multiply)
+
+        #expect(context.commands.count == 3) // begin + stroke + end
+        #expect(context.commands.last?.kind == .endTransparencyLayer)
+        // The endTransparencyLayer operation captures the restored state
+        #expect(context.commands.last?.state.alpha == 0.6)
+        #expect(context.commands.last?.state.blendMode == .multiply)
+    }
 }

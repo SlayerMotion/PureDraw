@@ -13,6 +13,8 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
         case stroke(Path)
         case drawLinearGradient(Gradient, start: Point, end: Point, options: GradientDrawingOptions)
         case drawRadialGradient(Gradient, startCenter: Point, startRadius: Double, endCenter: Point, endRadius: Double, options: GradientDrawingOptions)
+        case beginTransparencyLayer
+        case endTransparencyLayer
     }
 
     public let kind: Kind

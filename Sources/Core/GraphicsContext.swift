@@ -28,6 +28,15 @@ public struct GraphicsContext: Sendable, Validatable {
     /// A stack of saved graphics states.
     private var stateStack: [GraphicState] = []
 
+    private struct LayerState: Equatable {
+        let alpha: Double
+        let shadow: Shadow?
+        let blendMode: BlendMode
+    }
+
+    /// A stack of transparency layer states.
+    private var layerStateStack: [LayerState] = []
+
     public init() {}
 
     // MARK: - State Management
@@ -352,5 +361,28 @@ public struct GraphicsContext: Sendable, Validatable {
             currentState.clipPath = currentPath
         }
         currentPath = Path()
+    }
+
+    /// Begins a transparency layer. Subsequent drawing is accumulated and composite rendered as a single layer.
+    public mutating func beginTransparencyLayer() {
+        let layerState = LayerState(alpha: currentState.alpha, shadow: currentState.shadow, blendMode: currentState.blendMode)
+        layerStateStack.append(layerState)
+        commands.append(DrawOperation(kind: .beginTransparencyLayer, state: currentState))
+
+        // Temporarily reset style attributes that accumulate on the layer container
+        currentState.alpha = 1.0
+        currentState.shadow = nil
+        currentState.blendMode = .normal
+    }
+
+    /// Ends the most recently begun transparency layer, compositing it using the restored styles.
+    public mutating func endTransparencyLayer() {
+        guard !layerStateStack.isEmpty else { return }
+        let originalState = layerStateStack.removeLast()
+
+        currentState.alpha = originalState.alpha
+        currentState.shadow = originalState.shadow
+        currentState.blendMode = originalState.blendMode
+        commands.append(DrawOperation(kind: .endTransparencyLayer, state: currentState))
     }
 }
