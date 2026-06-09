@@ -36,5 +36,5 @@ jobs:
             echo "No Package.swift yet; skipping WASM build."
             exit 0
           fi
-          swift build --swift-sdk wasm32-unknown-wasip1
-          swift build -c release --swift-sdk wasm32-unknown-wasip1
+          swift build --swift-sdk wasm32-unknown-wasi
+          swift build -c release --swift-sdk wasm32-unknown-wasi
