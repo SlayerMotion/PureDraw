@@ -1,0 +1,31 @@
+name: Swift (macOS)
+
+# Apple-platform builds and any UI build/test run on macOS runners only
+# (git-discipline.md Rule 8.3). Keep this workflow; add a swift-ios.yml (also
+# runs-on: macos) if the repo ships an iOS/visionOS UI target.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-macos:
+    name: Swift (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Format, lint, build, test
+        run: |
+          if [ ! -f Packages/Package.swift ]; then
+            echo "No Packages/Package.swift yet; skipping Swift gates."
+            exit 0
+          fi
+          brew install swiftformat swiftlint
+          swiftformat . --config .swiftformat --lint
+          swiftlint --config .swiftlint.yml --strict
+          cd Packages && swift build && swift test

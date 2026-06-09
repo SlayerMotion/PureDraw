@@ -1,6 +1,6 @@
 # Folder Grouping Rule
 
-How to lay out source trees in TileKit: one folder per SPM target, with file-grouping rules for the files inside a target.
+How to lay out source trees in PureDraw: one folder per SPM target, with file-grouping rules for the files inside a target.
 
 Cross-cutting layout rule. Most concrete in Swift / SPM packages where one-target-per-folder is the default; the same intent applies to Python packages, web project trees, docs trees, anywhere a tree of files exists.
 
@@ -203,7 +203,7 @@ The lesson: pass 1 and pass 2 are both applications of the same rule at differen
 No automated linter today. Verify by eyeballing the tree before declaring a layout change done:
 
 ```bash
-find Sources -mindepth 1 -maxdepth 1 -type d | while read d; do
+find Packages/Sources -mindepth 1 -maxdepth 1 -type d | while read d; do
   count=$(find "$d" -maxdepth 1 -name "*.swift" | wc -l | tr -d ' ')
   printf "%3s  %s\n" "$count" "$d"
 done | sort -n

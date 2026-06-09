@@ -1,6 +1,6 @@
 # Shared Protocols Target
 
-The pattern for a single foundation-only target that holds every cross-target protocol seam. Tiledown is a monorepo from day one with many targets in one package, so the seam target applies as soon as one producer target needs to talk to another without importing its concretes. Add it when the first cross-target seam appears.
+The pattern for a single foundation-only target that holds every cross-target protocol seam. PureDraw is a monorepo from day one with many targets in one package, so the seam target applies as soon as one producer target needs to talk to another without importing its concretes. Add it when the first cross-target seam appears.
 
 Companion to [dependency-injection.md](dependency-injection.md) and [package-import-contract.md](package-import-contract.md). The target described here is conventionally named `SharedProtocols`.
 
@@ -151,7 +151,7 @@ Before adding a new `import` to a producer Swift file:
 # SharedProtocols must have no internal-package imports.
 # External imports (Foundation, SwiftUI, Combine, ...) are fine.
 INTERNAL_TARGETS=$(swift package describe --type json | jq -r '.targets[].name')
-for ln in $(grep -rn '^import ' Sources/SharedProtocols/); do
+for ln in $(grep -rn '^import ' Packages/Sources/SharedProtocols/); do
     mod=$(echo "$ln" | awk '{print $2}')
     if echo "$INTERNAL_TARGETS" | grep -qx "$mod"; then
         echo "FAIL: SharedProtocols imports internal target $mod ($ln)"

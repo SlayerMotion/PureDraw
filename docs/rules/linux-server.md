@@ -1,6 +1,6 @@
 # Linux-server Swift
 
-Operational rules for Tiledown code that runs on Linux in production: HTTP client, logging, database, crypto, signals, resources, POSIX interop, file I/O, and Docker CI.
+Operational rules for PureDraw code that runs on Linux in production: HTTP client, logging, database, crypto, signals, resources, POSIX interop, file I/O, and Docker CI.
 
 Load on demand. Triggers: Linux, server, Vapor, Hummingbird, AsyncHTTPClient, swift-log, swift-crypto, FluentSQLite, FluentPostgres, NIO, SIGTERM, graceful shutdown, Docker, `swift:6.0-jammy`, `swift:6.0-noble`, Bundle.module, FoundationNetworking on a server, isatty, BoringSSL.
 
@@ -15,7 +15,7 @@ If your target runs on Linux in production (server, CLI binary, container worklo
 
 If the answer is "Apple-only iOS/macOS app, no Linux," skip this file; load `cross-platform.md` for the Apple-cross-platform patterns instead.
 
-Note: the TileKit engine targets macOS and Linux. Both support subprocess and shell-out, so the engine may spawn subprocesses. As a design preference, keep server-only concerns (this file's HTTP/database/signal patterns) in dedicated CLI/server targets rather than the core, so the core stays focused; this is an organizational choice, not a platform limitation.
+Note: the PureDraw engine targets macOS and Linux. Both support subprocess and shell-out, so the engine may spawn subprocesses. As a design preference, keep server-only concerns (this file's HTTP/database/signal patterns) in dedicated CLI/server targets rather than the core, so the core stays focused; this is an organizational choice, not a platform limitation.
 
 ## 1. HTTP: AsyncHTTPClient, not URLSession
 
@@ -48,7 +48,7 @@ let session = URLSession(configuration: .ephemeral)
 // session goes out of scope here → crash
 
 // Correct option 1: final class with deinit (preferred, automatic for all callers)
-public final class TileDownloader: @unchecked Sendable {
+public final class PureDrawloader: @unchecked Sendable {
     private let session: URLSession
     init() { session = URLSession(configuration: .ephemeral) }
     deinit { session.invalidateAndCancel() }
@@ -339,7 +339,7 @@ If your repo is the Apple-clients-plus-Linux-server split (`cross-platform.md` T
 
 ```swift
 let baseProducts: [Product] = [
-    .singleTargetLibrary("TileKit"),
+    .singleTargetLibrary("PureDraw"),
     .singleTargetLibrary("TileServer"),
     .executable(name: "tiledownserver", targets: ["TileServerApp"]),
     // ... unconditional, Linux-buildable
@@ -347,8 +347,8 @@ let baseProducts: [Product] = [
 
 #if os(iOS) || os(macOS)
 let appleOnlyProducts: [Product] = [
-    .singleTargetLibrary("TileDownUI"),
-    .singleTargetLibrary("TileDownComponents"),
+    .singleTargetLibrary("PureDrawUI"),
+    .singleTargetLibrary("PureDrawComponents"),
     // ... Apple-only UI
 ]
 #else

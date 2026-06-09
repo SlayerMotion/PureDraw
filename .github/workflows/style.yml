@@ -1,0 +1,33 @@
+name: Style and namespacing
+
+# One workflow per concern so each README badge tracks exactly one job and is
+# truthful (git-discipline.md Rule 8.1). This job runs the repository gates:
+# style (no em dashes / no tool attribution), commit-message attribution
+# (tool-agnostic, scans the PR commit range), and namespacing (one type per file).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  style:
+    name: Style and namespacing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Style gate (no em dashes, no tool attribution)
+        run: bash scripts/check-style.sh
+      - name: Commit-message attribution gate (tool-agnostic, scans PR commits)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/check-commit-attribution.sh
+      - name: Namespacing gate (one type per file)
+        run: bash scripts/check-namespacing.sh

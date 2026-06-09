@@ -1,0 +1,50 @@
+name: Swift (WASM)
+
+# Include only if the package builds for wasm32-unknown-wasip1
+# (git-discipline.md Rule 8.3). Code that needs Foundation networking, threads,
+# or other WASI-absent surface does not get a WASM badge. This is a BUILD gate;
+# running wasm tests needs a separate runtime and is out of scope. Delete this
+# workflow and its README badge if the package does not support WASM.
+#
+# Uses swiftly + the official swift.org wasm SDK. Update the toolchain version,
+# SDK URL, and checksum to the current release when you bump Swift.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-wasm:
+    name: Swift (WASM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev
+      - name: Install swiftly
+        run: |
+          curl -L https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz > swiftly.tar.gz
+          tar zxf swiftly.tar.gz
+          ./swiftly init --quiet-shell-followup --assume-yes --skip-install
+      - name: Install Swift and the wasm SDK
+        run: |
+          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+          swiftly install --use 6.3.2
+          swift sdk install https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
+      - name: Build for WebAssembly
+        run: |
+          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+          if [ ! -f Packages/Package.swift ]; then
+            echo "No Packages/Package.swift yet; skipping WASM build."
+            exit 0
+          fi
+          cd Packages
+          swift build --swift-sdk swift-6.3.2-RELEASE_wasm
+          swift build -c release --swift-sdk swift-6.3.2-RELEASE_wasm

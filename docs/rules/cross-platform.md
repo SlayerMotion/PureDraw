@@ -1,10 +1,10 @@
 # Cross-platform Swift (Apple + Linux + Windows)
 
-How to structure Tiledown's Swift so the same sources build and run on Apple platforms, Linux, and Windows without silent breakage.
+How to structure PureDraw's Swift so the same sources build and run on Apple platforms, Linux, and Windows without silent breakage.
 
 Load on demand. Triggers: `canImport`, `Linux`, `FoundationNetworking`, `Darwin`, `Glibc`, `swift-system`, `swift-foundation`, cross-platform, manifest, `.when(platforms:)`, `os(Linux)`, `os(iOS)`, `os(macOS)`, `os(visionOS)`, `os(tvOS)`, Vapor, AsyncHTTPClient, Hummingbird.
 
-Grounded in Swift Evolution and `swiftlang/swift-foundation`. The TileKit engine targets macOS and Linux (a server-style Apple + Linux split), so it falls under Topology 2/3 below. Subprocess and shell-out are available on both macOS and Linux; the engine may use them.
+Grounded in Swift Evolution and `swiftlang/swift-foundation`. The PureDraw engine targets macOS and Linux (a server-style Apple + Linux split), so it falls under Topology 2/3 below. Subprocess and shell-out are available on both macOS and Linux; the engine may use them.
 
 ## Linux portability and the platform seam (mandatory)
 
@@ -30,7 +30,7 @@ The rest of this rule depends on which topology your target is in. Mixing them s
 
 1. **Apple-only.** iOS, macOS, plus optional visionOS/tvOS/watchOS. UI-heavy, SwiftUI or UIKit/AppKit primary. No Linux build, no server-side targets.
 2. **Apple clients + Linux server (split package).** UI lives on Apple, one or more server products build to Linux. The Linux-buildable surface is narrow (typically a single server product). Apple-only stuff is wrapped in conditional product/target arrays in `Package.swift`.
-3. **Cross-platform library or CLI.** Runs identically on Apple + Linux + Windows. No UI. Probably uses URLSession-via-FoundationNetworking, Darwin/Glibc conditionals, swift-system. The TileKit engine lives here (macOS + Linux): both platforms support subprocess and shell-out, so the engine may spawn subprocesses when needed.
+3. **Cross-platform library or CLI.** Runs identically on Apple + Linux + Windows. No UI. Probably uses URLSession-via-FoundationNetworking, Darwin/Glibc conditionals, swift-system. The PureDraw engine lives here (macOS + Linux): both platforms support subprocess and shell-out, so the engine may spawn subprocesses when needed.
 
 A "Linux UI" topology technically exists but is not production-grade. Do not try to render SwiftUI on Linux; if a server needs UI, ship HTTP responses (templates, JSON for an SPA), not native widgets.
 
@@ -47,8 +47,8 @@ Apple-only products and targets go in conditional arrays so non-Apple builds see
 ```swift
 #if os(iOS) || os(macOS)
 let appleOnlyProducts: [Product] = [
-    .singleTargetLibrary("TileDownUI"),
-    .singleTargetLibrary("TileDownComponents"),
+    .singleTargetLibrary("PureDrawUI"),
+    .singleTargetLibrary("PureDrawComponents"),
     // ...
 ]
 #else
@@ -56,7 +56,7 @@ let appleOnlyProducts: [Product] = []
 #endif
 ```
 
-Same pattern for `appleOnlyTargets`. Core engine products (e.g. `TileKit`) stay unconditional.
+Same pattern for `appleOnlyTargets`. Core engine products (e.g. `PureDraw`) stay unconditional.
 
 ### Layer B: Swift source files
 
@@ -90,7 +90,7 @@ Avoid spreading platform conditioning across both Layer A and Layer C for the sa
 
 ## UI cross-platform patterns
 
-These patterns (Patterns 1-7 and Pattern 13: iOS-only SwiftUI modifiers, UIKit/AppKit app shells, the forward-compat SDK shim, and the `@available(iOS ...)` examples) describe the planned native Apple UI app, NOT the TileKit engine. The engine targets macOS + Linux and has no UI. Apply these only in the app tier.
+These patterns (Patterns 1-7 and Pattern 13: iOS-only SwiftUI modifiers, UIKit/AppKit app shells, the forward-compat SDK shim, and the `@available(iOS ...)` examples) describe the planned native Apple UI app, NOT the PureDraw engine. The engine targets macOS + Linux and has no UI. Apply these only in the app tier.
 
 Linux UI is out of scope (no SwiftUI on Linux).
 
@@ -99,7 +99,7 @@ Linux UI is out of scope (no SwiftUI on Linux).
 A SwiftUI file that has no Linux meaning gets a file-level gate:
 
 ```swift
-// TileDownUI/MainTabs.swift
+// PureDrawUI/MainTabs.swift
 import SwiftUI
 
 #if os(iOS) || os(macOS)
@@ -481,13 +481,13 @@ Bad (User-Agent header reports "unknown" on Linux even though we ship there):
 
 ```swift
 #if os(iOS)
-return "Tiledown/iOS/\(version)"
+return "PureDraw/iOS/\(version)"
 #elseif os(macOS)
-return "Tiledown/macOS/\(version)"
+return "PureDraw/macOS/\(version)"
 #elseif os(visionOS)
-return "Tiledown/visionOS/\(version)"
+return "PureDraw/visionOS/\(version)"
 #else
-return "Tiledown/unknown/\(version)"  // Linux falls into "unknown"
+return "PureDraw/unknown/\(version)"  // Linux falls into "unknown"
 #endif
 ```
 
@@ -495,15 +495,15 @@ Good:
 
 ```swift
 #if os(iOS)
-return "Tiledown/iOS/\(version)"
+return "PureDraw/iOS/\(version)"
 #elseif os(macOS)
-return "Tiledown/macOS/\(version)"
+return "PureDraw/macOS/\(version)"
 #elseif os(visionOS)
-return "Tiledown/visionOS/\(version)"
+return "PureDraw/visionOS/\(version)"
 #elseif os(Linux)
-return "Tiledown/Linux/\(version)"
+return "PureDraw/Linux/\(version)"
 #else
-return "Tiledown/unknown/\(version)"  // truly unknown future platform
+return "PureDraw/unknown/\(version)"  // truly unknown future platform
 #endif
 ```
 

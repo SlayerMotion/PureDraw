@@ -1,0 +1,38 @@
+name: Swift (Windows)
+
+# Include only if the targets compile on Windows (git-discipline.md Rule 8.3).
+# If the test tooling is POSIX-only, this is a BUILD-ONLY gate: build the
+# portable library targets (debug and release), do not run the suite. The green
+# badge then truthfully means "compiles on Windows", not "tests pass". Delete
+# this workflow and its README badge if the package does not support Windows.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-windows:
+    name: Swift (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          branch: swift-6.1-release
+          tag: 6.1-RELEASE
+      - uses: actions/checkout@v4
+      - name: Build portable targets (debug and release)
+        shell: bash
+        run: |
+          if [ ! -f Packages/Package.swift ]; then
+            echo "No Packages/Package.swift yet; skipping Swift gates."
+            exit 0
+          fi
+          # Replace with the specific portable library targets if the package has
+          # macOS-host-only targets that must be excluded on Windows.
+          cd Packages && swift build && swift build -c release

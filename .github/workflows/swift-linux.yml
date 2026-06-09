@@ -1,0 +1,29 @@
+name: Swift (Linux)
+
+# Include only if the product builds on a Linux toolchain (library, server, CLI).
+# Delete this workflow and its README badge for a pure Apple-UI repo
+# (git-discipline.md Rule 8.3).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-linux:
+    name: Swift (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test
+        run: |
+          if [ ! -f Packages/Package.swift ]; then
+            echo "No Packages/Package.swift yet; skipping Swift gates."
+            exit 0
+          fi
+          cd Packages && swift build && swift test

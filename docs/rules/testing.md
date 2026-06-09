@@ -1,10 +1,10 @@
 # Swift Testing Framework Rules
 
-How to write tests for Tiledown: focused, isolated, deterministic suites built on the Swift Testing framework.
+How to write tests for PureDraw: focused, isolated, deterministic suites built on the Swift Testing framework.
 
-Write comprehensive tests using the Swift Testing framework (`@Test`). Tests must be focused, isolated, deterministic, and leverage modern Swift Testing features for maximum reliability and maintainability. The core engine (`TileKit`, the `Tile` / `TileType` primitives, the `TileDown` namespace) is non-UI and is exercised with plain unit and integration tests. The SwiftUI/ViewInspector/snapshot patterns below apply to the planned native macOS/iOS app, not to the engine.
+Write comprehensive tests using the Swift Testing framework (`@Test`). Tests must be focused, isolated, deterministic, and leverage modern Swift Testing features for maximum reliability and maintainability. The core engine (`PureDraw`, the `Tile` / `TileType` primitives, the `PureDraw` namespace) is non-UI and is exercised with plain unit and integration tests. The SwiftUI/ViewInspector/snapshot patterns below apply to the planned native macOS/iOS app, not to the engine.
 
-The `withDependencies` overrides shown in the patterns below assume the Point-Free Dependencies library, whose adoption is an open question; see [../decisions/point-free-dependencies.md](../decisions/point-free-dependencies.md). Where Tiledown does not use that library, control collaborators through plain constructor injection instead; the test-isolation and determinism rules apply either way.
+The `withDependencies` overrides shown in the patterns below assume the Point-Free Dependencies library, whose adoption is an open question; see [../decisions/point-free-dependencies.md](../decisions/point-free-dependencies.md). Where PureDraw does not use that library, control collaborators through plain constructor injection instead; the test-isolation and determinism rules apply either way.
 
 ## Core rules
 
@@ -73,7 +73,7 @@ What are you testing?
 // RULE: Each test file follows this structure
 import Testing
 import Dependencies
-@testable import TileKit
+@testable import PureDraw
 
 @Suite("Tile Rendering Tests")
 struct TileRenderingTests {
@@ -524,12 +524,12 @@ Declare a matching `Target.testTarget` for every `Target.target` in `Package.swi
 
 ```swift
 let tileKitTarget = Target.target(
-    name: "TileKit",
-    dependencies: ["TileDownModels", "FileClient"]
+    name: "PureDraw",
+    dependencies: ["PureDrawModels", "FileClient"]
 )
 let tileKitTestsTarget = Target.testTarget(
-    name: "TileKitTests",
-    dependencies: ["TileKit"]
+    name: "PureDrawTests",
+    dependencies: ["PureDraw"]
 )
 let tileKitTargets = [tileKitTarget, tileKitTestsTarget]
 ```
@@ -542,16 +542,16 @@ let tileKitTargets = [tileKitTarget, tileKitTestsTarget]
 
 ### Folder layout
 
-Tiledown is a monorepo from day one: sources live under `Sources/<SourceTarget>/` and tests under `Tests/<SourceTarget>Tests/`, mirroring each other:
+PureDraw is a monorepo from day one: sources live under `Packages/Sources/<SourceTarget>/` and tests under `Packages/Tests/<SourceTarget>Tests/`, mirroring each other:
 
 ```
 .
 ├── Packages/
 │   ├── Sources/
-│   │   └── TileKit/
+│   │   └── PureDraw/
 │   │       └── ...source files...
 │   └── Tests/
-│       └── TileKitTests/
+│       └── PureDrawTests/
 │           ├── ...test files...
 │           └── Mocks/
 │               └── ...mock implementations...
@@ -559,15 +559,15 @@ Tiledown is a monorepo from day one: sources live under `Sources/<SourceTarget>/
 
 ### Mocks live in the test target, never in the source package
 
-Public test doubles (mocks, fakes, stubs) are placed in `Tests/<SourceTarget>Tests/Mocks/`, NOT in `Sources/<SourceTarget>/`. Mocks shipped from `Sources/` leak into production binaries.
+Public test doubles (mocks, fakes, stubs) are placed in `Packages/Tests/<SourceTarget>Tests/Mocks/`, NOT in `Packages/Sources/<SourceTarget>/`. Mocks shipped from `Packages/Sources/` leak into production binaries.
 
 ```swift
-// Sources/FileClient/FileClientProtocol.swift
+// Packages/Sources/FileClient/FileClientProtocol.swift
 public protocol FileClientProtocol {
     func read(path: String) async throws -> String
 }
 
-// Tests/FileClientTests/Mocks/MockFileClient.swift
+// Packages/Tests/FileClientTests/Mocks/MockFileClient.swift
 public struct MockFileClient: FileClientProtocol {
     public var readResult: Result<String, Error>
     public func read(path: String) async throws -> String {

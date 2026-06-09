@@ -1,6 +1,6 @@
 # Code style: namespacing and structure
 
-The operational namespacing discipline for TileKit: folder mirroring, file naming, anchor placement, one-type-per-file, reserved names, namespace-vs-module collisions.
+The operational namespacing discipline for PureDraw: folder mirroring, file naming, anchor placement, one-type-per-file, reserved names, namespace-vs-module collisions.
 
 Swift does not have true namespaces, so we simulate them with root types and extensions.
 
@@ -10,7 +10,7 @@ For the narrower question "should the anchor be `enum`, `struct`, or `class`?", 
 
 **Every public type lives under a struct or enum namespace that mirrors its folder on disk.** No public type stays at file scope. The qualified name carries module + folder + role; reading `Module.Sub.Leaf` should be enough to know where the type lives and what it does.
 
-This applies to every Swift project. The TileDown-style root + sub-namespace pattern below is one specific instance of this discipline.
+This applies to every Swift project. The PureDraw-style root + sub-namespace pattern below is one specific instance of this discipline.
 
 ### Core rules
 
@@ -121,14 +121,14 @@ If renaming is genuinely not worth it (e.g. the two roots have stable independen
 Multiple SwiftPM targets MAY contribute additional concrete types under the same shared root namespace via extensions:
 
 ```text
-TileDown.Parser.Model.Token          // from TileKitCore
-TileDown.Generator.Command           // from TileKitCLI
-TileDown.Parser.Scanning.Scanner     // from TileKitTools
+PureDraw.Parser.Model.Token          // from PureDrawCore
+PureDraw.Generator.Command           // from PureDrawCLI
+PureDraw.Parser.Scanning.Scanner     // from PureDrawTools
 ```
 
 Targets MUST NOT redefine conflicting namespace trees, and the root namespace meaning MUST be identical across all modules.
 
-## Root + sub-namespace pattern (TileDown style)
+## Root + sub-namespace pattern (PureDraw style)
 
 This is one specific instance of the namespacing discipline above. Use it as the canonical example when designing a new project's namespace tree.
 
@@ -145,8 +145,8 @@ The root namespace file MUST define the full tree of namespace enums, and MUST c
 Example:
 
 ```swift
-/// Root namespace for all TileDown types across all modules
-public enum TileDown {
+/// Root namespace for all PureDraw types across all modules
+public enum PureDraw {
     /// Model types for tile metadata and structure
     public enum Model {}
 
@@ -178,7 +178,7 @@ public enum TileDown {
 
 Rules:
 
-- Root namespace = one file (e.g. `TileDown.swift`)
+- Root namespace = one file (e.g. `PureDraw.swift`)
 - Only namespace enums inside (no concrete logic)
 - No stored properties, no methods, no initializers, no nested concrete types
 - Doc comments are allowed and encouraged
@@ -196,7 +196,7 @@ Example:
 import Foundation
 import Models
 
-extension TileDown.Parser.Model {
+extension PureDraw.Parser.Model {
     /// Represents a parsed piece of tile content
     public enum Token: Equatable, Sendable {
         case text(String)
@@ -204,7 +204,7 @@ extension TileDown.Parser.Model {
     }
 }
 
-extension TileDown.Parser.Model.Token: CustomStringConvertible {
+extension PureDraw.Parser.Model.Token: CustomStringConvertible {
     public var description: String {
         switch self {
         case .text(let str): return "Text(\"\(str)\")"
@@ -218,32 +218,32 @@ Rules:
 
 - Implementation and conformances MUST be extensions
 - Type lives under the correct semantic path, e.g.:
-  - `TileDown.Model`
-  - `TileDown.Parser.Model`
-  - `TileDown.Parser.Metadata`
-  - `TileDown.Generator`
+  - `PureDraw.Model`
+  - `PureDraw.Parser.Model`
+  - `PureDraw.Parser.Metadata`
+  - `PureDraw.Generator`
 - Conformances (`Codable`, `Sendable`, `CustomStringConvertible`, etc.) MAY be separate extensions
 
-### File layout for TileDown-style namespacing
+### File layout for PureDraw-style namespacing
 
 Files SHOULD be placed to reflect the namespace tree. Two equivalent conventions:
 
 **Folder-based approach**: the folder tree mirrors the namespace tree, one file per leaf type:
 
 ```text
-TileDown/
-    TileDown.swift                       // namespace anchor: public enum TileDown {}
-    Parser/Model/Token.swift             // extension TileDown.Parser.Model { public enum Token {} }
-    Parser/Scanning/Scanner.swift        // extension TileDown.Parser.Scanning { public struct Scanner {} }
-    Generator/Writer.swift               // extension TileDown.Generator { public struct Writer {} }
+PureDraw/
+    PureDraw.swift                       // namespace anchor: public enum PureDraw {}
+    Parser/Model/Token.swift             // extension PureDraw.Parser.Model { public enum Token {} }
+    Parser/Scanning/Scanner.swift        // extension PureDraw.Parser.Scanning { public struct Scanner {} }
+    Generator/Writer.swift               // extension PureDraw.Generator { public struct Writer {} }
 ```
 
 **`<Namespace>.<Type>.swift` approach**: flat folder, file name encodes the namespace path with dots:
 
 ```text
-TileDown.swift                              // namespace anchor: public enum TileDown {}
-TileDown.Parser.Model.Token.swift           // extension TileDown.Parser.Model { public enum Token {} }
-TileDown.Parser.Metadata.Header.swift       // extension TileDown.Parser.Metadata { public struct Header {} }
+PureDraw.swift                              // namespace anchor: public enum PureDraw {}
+PureDraw.Parser.Model.Token.swift           // extension PureDraw.Parser.Model { public enum Token {} }
+PureDraw.Parser.Metadata.Header.swift       // extension PureDraw.Parser.Metadata { public struct Header {} }
 ```
 
 Within a single SPM target, pick ONE pattern and stay with it.
@@ -269,7 +269,7 @@ Why uniformity even when not strictly needed:
 
 The only file in a namespace folder that does NOT carry `.<Type>` is the **namespace anchor**:
 
-- `TileDown.swift` declaring `public enum TileDown { /* sub-namespaces */ }`
+- `PureDraw.swift` declaring `public enum PureDraw { /* sub-namespaces */ }`
 - `Tile.swift` declaring `public enum Tile { public enum Parse {} public enum Core {} ... }`
 
 Anchor files contain only namespace enums, never concrete types.
@@ -280,26 +280,26 @@ The anchor file for a namespace MUST live at the **root of the namespace's ownin
 
 When `<Namespace>` is the umbrella for several SPM sub-targets that each live in a child folder, the anchor file `<Namespace>.swift` goes at the parent folder root, alongside (not inside) the sub-target folders. The sub-target whose SPM `path:` spans the parent folder picks up the anchor file as part of its sources.
 
-Concrete example, a `TileKit` namespace umbrella:
+Concrete example, a `PureDraw` namespace umbrella:
 
 ```text
-Sources/TileKit/
-├── TileKit.swift          // namespace anchor: extension TileKit { ... }      <-- AT ROOT, not Core/TileKit.swift
-├── Client/                // TileKitClient SPM target
-├── Core/                  // TileKitCore SPM target (path includes ../TileKit.swift)
+Sources/PureDraw/
+├── PureDraw.swift          // namespace anchor: extension PureDraw { ... }      <-- AT ROOT, not Core/PureDraw.swift
+├── Client/                // PureDrawClient SPM target
+├── Core/                  // PureDrawCore SPM target (path includes ../PureDraw.swift)
 │   ├── Protocol/
 │   ├── Server/
 │   └── Transport/
-├── SharedTools/           // TileKitSharedTools SPM target
-└── Support/               // TileKitSupport SPM target
+├── SharedTools/           // PureDrawSharedTools SPM target
+└── Support/               // PureDrawSupport SPM target
 ```
 
-The TileKitCore target's `Package.swift` entry uses `path: "Sources/TileKit"` with `exclude: ["Client", "SharedTools", "Support"]` so it picks up the anchor file plus the `Core/` subtree. Every sibling target (Client, SharedTools, Support) depends on TileKitCore in production, so the `TileKit` namespace anchor reaches them through that dep.
+The PureDrawCore target's `Package.swift` entry uses `path: "Sources/PureDraw"` with `exclude: ["Client", "SharedTools", "Support"]` so it picks up the anchor file plus the `Core/` subtree. Every sibling target (Client, SharedTools, Support) depends on PureDrawCore in production, so the `PureDraw` namespace anchor reaches them through that dep.
 
 Why this matters:
 
-- Reading the file listing immediately tells you "TileKit is the umbrella here": the anchor sits visually at the top.
-- Moving an anchor into `Core/TileKit.swift` (or any other sub-target folder) hides the umbrella relationship behind one extra `cd` and one extra mental indirection.
+- Reading the file listing immediately tells you "PureDraw is the umbrella here": the anchor sits visually at the top.
+- Moving an anchor into `Core/PureDraw.swift` (or any other sub-target folder) hides the umbrella relationship behind one extra `cd` and one extra mental indirection.
 - The same parent-folder pattern applies to `Shared` (anchor at `Sources/Shared/Shared.swift`, not `Sources/Shared/Constants/Shared.swift`), and to any future grouped target family.
 
 For cross-cutting namespaces (e.g. a `Tile` namespace that touches multiple SPM targets and is not owned by any single folder), the anchor lives in the lowest-leaf foundation target that every consumer reaches, AT THAT TARGET'S FOLDER ROOT, not in a sub-folder: e.g. `Sources/Shared/Tile.swift` (alongside `Shared.swift`), not `Sources/Shared/Constants/Tile.swift`.
@@ -349,7 +349,7 @@ extension Core.Parser {
 Acceptance check:
 
 ```bash
-for f in $(find Sources -name "*.swift"); do
+for f in $(find Packages/Sources -name "*.swift"); do
     count=$(grep -cE "^(public |package |internal )?(actor|struct|enum|protocol|class|final class) [A-Z]" "$f")
     [ "$count" -gt 1 ] && echo "$count $f"
 done
