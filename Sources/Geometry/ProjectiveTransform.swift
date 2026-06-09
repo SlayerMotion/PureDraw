@@ -128,6 +128,36 @@ public struct ProjectiveTransform: Equatable, Sendable, Validatable {
         return ProjectiveTransform(toUnit).concatenated(with: unitToQuad)
     }
 
+    /// Creates a projective transform that translates by `(x, y)`.
+    public static func translation(x: Double, y: Double) -> ProjectiveTransform {
+        ProjectiveTransform(.translation(x: x, y: y))
+    }
+
+    /// Creates a projective transform that scales by `(x, y)`.
+    public static func scale(x: Double, y: Double) -> ProjectiveTransform {
+        ProjectiveTransform(.scale(x: x, y: y))
+    }
+
+    /// Creates a projective transform that rotates by `angle` radians.
+    public static func rotation(angle: Double) -> ProjectiveTransform {
+        ProjectiveTransform(.rotation(angle: angle))
+    }
+
+    /// Translates the projective transform by `(x, y)`.
+    public func translatedBy(x: Double, y: Double) -> ProjectiveTransform {
+        concatenated(with: .translation(x: x, y: y))
+    }
+
+    /// Scales the projective transform by `(x, y)`.
+    public func scaledBy(x: Double, y: Double) -> ProjectiveTransform {
+        concatenated(with: .scale(x: x, y: y))
+    }
+
+    /// Rotates the projective transform by `angle` radians.
+    public func rotated(by angle: Double) -> ProjectiveTransform {
+        concatenated(with: .rotation(angle: angle))
+    }
+
     /// Concatenates `t2` onto `self`. Mathematically, this is `self * t2`.
     public func concatenated(with t2: ProjectiveTransform) -> ProjectiveTransform {
         ProjectiveTransform(

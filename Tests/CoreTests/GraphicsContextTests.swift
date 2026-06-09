@@ -205,4 +205,44 @@ struct GraphicsContextTests {
             Issue.record("Expected a stroke command for line segments")
         }
     }
+
+    @Test func convenienceDrawingOperations() {
+        var context = GraphicsContext()
+        let rect = Rect(x: 10, y: 15, width: 100, height: 200)
+
+        // 1. Test fill(_ rect:)
+        context.fill(rect)
+        #expect(context.commands.count == 1)
+        if case let .fill(path, rule) = context.commands[0].kind {
+            #expect(rule == .winding)
+            #expect(path.elements.count == 5) // move, 3 lines, close
+        } else {
+            Issue.record("Expected a fill command")
+        }
+
+        // 2. Test stroke(_ rect:)
+        context.stroke(rect)
+        #expect(context.commands.count == 2)
+        if case let .stroke(path) = context.commands[1].kind {
+            #expect(path.elements.count == 5)
+        } else {
+            Issue.record("Expected a stroke command")
+        }
+
+        // 3. Test stroke(_ rect:width:)
+        context.stroke(rect, width: 5.5)
+        #expect(context.commands.count == 3)
+        if case let .stroke(path) = context.commands[2].kind {
+            #expect(path.elements.count == 5)
+            #expect(context.commands[2].state.lineWidth == 5.5)
+        } else {
+            Issue.record("Expected a stroke command with custom width")
+        }
+        #expect(context.currentState.lineWidth == 1.0) // Graphics state was restored
+
+        // 4. Test strokeEllipse(in:) and fillEllipse(in:)
+        context.strokeEllipse(in: rect)
+        context.fillEllipse(in: rect)
+        #expect(context.commands.count == 5)
+    }
 }

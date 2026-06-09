@@ -147,11 +147,12 @@ public struct GraphicsContext: Sendable, Validatable {
 
     /// Adds a rectangle as a complete closed subpath.
     public mutating func addRect(_ rect: Rect) {
-        move(to: rect.origin)
-        addLine(to: Point(x: rect.origin.x + rect.width, y: rect.origin.y))
-        addLine(to: Point(x: rect.origin.x + rect.width, y: rect.origin.y + rect.height))
-        addLine(to: Point(x: rect.origin.x, y: rect.origin.y + rect.height))
-        closeSubpath()
+        currentPath.addRect(rect)
+    }
+
+    /// Adds a sequence of rectangles to the current path.
+    public mutating func addRects(_ rects: [Rect]) {
+        currentPath.addRects(rects)
     }
 
     /// Appends the elements of another path to the current path.
@@ -289,6 +290,50 @@ public struct GraphicsContext: Sendable, Validatable {
         guard !currentPath.isEmpty else { return }
         commands.append(DrawOperation(kind: .fill(currentPath, rule: rule), state: currentState))
         currentPath = Path()
+    }
+
+    /// Strokes the specified path using the current graphics state, leaving the current path of the context unchanged.
+    public mutating func stroke(_ path: Path) {
+        commands.append(DrawOperation(kind: .stroke(path), state: currentState))
+    }
+
+    /// Fills the specified path using the current graphics state, leaving the current path of the context unchanged.
+    public mutating func fill(_ path: Path, using rule: FillRule = .winding) {
+        commands.append(DrawOperation(kind: .fill(path, rule: rule), state: currentState))
+    }
+
+    /// Strokes the boundary of the specified rectangle using the current graphics state.
+    public mutating func stroke(_ rect: Rect) {
+        let path = Path(rect: rect)
+        stroke(path)
+    }
+
+    /// Strokes the boundary of the specified rectangle with the specified line width.
+    ///
+    /// This method temporarily sets the line width in the graphics state to the specified value.
+    public mutating func stroke(_ rect: Rect, width: Double) {
+        var tempState = currentState
+        tempState.lineWidth = width
+        let path = Path(rect: rect)
+        commands.append(DrawOperation(kind: .stroke(path), state: tempState))
+    }
+
+    /// Fills the interior of the specified rectangle using the current graphics state.
+    public mutating func fill(_ rect: Rect) {
+        let path = Path(rect: rect)
+        fill(path)
+    }
+
+    /// Strokes the boundary of an ellipse that fits inside the specified rectangle.
+    public mutating func strokeEllipse(in rect: Rect) {
+        let path = Path(ellipseIn: rect)
+        stroke(path)
+    }
+
+    /// Fills the interior of an ellipse that fits inside the specified rectangle.
+    public mutating func fillEllipse(in rect: Rect) {
+        let path = Path(ellipseIn: rect)
+        fill(path)
     }
 
     /// Intersects the current clipping path with the current path and clears the current path.

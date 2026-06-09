@@ -28,8 +28,8 @@ jobs:
       - name: Install WebAssembly SDK
         run: |
           apt-get update && apt-get install -y curl
-          curl -fL -o sdk.artifactbundle.tar.gz https://github.com/swiftwasm/swift/releases/download/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-wasm32-unknown-wasip1.artifactbundle.tar.gz
-          swift sdk install sdk.artifactbundle.tar.gz
+          curl -fL -o sdk.artifactbundle.zip https://github.com/swiftwasm/swift/releases/download/swift-wasm-6.0.3-RELEASE/swift-wasm-6.0.3-RELEASE-wasm32-unknown-wasi.artifactbundle.zip
+          swift sdk install sdk.artifactbundle.zip
       - name: Build for WebAssembly
         run: |
           if [ ! -f Package.swift ]; then

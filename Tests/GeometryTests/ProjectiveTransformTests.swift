@@ -46,6 +46,32 @@ struct ProjectiveTransformTests {
         #expect(isAlmostEqual(pAffine, pProj))
     }
 
+    @Test func projectiveTransforms() {
+        let t = ProjectiveTransform.identity
+            .translatedBy(x: 10.0, y: -5.0)
+            .scaledBy(x: 2.0, y: 0.5)
+            .rotated(by: Double.pi / 2.0)
+
+        let affine = AffineTransform.identity
+            .translatedBy(x: 10.0, y: -5.0)
+            .scaledBy(x: 2.0, y: 0.5)
+            .rotated(by: Double.pi / 2.0)
+
+        let p = Point(x: 4.0, y: 6.0)
+        #expect(isAlmostEqual(p.applying(t), p.applying(affine)))
+
+        let tRot = ProjectiveTransform.rotation(angle: Double.pi / 4.0)
+        let tScale = ProjectiveTransform.scale(x: 1.5, y: 2.5)
+        let tTrans = ProjectiveTransform.translation(x: -5.0, y: 12.0)
+
+        let combined = tRot.concatenated(with: tScale).concatenated(with: tTrans)
+        let combinedAffine = AffineTransform.rotation(angle: Double.pi / 4.0)
+            .scaledBy(x: 1.5, y: 2.5)
+            .translatedBy(x: -5.0, y: 12.0)
+
+        #expect(isAlmostEqual(p.applying(combined), p.applying(combinedAffine)))
+    }
+
     @Test func algebraicAssociativity() {
         let t1 = ProjectiveTransform(AffineTransform.translation(x: 10, y: 20))
 
