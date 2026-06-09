@@ -478,6 +478,35 @@ struct RendererTests {
         context.fillPath()
         context.restoreGState()
 
+        // 3b. Draw a floating 3D circle disk next to the cube (horizontal ring projected in perspective)
+        context.saveGState()
+        context.setFillColor(Color(red: 0.8, green: 0.1, blue: 0.8, alpha: 0.25)) // Semi-transparent magenta disk
+        context.setStrokeColor(Color(red: 0.8, green: 0.1, blue: 0.8, alpha: 0.85)) // Solid magenta border
+        context.setLineWidth(3.0)
+
+        let circleCenter3D = Point3D(x: 120, y: 50, z: 200)
+        let circleRadius = 45.0
+        var circlePoints: [Point] = []
+        for i in 0 ..< 64 {
+            let theta = (Double(i) / 64.0) * 2.0 * Double.pi
+            let px = circleCenter3D.x + circleRadius * cos(theta)
+            let pz = circleCenter3D.z + circleRadius * sin(theta)
+            let py = circleCenter3D.y // Horizontal plane
+
+            let pt3d = Point3D(x: px, y: py, z: pz)
+            let p2d = pt3d.projected(viewportSize: 500, cameraDistance: 300)
+            circlePoints.append(p2d)
+        }
+
+        context.addLines(between: circlePoints)
+        context.closeSubpath()
+        context.fillPath()
+
+        context.addLines(between: circlePoints)
+        context.closeSubpath()
+        context.strokePath()
+        context.restoreGState()
+
         for (face, _) in sortedFaces {
             context.saveGState()
 
