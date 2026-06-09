@@ -1,4 +1,5 @@
 // swift-tools-version: 5.9
+// swiftformat:disable all
 import PackageDescription
 
 // PureDraw - Dependency-free, Swift-native 2D graphics engine.
