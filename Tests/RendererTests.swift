@@ -233,6 +233,51 @@ struct RendererTests {
         #expect(ps.contains("shfill"))
     }
 
+    @Test func canvasRendererOutputStructure() throws {
+        var context = GraphicsContext()
+        context.setFillColor(Color(red: 1.0, green: 0.0, blue: 0.0)) // Red
+        context.setStrokeColor(Color(red: 0.0, green: 0.0, blue: 1.0)) // Blue
+        context.setLineWidth(4.0)
+
+        // Draw a rect
+        context.addRect(Rect(x: 10, y: 15, width: 100, height: 200))
+        context.fillPath()
+
+        // Draw a line
+        context.move(to: Point(x: 0, y: 0))
+        context.addLine(to: Point(x: 50, y: 50))
+        context.strokePath()
+
+        // Create Gradient
+        let stops = [
+            GradientStop(color: .white, location: 0.0),
+            GradientStop(color: .black, location: 1.0),
+        ]
+        let grad = Gradient(stops: stops)
+        context.drawLinearGradient(grad, start: Point(x: 0, y: 0), end: Point(x: 100, y: 100))
+
+        // Render Canvas JS
+        let renderer = CanvasRenderer(contextName: "ctx")
+        let js = try renderer.render(context)
+
+        // Verify Canvas JS commands
+        #expect(js.contains("ctx.save();"))
+        #expect(js.contains("ctx.restore();"))
+        #expect(js.contains("ctx.fillStyle = 'rgba(255, 0, 0, 1.0)';"))
+        #expect(js.contains("ctx.strokeStyle = 'rgba(0, 0, 255, 1.0)';"))
+        #expect(js.contains("ctx.lineWidth = 4.0;"))
+        #expect(js.contains("ctx.moveTo(0.0, 0.0);"))
+        #expect(js.contains("ctx.lineTo(50.0, 50.0);"))
+        #expect(js.contains("ctx.createLinearGradient(0.0, 0.0, 100.0, 100.0)"))
+        #expect(js.contains("ctx.fillRect(-10000, -10000, 20000, 20000);"))
+
+        // Render complete HTML page
+        let html = try renderer.renderToHTMLPage(context, width: 500, height: 500)
+        #expect(html.contains("<!DOCTYPE html>"))
+        #expect(html.contains("<canvas id=\"pureDrawCanvas\" width=\"500.0\" height=\"500.0\"></canvas>"))
+        #expect(html.contains("ctx.save();"))
+    }
+
     @Test func generate3DPerspectivePDF() throws {
         struct Point3D {
             var x: Double
@@ -592,5 +637,11 @@ struct RendererTests {
         let outputPath = "3d_transform_scene.pdf"
         try pdfData.write(to: URL(fileURLWithPath: outputPath))
         print("Generated 3D perspective scene at: \(outputPath)")
+
+        // Render to HTML Canvas page
+        let htmlData = try CanvasRenderer().renderToHTMLPage(context, width: 500, height: 500)
+        let htmlPath = "3d_transform_scene.html"
+        try htmlData.write(to: URL(fileURLWithPath: htmlPath), atomically: true, encoding: .utf8)
+        print("Generated 3D HTML Canvas preview at: \(htmlPath)")
     }
 }
