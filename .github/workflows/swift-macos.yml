@@ -16,7 +16,7 @@ permissions:
 jobs:
   swift-macos:
     name: Swift (macOS)
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Format, lint, build, test
@@ -25,7 +25,12 @@ jobs:
             echo "No Package.swift yet; skipping Swift gates."
             exit 0
           fi
-          brew install swiftformat swiftlint
+          if ! command -v swiftformat &> /dev/null; then
+            brew install swiftformat
+          fi
+          if ! command -v swiftlint &> /dev/null; then
+            brew install swiftlint
+          fi
           swiftformat . --config .swiftformat --lint
           swiftlint --config .swiftlint.yml --strict
           swift build && swift test
