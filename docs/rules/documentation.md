@@ -85,7 +85,7 @@ Content with real code listings, tables, lists.
 ### Rule 6: Cross-linking
 
 - MUST use `<doc:ArticleName>` for catalog-internal links. No angle brackets around spaces ever (causes DocC warnings).
-- MUST use plain markdown paths (`Packages/Sources/Foo/README.md`) for files outside the catalog.
+- MUST use plain markdown paths (`Sources/Foo/README.md`) for files outside the catalog.
 - MUST NOT use `<doc:>` for non-existent articles; DocC emits a warning per broken reference.
 - MUST NOT put `<doc:ExampleName>` inside example code blocks; DocC sometimes tries to resolve them even inside fences. Use `{example-placeholder}` or HTML entities for placeholders.
 

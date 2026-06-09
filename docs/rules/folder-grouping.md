@@ -203,7 +203,7 @@ The lesson: pass 1 and pass 2 are both applications of the same rule at differen
 No automated linter today. Verify by eyeballing the tree before declaring a layout change done:
 
 ```bash
-find Packages/Sources -mindepth 1 -maxdepth 1 -type d | while read d; do
+find Sources -mindepth 1 -maxdepth 1 -type d | while read d; do
   count=$(find "$d" -maxdepth 1 -name "*.swift" | wc -l | tr -d ' ')
   printf "%3s  %s\n" "$count" "$d"
 done | sort -n

@@ -38,7 +38,6 @@ project's when you adopt these.
   for Apple-API facts; never ask it to reason.
 - [file-naming.md](file-naming.md) - filename conventions.
 - [folder-grouping.md](folder-grouping.md) - when to flatten one-file folders.
-- [package-structure.md](package-structure.md) - workspace and package layout: one
   `Package.swift` under `Packages/`, many targets, `Apps/` for app targets.
 - [package-architecture.md](package-architecture.md) - single-responsibility
   targets with unidirectional dependencies.

@@ -3,11 +3,11 @@
 # file. A file with more than one file-scope type declaration is a violation:
 # split it, or mark helper types private/fileprivate.
 #
-# Inert until Packages/Sources exists. Portable: bash 3.2 and 4+.
+# Inert until Sources exists. Portable: bash 3.2 and 4+.
 
 set -u
 
-SRC="Packages/Sources"
+SRC="Sources"
 if [ ! -d "$SRC" ]; then
   echo "namespacing: no $SRC yet, skipping."
   exit 0

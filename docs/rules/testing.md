@@ -542,7 +542,7 @@ let tileKitTargets = [tileKitTarget, tileKitTestsTarget]
 
 ### Folder layout
 
-Tiledown is a monorepo from day one: sources live under `Packages/Sources/<SourceTarget>/` and tests under `Packages/Tests/<SourceTarget>Tests/`, mirroring each other:
+Tiledown is a monorepo from day one: sources live under `Sources/<SourceTarget>/` and tests under `Tests/<SourceTarget>Tests/`, mirroring each other:
 
 ```
 .
@@ -559,15 +559,15 @@ Tiledown is a monorepo from day one: sources live under `Packages/Sources/<Sourc
 
 ### Mocks live in the test target, never in the source package
 
-Public test doubles (mocks, fakes, stubs) are placed in `Packages/Tests/<SourceTarget>Tests/Mocks/`, NOT in `Packages/Sources/<SourceTarget>/`. Mocks shipped from `Packages/Sources/` leak into production binaries.
+Public test doubles (mocks, fakes, stubs) are placed in `Tests/<SourceTarget>Tests/Mocks/`, NOT in `Sources/<SourceTarget>/`. Mocks shipped from `Sources/` leak into production binaries.
 
 ```swift
-// Packages/Sources/FileClient/FileClientProtocol.swift
+// Sources/FileClient/FileClientProtocol.swift
 public protocol FileClientProtocol {
     func read(path: String) async throws -> String
 }
 
-// Packages/Tests/FileClientTests/Mocks/MockFileClient.swift
+// Tests/FileClientTests/Mocks/MockFileClient.swift
 public struct MockFileClient: FileClientProtocol {
     public var readResult: Result<String, Error>
     public func read(path: String) async throws -> String {

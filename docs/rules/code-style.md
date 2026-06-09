@@ -349,7 +349,7 @@ extension Core.Parser {
 Acceptance check:
 
 ```bash
-for f in $(find Packages/Sources -name "*.swift"); do
+for f in $(find Sources -name "*.swift"); do
     count=$(grep -cE "^(public |package |internal )?(actor|struct|enum|protocol|class|final class) [A-Z]" "$f")
     [ "$count" -gt 1 ] && echo "$count $f"
 done

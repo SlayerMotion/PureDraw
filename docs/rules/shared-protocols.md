@@ -151,7 +151,7 @@ Before adding a new `import` to a producer Swift file:
 # SharedProtocols must have no internal-package imports.
 # External imports (Foundation, SwiftUI, Combine, ...) are fine.
 INTERNAL_TARGETS=$(swift package describe --type json | jq -r '.targets[].name')
-for ln in $(grep -rn '^import ' Packages/Sources/SharedProtocols/); do
+for ln in $(grep -rn '^import ' Sources/SharedProtocols/); do
     mod=$(echo "$ln" | awk '{print $2}')
     if echo "$INTERNAL_TARGETS" | grep -qx "$mod"; then
         echo "FAIL: SharedProtocols imports internal target $mod ($ln)"
