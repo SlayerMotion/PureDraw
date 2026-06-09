@@ -26,6 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: swiftwasm/setup-swiftwasm@v2
+        with:
+          target: wasm32-unknown-wasip1
       - name: Build for WebAssembly
         run: |
           if [ ! -f Package.swift ]; then
