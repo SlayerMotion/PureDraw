@@ -11,9 +11,11 @@ public struct ValidationErrorCollection: Error, CustomStringConvertible, Sendabl
         self.values = values
     }
     
+    public var localizedDescription: String {
+        return values.map { $0.description }.joined(separator: "\n")
+    }
+    
     public var description: String {
-        guard !values.isEmpty else { return "No validation errors." }
-        let errorDescriptions = values.map { " - \($0.description)" }.joined(separator: "\n")
-        return "Validation failed with \(values.count) error(s):\n\(errorDescriptions)"
+        return localizedDescription
     }
 }

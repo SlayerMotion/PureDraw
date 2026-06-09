@@ -14,13 +14,15 @@ public struct ValidationError: Error, CustomStringConvertible, Sendable {
         self.codingPath = codingPath
     }
     
+    public var codingPathString: String {
+        return codingPath.stringValue
+    }
+    
     public var description: String {
         let cleanReason = reason.hasSuffix(".") ? String(reason.dropLast()) : reason
-        if codingPath.isEmpty {
+        guard !codingPath.isEmpty else {
             return "\(cleanReason) at root of document"
-        } else {
-            let pathString = codingPath.map { $0.stringValue }.joined(separator: ".")
-            return "\(cleanReason) at path: .\(pathString)"
         }
+        return "\(cleanReason) at path: \(codingPath.stringValue)"
     }
 }

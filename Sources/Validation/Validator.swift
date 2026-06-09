@@ -32,6 +32,21 @@ public struct Validator<Document: Sendable>: Sendable {
         return validating(Validation(description: description, check: check, when: predicate))
     }
     
+    /// Adds a validation closure that returns multiple validation errors.
+    public func validating<Subject>(
+        _ validate: @escaping @Sendable (ValidationContext<Document, Subject>) -> [ValidationError]
+    ) -> Validator<Document> {
+        return validating(Validation(check: validate, when: { _ in true }))
+    }
+    
+    /// Adds a validation closure and predicate that returns multiple validation errors.
+    public func validating<Subject>(
+        _ validate: @escaping @Sendable (ValidationContext<Document, Subject>) -> [ValidationError],
+        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool
+    ) -> Validator<Document> {
+        return validating(Validation(check: validate, when: predicate))
+    }
+    
     /// Returns the descriptions of all active rules in this validator.
     public var validationDescriptions: [String] {
         return validations.map { $0.description }

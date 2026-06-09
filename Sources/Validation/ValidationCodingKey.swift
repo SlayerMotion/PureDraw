@@ -32,3 +32,20 @@ public struct ValidationCodingKey: CodingKey, Sendable, CustomStringConvertible 
         return stringValue
     }
 }
+
+public extension Array where Element == CodingKey {
+    /// Formats the array of coding keys into a string, using dot-notation for keys and brackets for indices.
+    var stringValue: String {
+        return self.map { key in
+            if let intValue = key.intValue {
+                return "[\(intValue)]"
+            }
+            let stringVal = key.stringValue
+            if stringVal.contains("/") {
+                return "['\(stringVal)']"
+            }
+            return ".\(stringVal)"
+        }.joined()
+    }
+}
+

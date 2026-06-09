@@ -23,7 +23,7 @@ struct TraversalValidationTests {
             #expect(error.reason == "Failed to satisfy: Point coordinates are finite (not NaN or Infinity)")
             // Verify path matches structural traversal
             let pathString = error.description
-            #expect(pathString.contains("Failed to satisfy: Point coordinates are finite (not NaN or Infinity) at path: .elements.1.line.to"))
+            #expect(pathString.contains("Failed to satisfy: Point coordinates are finite (not NaN or Infinity) at path: .elements[1].line.to"))
         } catch {
             Issue.record("Unexpected error: \(error)")
         }
