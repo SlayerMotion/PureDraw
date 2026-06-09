@@ -26,13 +26,11 @@ jobs:
           branch: swift-6.1-release
           tag: 6.1-RELEASE
       - uses: actions/checkout@v4
-      - name: Build portable targets (debug and release)
+      - name: Build and test
         shell: bash
         run: |
           if [ ! -f Package.swift ]; then
             echo "No Package.swift yet; skipping Swift gates."
             exit 0
           fi
-          # Replace with the specific portable library targets if the package has
-          # macOS-host-only targets that must be excluded on Windows.
-          swift build && swift build -c release
+          swift build && swift build -c release && swift test

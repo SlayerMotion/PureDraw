@@ -589,7 +589,7 @@ struct RendererTests {
         let pdfData = try PDFRenderer(width: 500, height: 500).render(context)
 
         // Write PDF data to the workspace directory
-        let outputPath = "/Volumes/Code/DeveloperExt/public/PureDraw/3d_transform_scene.pdf"
+        let outputPath = "3d_transform_scene.pdf"
         try pdfData.write(to: URL(fileURLWithPath: outputPath))
         print("Generated 3D perspective scene at: \(outputPath)")
     }
