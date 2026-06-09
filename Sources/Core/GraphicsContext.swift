@@ -76,6 +76,11 @@ public struct GraphicsContext: Sendable, Validatable {
         currentState.dashPattern = lengths
     }
 
+    /// Sets the accuracy of curve rendering.
+    public mutating func setFlatness(_ flatness: Double) {
+        currentState.flatness = flatness
+    }
+
     /// Sets the overall opacity multiplier.
     public mutating func setAlpha(_ alpha: Double) {
         currentState.alpha = alpha
@@ -152,6 +157,11 @@ public struct GraphicsContext: Sendable, Validatable {
     /// Appends the elements of another path to the current path.
     public mutating func addPath(_ path: Path) {
         currentPath.addPath(path)
+    }
+
+    /// Adds a sequence of connected line segments between the specified points to the current path.
+    public mutating func addLines(between points: [Point]) {
+        currentPath.addLines(between: points)
     }
 
     /// Adds an ellipse that fits inside the specified rectangle.
@@ -259,6 +269,19 @@ public struct GraphicsContext: Sendable, Validatable {
         guard !currentPath.isEmpty else { return }
         commands.append(DrawOperation(kind: .stroke(currentPath), state: currentState))
         currentPath = Path()
+    }
+
+    /// Draws a sequence of unconnected line segments.
+    ///
+    /// For every pair of points (2i, 2i+1), a line segment is drawn.
+    public mutating func strokeLineSegments(between points: [Point]) {
+        guard points.count >= 2 else { return }
+        var segmentsPath = Path()
+        for i in stride(from: 0, to: points.count - 1, by: 2) {
+            segmentsPath.move(to: points[i])
+            segmentsPath.addLine(to: points[i + 1])
+        }
+        commands.append(DrawOperation(kind: .stroke(segmentsPath), state: currentState))
     }
 
     /// Records a fill command in the buffer using the current state and clears the current path.

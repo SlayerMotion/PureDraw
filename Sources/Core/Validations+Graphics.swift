@@ -43,6 +43,13 @@ public extension Validation {
                     ))
                 }
 
+                if s.flatness < 0 {
+                    errors.append(ValidationError(
+                        reason: "flatness cannot be negative",
+                        at: context.codingPath + [ValidationCodingKey("flatness")]
+                    ))
+                }
+
                 if !(0.0 ... 1.0).contains(s.alpha) {
                     errors.append(ValidationError(
                         reason: "alpha must be between 0.0 and 1.0",

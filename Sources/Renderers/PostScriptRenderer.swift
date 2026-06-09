@@ -114,6 +114,7 @@ public struct PostScriptRenderer: Renderer {
             }
             ps += "\(joinValue) setlinejoin\n"
             ps += "\(op.state.miterLimit) setmiterlimit\n"
+            ps += "\(op.state.flatness) setflat\n"
 
             if !op.state.dashPattern.isEmpty {
                 let patternStr = op.state.dashPattern.map { String($0) }.joined(separator: " ")

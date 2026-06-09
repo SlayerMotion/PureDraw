@@ -29,6 +29,9 @@ public struct GraphicState: Equatable, Sendable, Validatable {
     /// The limit for miter joins.
     public var miterLimit: Double
 
+    /// The accuracy of curve rendering.
+    public var flatness: Double
+
     /// The dash lengths for strokes. An empty array indicates a solid line.
     public var dashPattern: [Double]
 
@@ -55,6 +58,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         lineCap: LineCap = .butt,
         lineJoin: LineJoin = .miter,
         miterLimit: Double = 10.0,
+        flatness: Double = 0.6,
         dashPattern: [Double] = [],
         dashPhase: Double = 0.0,
         alpha: Double = 1.0,
@@ -69,6 +73,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         self.lineCap = lineCap
         self.lineJoin = lineJoin
         self.miterLimit = miterLimit
+        self.flatness = flatness
         self.dashPattern = dashPattern
         self.dashPhase = dashPhase
         self.alpha = alpha

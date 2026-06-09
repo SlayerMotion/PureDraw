@@ -42,6 +42,7 @@
                 targetContext.setLineCap(CGLineCap(from: operation.state.lineCap))
                 targetContext.setLineJoin(CGLineJoin(from: operation.state.lineJoin))
                 targetContext.setMiterLimit(CGFloat(operation.state.miterLimit))
+                targetContext.setFlatness(CGFloat(operation.state.flatness))
 
                 if !operation.state.dashPattern.isEmpty {
                     targetContext.setLineDash(

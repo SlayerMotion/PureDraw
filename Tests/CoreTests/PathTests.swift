@@ -124,4 +124,27 @@ struct PathTests {
             Issue.record("Expected .cubicCurve representing the arc")
         }
     }
+
+    @Test func pathConstructionWithLines() {
+        var path = Path()
+        let points = [Point(x: 10, y: 10), Point(x: 20, y: 20), Point(x: 30, y: 10)]
+        path.addLines(between: points)
+
+        #expect(path.elements.count == 3)
+        if case let .move(p) = path.elements[0] {
+            #expect(p == Point(x: 10, y: 10))
+        } else {
+            Issue.record("Expected .move")
+        }
+        if case let .line(p) = path.elements[1] {
+            #expect(p == Point(x: 20, y: 20))
+        } else {
+            Issue.record("Expected .line")
+        }
+        if case let .line(p) = path.elements[2] {
+            #expect(p == Point(x: 30, y: 10))
+        } else {
+            Issue.record("Expected .line")
+        }
+    }
 }

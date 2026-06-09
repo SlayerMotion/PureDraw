@@ -20,6 +20,24 @@ public struct Path: Equatable, Sendable, Validatable {
         self.elements = elements
     }
 
+    /// Creates a path containing a single rectangle.
+    public init(rect: Rect) {
+        self.elements = []
+        addRect(rect)
+    }
+
+    /// Creates a path containing a single ellipse.
+    public init(ellipseIn rect: Rect) {
+        self.elements = []
+        addEllipse(in: rect)
+    }
+
+    /// Creates a path containing a single rounded rectangle.
+    public init(roundedRect rect: Rect, cornerWidth: Double, cornerHeight: Double) {
+        self.elements = []
+        addRoundedRect(in: rect, cornerWidth: cornerWidth, cornerHeight: cornerHeight)
+    }
+
     public static var defaultValidator: Validator<Path> {
         Validator().validating(.pathStructureIsValid)
     }
@@ -366,6 +384,31 @@ public struct Path: Equatable, Sendable, Validatable {
 
         let clockwise = cross < 0
         addArc(center: c, radius: radius, startAngle: a1, endAngle: a2, clockwise: clockwise)
+    }
+
+    /// Adds a sequence of connected line segments between the specified points.
+    public mutating func addLines(between points: [Point]) {
+        guard !points.isEmpty else { return }
+        move(to: points[0])
+        for i in 1 ..< points.count {
+            addLine(to: points[i])
+        }
+    }
+
+    /// Adds a rectangle as a complete closed subpath.
+    public mutating func addRect(_ rect: Rect) {
+        move(to: rect.origin)
+        addLine(to: Point(x: rect.origin.x + rect.width, y: rect.origin.y))
+        addLine(to: Point(x: rect.origin.x + rect.width, y: rect.origin.y + rect.height))
+        addLine(to: Point(x: rect.origin.x, y: rect.origin.y + rect.height))
+        closeSubpath()
+    }
+
+    /// Adds a sequence of rectangles to the path.
+    public mutating func addRects(_ rects: [Rect]) {
+        for rect in rects {
+            addRect(rect)
+        }
     }
 
     /// Transforms all points in the path using a custom deformation/displacement function.

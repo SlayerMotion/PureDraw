@@ -157,4 +157,52 @@ struct GraphicsContextTests {
         #expect(invalidResult.contains { $0.reason == "lineWidth cannot be negative" })
         #expect(invalidResult.contains { $0.reason == "alpha must be between 0.0 and 1.0" })
     }
+
+    @Test func flatnessAndLineProperties() {
+        var context = GraphicsContext()
+        #expect(context.currentState.flatness == 0.6)
+
+        context.setFlatness(0.8)
+        #expect(context.currentState.flatness == 0.8)
+
+        // Invalid state (negative flatness)
+        let invalidState = GraphicState(flatness: -0.1)
+        let invalidResult = Validation<Void, GraphicState>.graphicStateIsValid.apply(to: invalidState, at: [], in: ())
+        #expect(invalidResult.contains { $0.reason == "flatness cannot be negative" })
+    }
+
+    @Test func contextAddLinesAndStrokeLineSegments() {
+        var context = GraphicsContext()
+        let points = [Point(x: 10, y: 10), Point(x: 20, y: 20), Point(x: 30, y: 10), Point(x: 40, y: 20)]
+
+        // 1. Test addLines(between:)
+        context.addLines(between: points)
+        #expect(context.currentPath.elements.count == 4)
+
+        context.strokePath()
+        #expect(context.commands.count == 1)
+        #expect(context.currentPath.isEmpty)
+
+        // 2. Test strokeLineSegments(between:)
+        context.strokeLineSegments(between: points)
+        #expect(context.commands.count == 2)
+        // Verify segments path was created correctly with 2 segments (4 elements: move, line, move, line)
+        if case let .stroke(segmentsPath) = context.commands.last?.kind {
+            #expect(segmentsPath.elements.count == 4)
+            if case let .move(p1) = segmentsPath.elements[0] {
+                #expect(p1 == Point(x: 10, y: 10))
+            }
+            if case let .line(p2) = segmentsPath.elements[1] {
+                #expect(p2 == Point(x: 20, y: 20))
+            }
+            if case let .move(p3) = segmentsPath.elements[2] {
+                #expect(p3 == Point(x: 30, y: 10))
+            }
+            if case let .line(p4) = segmentsPath.elements[3] {
+                #expect(p4 == Point(x: 40, y: 20))
+            }
+        } else {
+            Issue.record("Expected a stroke command for line segments")
+        }
+    }
 }

@@ -74,6 +74,7 @@ public struct PDFRenderer: Renderer {
             }
             contentStream += "\(joinValue) j\n"
             contentStream += "\(op.state.miterLimit) M\n"
+            contentStream += "\(op.state.flatness) i\n"
 
             if !op.state.dashPattern.isEmpty {
                 let patternStr = op.state.dashPattern.map { String($0) }.joined(separator: " ")
