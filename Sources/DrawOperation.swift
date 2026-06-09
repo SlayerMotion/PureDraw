@@ -19,4 +19,11 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
         self.kind = kind
         self.state = state
     }
+    
+    public static var defaultValidator: Validator<DrawOperation> {
+        Validator()
+            .validating(.drawOperationPathIsNotEmpty)
+            .validating(.linearGradientPointsAreDistinct)
+            .validating(.radialGradientIsValid)
+    }
 }

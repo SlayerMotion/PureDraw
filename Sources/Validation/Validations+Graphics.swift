@@ -56,6 +56,16 @@ extension Validation {
                     }
                 }
                 
+                if !s.dashPattern.isEmpty {
+                    let sum = s.dashPattern.reduce(0.0, +)
+                    if sum <= 0 {
+                        errors.append(ValidationError(
+                            reason: "dashPattern cannot consist of only zero lengths",
+                            at: context.codingPath + [ValidationCodingKey("dashPattern")]
+                        ))
+                    }
+                }
+                
                 // Validate transform using determinant
                 if s.transform.determinant == 0 {
                     errors.append(ValidationError(
@@ -118,6 +128,77 @@ extension Validation {
             description: "Shadow blur radius is non-negative",
             check: { context in
                 context.subject.blur >= 0
+            }
+        )
+    }
+    
+    /// Validates that a draw operation's path (if any) is not empty.
+    public static var drawOperationPathIsNotEmpty: Validation<Document, DrawOperation> {
+        .init(
+            description: "Draw operation path is not empty",
+            check: { context in
+                switch context.subject.kind {
+                case .fill(let path, _), .stroke(let path):
+                    if path.isEmpty {
+                        return [ValidationError(
+                            reason: "Drawing path cannot be empty",
+                            at: context.codingPath + [ValidationCodingKey("kind")]
+                        )]
+                    }
+                case .drawLinearGradient, .drawRadialGradient:
+                    break
+                }
+                return []
+            }
+        )
+    }
+    
+    /// Validates that a linear gradient has distinct start and end points.
+    public static var linearGradientPointsAreDistinct: Validation<Document, DrawOperation> {
+        .init(
+            description: "Linear gradient start and end points are distinct",
+            check: { context in
+                if case .drawLinearGradient(_, let start, let end, _) = context.subject.kind {
+                    if start == end {
+                        return [ValidationError(
+                            reason: "Linear gradient start and end points cannot be identical",
+                            at: context.codingPath + [ValidationCodingKey("kind")]
+                        )]
+                    }
+                }
+                return []
+            }
+        )
+    }
+    
+    /// Validates that radial gradient radii are non-negative and distinct if centers are identical.
+    public static var radialGradientIsValid: Validation<Document, DrawOperation> {
+        .init(
+            description: "Radial gradient configuration is valid",
+            check: { context in
+                if case .drawRadialGradient(_, let startCenter, let startRadius, let endCenter, let endRadius, _) = context.subject.kind {
+                    var errors: [ValidationError] = []
+                    if startRadius < 0 {
+                        errors.append(ValidationError(
+                            reason: "Radial gradient start radius cannot be negative",
+                            at: context.codingPath + [ValidationCodingKey("kind"), ValidationCodingKey("startRadius")]
+                        ))
+                    }
+                    if endRadius < 0 {
+                        errors.append(ValidationError(
+                            reason: "Radial gradient end radius cannot be negative",
+                            at: context.codingPath + [ValidationCodingKey("kind"), ValidationCodingKey("endRadius")]
+                        ))
+                    }
+                    if startCenter == endCenter && startRadius == endRadius {
+                        errors.append(ValidationError(
+                            reason: "Radial gradient start and end circles cannot be identical",
+                            at: context.codingPath + [ValidationCodingKey("kind")]
+                        ))
+                    }
+                    return errors
+                }
+                return []
             }
         )
     }

@@ -122,4 +122,95 @@ struct TraversalValidationTests {
             #expect(descriptions.contains { $0.contains("stops") && $0.contains("location") })
         }
     }
+    
+    @Test func zeroLengthDashPatternValidation() {
+        var state = GraphicState()
+        state.dashPattern = [0.0, 0.0, 0.0]
+        do {
+            try state.validate()
+            Issue.record("Expected GraphicState validation to fail because dash pattern consists of only zero lengths")
+        } catch let errors as ValidationErrorCollection {
+            #expect(errors.values.count == 1)
+            #expect(errors.values[0].reason.contains("dashPattern cannot consist of only zero lengths"))
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+    
+    @Test func drawOperationValidation() {
+        // 1. Empty path draw operation
+        let emptyPathOp = DrawOperation(kind: .stroke(Path()), state: GraphicState())
+        do {
+            try emptyPathOp.validate()
+            Issue.record("Expected empty path stroke operation to fail validation")
+        } catch let errors as ValidationErrorCollection {
+            #expect(errors.values.count == 1)
+            #expect(errors.values[0].reason.contains("Drawing path cannot be empty"))
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+        
+        // 2. Singular linear gradient (start == end)
+        let singularLinearOp = DrawOperation(
+            kind: .drawLinearGradient(
+                Gradient(stops: [GradientStop(color: .white, location: 0.0), GradientStop(color: .black, location: 1.0)]),
+                start: Point(x: 10, y: 10),
+                end: Point(x: 10, y: 10),
+                options: []
+            ),
+            state: GraphicState()
+        )
+        do {
+            try singularLinearOp.validate()
+            Issue.record("Expected singular linear gradient to fail validation")
+        } catch let errors as ValidationErrorCollection {
+            #expect(errors.values.count == 1)
+            #expect(errors.values[0].reason.contains("Linear gradient start and end points cannot be identical"))
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+        
+        // 3. Singular radial gradient (same circles, or negative radius)
+        let badRadialOp = DrawOperation(
+            kind: .drawRadialGradient(
+                Gradient(stops: [GradientStop(color: .white, location: 0.0), GradientStop(color: .black, location: 1.0)]),
+                startCenter: Point(x: 0, y: 0),
+                startRadius: -5.0,
+                endCenter: Point(x: 0, y: 0),
+                endRadius: 5.0,
+                options: []
+            ),
+            state: GraphicState()
+        )
+        do {
+            try badRadialOp.validate()
+            Issue.record("Expected radial gradient with negative radius to fail validation")
+        } catch let errors as ValidationErrorCollection {
+            #expect(errors.values.count == 1)
+            #expect(errors.values[0].reason.contains("Radial gradient start radius cannot be negative"))
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+        
+        let identicalRadialOp = DrawOperation(
+            kind: .drawRadialGradient(
+                Gradient(stops: [GradientStop(color: .white, location: 0.0), GradientStop(color: .black, location: 1.0)]),
+                startCenter: Point(x: 5, y: 5),
+                startRadius: 10.0,
+                endCenter: Point(x: 5, y: 5),
+                endRadius: 10.0,
+                options: []
+            ),
+            state: GraphicState()
+        )
+        do {
+            try identicalRadialOp.validate()
+            Issue.record("Expected radial gradient with identical circles to fail validation")
+        } catch let errors as ValidationErrorCollection {
+            #expect(errors.values.count == 1)
+            #expect(errors.values[0].reason.contains("Radial gradient start and end circles cannot be identical"))
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
 }

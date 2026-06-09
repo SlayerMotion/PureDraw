@@ -100,6 +100,11 @@ public struct GraphicsContext: Sendable, Validatable {
         currentState.transform = currentState.transform.rotated(by: angle)
     }
     
+    /// Applies a skew/shear to the CTM.
+    public mutating func skew(by x: Double, _ y: Double) {
+        currentState.transform = currentState.transform.skewedBy(x: x, y: y)
+    }
+    
     /// Concatenates the given transform with the CTM.
     public mutating func concatenate(_ transform: AffineTransform) {
         currentState.transform = currentState.transform.concatenating(transform)
@@ -186,6 +191,11 @@ public struct GraphicsContext: Sendable, Validatable {
             startAngle: startAngle,
             delta: delta
         )
+    }
+    
+    /// Appends a circular arc defined by a tangent and radius to the current path.
+    public mutating func addArc(tangent1End: Point, tangent2End: Point, radius: Double) {
+        currentPath.addArc(tangent1End: tangent1End, tangent2End: tangent2End, radius: radius)
     }
     
     // MARK: - Drawing Actions

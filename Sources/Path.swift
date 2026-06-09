@@ -19,6 +19,10 @@ public struct Path: Equatable, Sendable, Validatable {
         self.elements = elements
     }
     
+    public static var defaultValidator: Validator<Path> {
+        Validator().validating(.pathStructureIsValid)
+    }
+    
     /// Appends a move command to start a new subpath.
     public mutating func move(to point: Point) {
         elements.append(.move(to: point))
@@ -51,6 +55,29 @@ public struct Path: Equatable, Sendable, Validatable {
     
     /// Applies an affine transformation to all elements in the path, returning a new transformed path.
     public func applying(_ transform: AffineTransform) -> Path {
+        let transformedElements: [PathElement] = elements.map { element in
+            switch element {
+            case .move(let to):
+                return .move(to: to.applying(transform))
+            case .line(let to):
+                return .line(to: to.applying(transform))
+            case .quadCurve(let to, let control):
+                return .quadCurve(to: to.applying(transform), control: control.applying(transform))
+            case .cubicCurve(let to, let control1, let control2):
+                return .cubicCurve(
+                    to: to.applying(transform),
+                    control1: control1.applying(transform),
+                    control2: control2.applying(transform)
+                )
+            case .close:
+                return .close
+            }
+        }
+        return Path(elements: transformedElements)
+    }
+    
+    /// Applies a projective transformation to all elements in the path, returning a new transformed path.
+    public func applying(_ transform: ProjectiveTransform) -> Path {
         let transformedElements: [PathElement] = elements.map { element in
             switch element {
             case .move(let to):
@@ -190,7 +217,7 @@ public struct Path: Equatable, Sendable, Validatable {
         }
         
         let maxSegmentAngle = .pi / 2.0
-        let segmentCount = max(1, Int(ceil(abs(sweep) / maxSegmentAngle)))
+        let segmentCount = max(1, Int(ceil((abs(sweep) - 1e-9) / maxSegmentAngle)))
         let deltaTheta = sweep / Double(segmentCount)
         
         let startPt = Point(
@@ -199,7 +226,24 @@ public struct Path: Equatable, Sendable, Validatable {
         )
         
         if !isEmpty {
-            addLine(to: startPt)
+            var lastPoint: Point? = nil
+            if let lastElement = elements.last {
+                switch lastElement {
+                case .move(let to), .line(let to), .quadCurve(let to, _), .cubicCurve(let to, _, _):
+                    lastPoint = to
+                case .close:
+                    break
+                }
+            }
+            if let last = lastPoint {
+                let dx = last.x - startPt.x
+                let dy = last.y - startPt.y
+                if sqrt(dx * dx + dy * dy) > 1e-9 {
+                    addLine(to: startPt)
+                }
+            } else {
+                addLine(to: startPt)
+            }
         } else {
             move(to: startPt)
         }
@@ -237,5 +281,89 @@ public struct Path: Equatable, Sendable, Validatable {
             endAngle: startAngle + delta,
             clockwise: delta >= 0
         )
+    }
+    
+    /// Appends a circular arc defined by a tangent and radius to the current path.
+    public mutating func addArc(tangent1End: Point, tangent2End: Point, radius: Double) {
+        guard radius >= 0 else { return }
+        
+        var currentPoint = Point.zero
+        var hasCurrentPoint = false
+        
+        for element in elements {
+            switch element {
+            case .move(let to), .line(let to), .quadCurve(let to, _), .cubicCurve(let to, _, _):
+                currentPoint = to
+                hasCurrentPoint = true
+            case .close:
+                break
+            }
+        }
+        
+        if !hasCurrentPoint {
+            move(to: tangent1End)
+            return
+        }
+        
+        let p0 = currentPoint
+        let t1 = tangent1End
+        let t2 = tangent2End
+        
+        let dx1 = p0.x - t1.x
+        let dy1 = p0.y - t1.y
+        let dx2 = t2.x - t1.x
+        let dy2 = t2.y - t1.y
+        
+        let len1 = sqrt(dx1 * dx1 + dy1 * dy1)
+        let len2 = sqrt(dx2 * dx2 + dy2 * dy2)
+        
+        if len1 < 1e-9 || len2 < 1e-9 {
+            addLine(to: t1)
+            return
+        }
+        
+        let v1x = dx1 / len1
+        let v1y = dy1 / len1
+        let v2x = dx2 / len2
+        let v2y = dy2 / len2
+        
+        let dot = v1x * v2x + v1y * v2y
+        let cross = v1x * v2y - v1y * v2x
+        
+        if abs(cross) < 1e-9 {
+            addLine(to: t1)
+            return
+        }
+        
+        let theta = acos(max(-1.0, min(1.0, dot)))
+        let halfTheta = theta / 2.0
+        let d = radius / tan(halfTheta)
+        
+        let q1 = Point(x: t1.x + d * v1x, y: t1.y + d * v1y)
+        let q2 = Point(x: t1.x + d * v2x, y: t1.y + d * v2y)
+        
+        let h = radius / sin(halfTheta)
+        
+        let bx = v1x + v2x
+        let by = v1y + v2y
+        let blen = sqrt(bx * bx + by * by)
+        
+        guard blen > 1e-9 else {
+            addLine(to: t1)
+            return
+        }
+        
+        let ux = bx / blen
+        let uy = by / blen
+        
+        let c = Point(x: t1.x + h * ux, y: t1.y + h * uy)
+        
+        let a1 = atan2(q1.y - c.y, q1.x - c.x)
+        let a2 = atan2(q2.y - c.y, q2.x - c.x)
+        
+        addLine(to: q1)
+        
+        let clockwise = cross < 0
+        addArc(center: c, radius: radius, startAngle: a1, endAngle: a2, clockwise: clockwise)
     }
 }

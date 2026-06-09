@@ -22,6 +22,17 @@ public struct Point: Equatable, Sendable, Validatable {
         return Point(x: newX, y: newY)
     }
     
+    /// Applies a projective transformation to the point.
+    public func applying(_ t: ProjectiveTransform) -> Point {
+        let w = t.m13 * x + t.m23 * y + t.m33
+        guard w != 0.0 && w.isFinite else {
+            return Point(x: .nan, y: .nan)
+        }
+        let newX = (t.m11 * x + t.m21 * y + t.m31) / w
+        let newY = (t.m12 * x + t.m22 * y + t.m32) / w
+        return Point(x: newX, y: newY)
+    }
+    
     public static var defaultValidator: Validator<Point> {
         Validator().validating(.pointIsFinite)
     }

@@ -99,4 +99,28 @@ struct PathTests {
         path2.addArc(center: Point(x: 0, y: 0), radius: 10, startAngle: .pi / 2.0, endAngle: 0, clockwise: false)
         #expect(path2.elements.count == 2)
     }
+    
+    @Test func pathConstructionWithTangentArc() {
+        var path = Path()
+        path.move(to: Point(x: 0, y: 0))
+        path.addArc(tangent1End: Point(x: 100, y: 0), tangent2End: Point(x: 100, y: 100), radius: 50)
+        
+        // Starts at 0,0. Goes towards 100,0. Tangent point Q1 will be at 100 - 50 = 50,0.
+        // Arc goes to tangent point Q2 at 100, 50.
+        #expect(path.elements.count == 3)
+        
+        if case .line(let p) = path.elements[1] {
+            #expect(abs(p.x - 50) < 1e-9)
+            #expect(abs(p.y) < 1e-9)
+        } else {
+            Issue.record("Expected .line to tangent point")
+        }
+        
+        if case .cubicCurve(let to, _, _) = path.elements[2] {
+            #expect(abs(to.x - 100) < 1e-9)
+            #expect(abs(to.y - 50) < 1e-9)
+        } else {
+            Issue.record("Expected .cubicCurve representing the arc")
+        }
+    }
 }

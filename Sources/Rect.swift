@@ -3,6 +3,8 @@
 //  PureDraw
 //
 
+import Foundation
+
 /// A rectangle in a two-dimensional coordinate system.
 public struct Rect: Equatable, Sendable, Validatable {
     public var origin: Point
@@ -28,6 +30,131 @@ public struct Rect: Equatable, Sendable, Validatable {
     public var maxX: Double { origin.x + width }
     public var maxY: Double { origin.y + height }
     
+    public var midX: Double { origin.x + width / 2.0 }
+    public var midY: Double { origin.y + height / 2.0 }
+
+    public var isEmpty: Bool {
+        return width <= 0.0 || height <= 0.0
+    }
+
+    public func standardized() -> Rect {
+        var r = self
+        if r.width < 0 {
+            r.origin.x += r.width
+            r.width = -r.width
+        }
+        if r.height < 0 {
+            r.origin.y += r.height
+            r.height = -r.height
+        }
+        return r
+    }
+
+    public func integral() -> Rect {
+        let std = self.standardized()
+        let minX = floor(std.minX)
+        let minY = floor(std.minY)
+        let maxX = ceil(std.maxX)
+        let maxY = ceil(std.maxY)
+        return Rect(x: minX, y: minY, width: max(0.0, maxX - minX), height: max(0.0, maxY - minY))
+    }
+
+    public func insetBy(dx: Double, dy: Double) -> Rect {
+        let std = self.standardized()
+        return Rect(
+            x: std.origin.x + dx,
+            y: std.origin.y + dy,
+            width: max(0.0, std.width - 2.0 * dx),
+            height: max(0.0, std.height - 2.0 * dy)
+        )
+    }
+
+    public func offsetBy(dx: Double, dy: Double) -> Rect {
+        return Rect(
+            origin: Point(x: origin.x + dx, y: origin.y + dy),
+            width: width,
+            height: height
+        )
+    }
+
+    public func centered(in outer: Rect) -> Rect {
+        let stdSelf = self.standardized()
+        let stdOuter = outer.standardized()
+        let newX = stdOuter.origin.x + floor((stdOuter.width - stdSelf.width) / 2.0)
+        let newY = stdOuter.origin.y + floor((stdOuter.height - stdSelf.height) / 2.0)
+        return Rect(x: newX, y: newY, width: stdSelf.width, height: stdSelf.height)
+    }
+
+    public func divided(at amount: Double, from edge: RectEdge) -> (slice: Rect, remainder: Rect) {
+        let std = self.standardized()
+        let sliceAmount = min(max(0.0, amount), (edge == .minX || edge == .maxX) ? std.width : std.height)
+        
+        switch edge {
+        case .minX:
+            let slice = Rect(x: std.minX, y: std.minY, width: sliceAmount, height: std.height)
+            let remainder = Rect(x: std.minX + sliceAmount, y: std.minY, width: std.width - sliceAmount, height: std.height)
+            return (slice, remainder)
+        case .minY:
+            let slice = Rect(x: std.minX, y: std.minY, width: std.width, height: sliceAmount)
+            let remainder = Rect(x: std.minX, y: std.minY + sliceAmount, width: std.width, height: std.height - sliceAmount)
+            return (slice, remainder)
+        case .maxX:
+            let slice = Rect(x: std.maxX - sliceAmount, y: std.minY, width: sliceAmount, height: std.height)
+            let remainder = Rect(x: std.minX, y: std.minY, width: std.width - sliceAmount, height: std.height)
+            return (slice, remainder)
+        case .maxY:
+            let slice = Rect(x: std.minX, y: std.maxY - sliceAmount, width: std.width, height: sliceAmount)
+            let remainder = Rect(x: std.minX, y: std.minY, width: std.width, height: std.height - sliceAmount)
+            return (slice, remainder)
+        }
+    }
+
+    public func contains(_ point: Point) -> Bool {
+        let std = self.standardized()
+        return point.x >= std.minX && point.x <= std.maxX &&
+               point.y >= std.minY && point.y <= std.maxY
+    }
+
+    public func contains(_ other: Rect) -> Bool {
+        let std = self.standardized()
+        let stdOther = other.standardized()
+        return stdOther.minX >= std.minX && stdOther.maxX <= std.maxX &&
+               stdOther.minY >= std.minY && stdOther.maxY <= std.maxY
+    }
+
+    public func intersects(_ other: Rect) -> Bool {
+        let std = self.standardized()
+        let stdOther = other.standardized()
+        return std.minX < stdOther.maxX && stdOther.minX < std.maxX &&
+               std.minY < stdOther.maxY && stdOther.minY < std.maxY
+    }
+
+    public func union(_ other: Rect) -> Rect {
+        if self.isEmpty { return other }
+        if other.isEmpty { return self }
+        let std = self.standardized()
+        let stdOther = other.standardized()
+        let minX = min(std.minX, stdOther.minX)
+        let minY = min(std.minY, stdOther.minY)
+        let maxX = max(std.maxX, stdOther.maxX)
+        let maxY = max(std.maxY, stdOther.maxY)
+        return Rect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
+
+    public func intersection(_ other: Rect) -> Rect {
+        let std = self.standardized()
+        let stdOther = other.standardized()
+        let minX = max(std.minX, stdOther.minX)
+        let minY = max(std.minY, stdOther.minY)
+        let maxX = min(std.maxX, stdOther.maxX)
+        let maxY = min(std.maxY, stdOther.maxY)
+        if minX < maxX && minY < maxY {
+            return Rect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        } else {
+            return .zero
+        }
+    }
+    
     /// Returns the smallest rectangle that contains the original rectangle after the transformation is applied.
     public func applying(_ t: AffineTransform) -> Rect {
         let p1 = Point(x: minX, y: minY).applying(t)
@@ -44,6 +171,8 @@ public struct Rect: Equatable, Sendable, Validatable {
     }
     
     public static var defaultValidator: Validator<Rect> {
-        Validator().validating(.rectHasValidDimensions)
+        Validator()
+            .validating(.rectHasValidDimensions)
+            .validating(.rectIsFinite)
     }
 }

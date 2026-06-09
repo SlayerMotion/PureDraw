@@ -84,4 +84,13 @@ struct AffineTransformTests {
         let r3 = p.applying(t3)
         #expect(r3.x == 25 && r3.y == 25)
     }
+    
+    @Test func skewTransformation() {
+        let p = Point(x: 10, y: 10)
+        let t = PureDraw.AffineTransform.skew(x: 0.5, y: 0.0)
+        
+        let result = p.applying(t)
+        #expect(result.x == 15)
+        #expect(result.y == 10)
+    }
 }

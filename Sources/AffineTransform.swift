@@ -51,6 +51,11 @@ public struct AffineTransform: Equatable, Sendable, Validatable {
         let cosine = cos(angle)
         return AffineTransform(a: cosine, b: sine, c: -sine, d: cosine, tx: 0, ty: 0)
     }
+    
+    /// Creates a transform that skews/shears by `(x, y)` factors.
+    public static func skew(x: Double, y: Double) -> AffineTransform {
+        AffineTransform(a: 1, b: y, c: x, d: 1, tx: 0, ty: 0)
+    }
 
     /// Concatenates `t2` onto `self`. Mathematically, this is `self * t2`.
     public func concatenating(_ t2: AffineTransform) -> AffineTransform {
@@ -77,6 +82,11 @@ public struct AffineTransform: Equatable, Sendable, Validatable {
     /// Rotates the transform by `angle` radians.
     public func rotated(by angle: Double) -> AffineTransform {
         self.concatenating(.rotation(angle: angle))
+    }
+    
+    /// Skews the transform by `(x, y)` factors.
+    public func skewedBy(x: Double, y: Double) -> AffineTransform {
+        self.concatenating(.skew(x: x, y: y))
     }
 }
 
@@ -110,6 +120,8 @@ public extension AffineTransform {
     }
     
     static var defaultValidator: Validator<AffineTransform> {
-        Validator().validating(.matrixIsReversible)
+        Validator()
+            .validating(.matrixIsReversible)
+            .validating(.matrixIsFinite)
     }
 }
