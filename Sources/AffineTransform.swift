@@ -79,3 +79,33 @@ public struct AffineTransform: Equatable, Sendable {
         self.concatenating(.rotation(angle: angle))
     }
 }
+
+public extension AffineTransform {
+    /// The determinant of the transformation matrix.
+    ///
+    /// If the determinant is 0, the matrix is singular and cannot be inverted.
+    var determinant: Double {
+        return (a * d) - (b * c)
+    }
+
+    /// Returns the inverse of the affine transform.
+    ///
+    /// If the transform is singular (determinant is 0), it cannot be inverted.
+    /// In this case, the function returns `self` unchanged to prevent a crash,
+    /// which mirrors the defensive behavior of `CGAffineTransformInvert`.
+    func inverted() -> AffineTransform {
+        let det = determinant
+        if det == 0 {
+            return self // Singular matrix fallback
+        }
+        
+        return AffineTransform(
+            a: d / det,
+            b: -b / det,
+            c: -c / det,
+            d: a / det,
+            tx: (c * ty - d * tx) / det,
+            ty: (b * tx - a * ty) / det
+        )
+    }
+}
