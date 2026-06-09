@@ -207,17 +207,9 @@ public struct CanvasRenderer: Renderer {
     private func canvasBlendMode(_ mode: BlendMode) -> String {
         switch mode {
         case .normal: "source-over"
-        case .multiply: "multiply"
-        case .screen: "screen"
-        case .overlay: "overlay"
-        case .darken: "darken"
-        case .lighten: "lighten"
-        case .colorDodge: "color-dodge"
-        case .colorBurn: "color-burn"
-        case .softLight: "soft-light"
-        case .hardLight: "hard-light"
-        case .difference: "difference"
-        case .exclusion: "exclusion"
+        case .plusLighter: "lighter"
+        case .plusDarker: "darker"
+        default: mode.rawValue
         }
     }
 }

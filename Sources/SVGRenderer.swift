@@ -240,7 +240,7 @@ public struct SVGRenderer: Renderer {
         }
 
         // Blend mode (using SVG style attribute)
-        if state.blendMode != .normal {
+        if state.blendMode != .normal, state.blendMode.isCSSBlendMode {
             attrs.append("style=\"mix-blend-mode: \(state.blendMode.rawValue)\"")
         }
 

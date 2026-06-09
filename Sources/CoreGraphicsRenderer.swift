@@ -230,6 +230,22 @@
             case .hardLight: self = .hardLight
             case .difference: self = .difference
             case .exclusion: self = .exclusion
+            case .hue: self = .hue
+            case .saturation: self = .saturation
+            case .color: self = .color
+            case .luminosity: self = .luminosity
+            case .clear: self = .clear
+            case .copy: self = .copy
+            case .sourceIn: self = .sourceIn
+            case .sourceOut: self = .sourceOut
+            case .sourceAtop: self = .sourceAtop
+            case .destinationOver: self = .destinationOver
+            case .destinationIn: self = .destinationIn
+            case .destinationOut: self = .destinationOut
+            case .destinationAtop: self = .destinationAtop
+            case .xor: self = .xor
+            case .plusDarker: self = .plusDarker
+            case .plusLighter: self = .plusLighter
             }
         }
     }

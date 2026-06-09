@@ -210,6 +210,11 @@ public struct PDFRenderer: Renderer {
                 case .hardLight: "HardLight"
                 case .difference: "Difference"
                 case .exclusion: "Exclusion"
+                case .hue: "Hue"
+                case .saturation: "Saturation"
+                case .color: "Color"
+                case .luminosity: "Luminosity"
+                default: "Normal"
                 }
                 resourcesStr += "\n    /\(gsName) << /Type /ExtGState /ca \(key.ca) /CA \(key.CA) /BM /\(bmName) >>"
             }

@@ -644,4 +644,63 @@ struct RendererTests {
         try htmlData.write(to: URL(fileURLWithPath: htmlPath), atomically: true, encoding: .utf8)
         print("Generated 3D HTML Canvas preview at: \(htmlPath)")
     }
+
+    @Test func allBlendModesExecutionAndValidation() throws {
+        for mode in BlendMode.allCases {
+            var context = GraphicsContext()
+            context.saveGState()
+            context.setBlendMode(mode)
+            context.setFillColor(Color(red: 1.0, green: 0.0, blue: 0.0))
+            context.addRect(Rect(x: 10, y: 10, width: 50, height: 50))
+            context.fillPath()
+            context.restoreGState()
+
+            // 1. SVG Renderer
+            let svg = try SVGRenderer().render(context)
+            if mode != .normal, mode.isCSSBlendMode {
+                #expect(svg.contains("style=\"mix-blend-mode: \(mode.rawValue)\""))
+            } else {
+                #expect(!svg.contains("style=\"mix-blend-mode:"))
+            }
+
+            // 2. Canvas Renderer
+            let canvas = try CanvasRenderer().render(context)
+            if mode != .normal {
+                let expectedCanvasString = switch mode {
+                case .plusLighter: "lighter"
+                case .plusDarker: "darker"
+                default: mode.rawValue
+                }
+                #expect(canvas.contains("globalCompositeOperation = '\(expectedCanvasString)'"))
+            } else {
+                #expect(!canvas.contains("globalCompositeOperation"))
+            }
+
+            // 3. PDF Renderer
+            let pdf = try PDFRenderer(width: 100, height: 100).render(context)
+            #expect(!pdf.isEmpty)
+
+            // 4. PostScript Renderer
+            let ps = try PostScriptRenderer(width: 100, height: 100).render(context)
+            #expect(!ps.isEmpty)
+
+            // 5. CoreGraphics Renderer (if available)
+            #if canImport(CoreGraphics)
+                let colorSpace = CGColorSpaceCreateDeviceRGB()
+                if let cgContext = CGContext(
+                    data: nil,
+                    width: 100,
+                    height: 100,
+                    bitsPerComponent: 8,
+                    bytesPerRow: 0,
+                    space: colorSpace,
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue,
+                ) {
+                    try CoreGraphicsRenderer(context: cgContext).render(context)
+                } else {
+                    Issue.record("Failed to create offscreen CGContext in blend mode tests")
+                }
+            #endif
+        }
+    }
 }
