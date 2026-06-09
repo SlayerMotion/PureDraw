@@ -196,4 +196,41 @@ struct RendererTests {
         }
         #endif
     }
+    
+    @Test func postScriptRendererOutputStructure() throws {
+        var context = GraphicsContext()
+        context.setFillColor(Color(red: 1.0, green: 0.0, blue: 0.0)) // Red
+        context.setStrokeColor(Color(red: 0.0, green: 0.0, blue: 1.0)) // Blue
+        context.setLineWidth(4.0)
+        
+        // Draw a rect
+        context.addRect(Rect(x: 10, y: 15, width: 100, height: 200))
+        context.fillPath()
+        
+        // Draw a line
+        context.move(to: Point(x: 0, y: 0))
+        context.addLine(to: Point(x: 50, y: 50))
+        context.strokePath()
+        
+        // Create Gradient
+        let stops = [
+            GradientStop(color: .white, location: 0.0),
+            GradientStop(color: .black, location: 1.0)
+        ]
+        let grad = Gradient(stops: stops)
+        context.drawLinearGradient(grad, start: Point(x: 0, y: 0), end: Point(x: 100, y: 100))
+        
+        // Render PostScript
+        let ps = try PostScriptRenderer(width: 500, height: 500).render(context)
+        
+        // Verify EPS Headers and contents
+        #expect(ps.contains("%!PS-Adobe-3.0 EPSF-3.0"))
+        #expect(ps.contains("%%BoundingBox: 0 0 500 500"))
+        #expect(ps.contains("moveto"))
+        #expect(ps.contains("lineto"))
+        #expect(ps.contains("fill"))
+        #expect(ps.contains("stroke"))
+        #expect(ps.contains("/ShadingType 2"))
+        #expect(ps.contains("shfill"))
+    }
 }
