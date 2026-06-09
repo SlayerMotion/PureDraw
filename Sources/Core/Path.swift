@@ -22,19 +22,19 @@ public struct Path: Equatable, Sendable, Validatable {
 
     /// Creates a path containing a single rectangle.
     public init(rect: Rect) {
-        self.elements = []
+        elements = []
         addRect(rect)
     }
 
     /// Creates a path containing a single ellipse.
     public init(ellipseIn rect: Rect) {
-        self.elements = []
+        elements = []
         addEllipse(in: rect)
     }
 
     /// Creates a path containing a single rounded rectangle.
     public init(roundedRect rect: Rect, cornerWidth: Double, cornerHeight: Double) {
-        self.elements = []
+        elements = []
         addRoundedRect(in: rect, cornerWidth: cornerWidth, cornerHeight: cornerHeight)
     }
 
