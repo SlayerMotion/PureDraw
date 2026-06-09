@@ -3,12 +3,12 @@
 //  PureDraw
 //
 
+import Core
 import Foundation
-import PureDrawCore
-import PureGeometry
-import PureValidation
+import Geometry
 import Renderers
 import Testing
+import Validation
 
 #if canImport(CoreGraphics)
     import CoreGraphics

@@ -3,9 +3,9 @@
 //  PureDraw
 //
 
+import Core
 import Foundation
-import PureDrawCore
-import PureGeometry
+import Geometry
 
 /// A renderer that exports a `GraphicsContext` drawing buffer as a PDF document (binary Data).
 public struct PDFRenderer: Renderer {

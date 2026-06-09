@@ -22,11 +22,10 @@ jobs:
   swift-wasm:
     name: Swift (WASM)
     runs-on: ubuntu-latest
+    container: swift:6.0.3
     steps:
       - uses: actions/checkout@v4
       - uses: swiftwasm/setup-swiftwasm@v2
-        with:
-          swift-version: "6.0.3"
       - name: Build for WebAssembly
         run: |
           if [ ! -f Package.swift ]; then

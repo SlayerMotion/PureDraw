@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 5.9
 import PackageDescription
 
 // PureDraw - Dependency-free, Swift-native 2D graphics engine.
@@ -11,16 +11,16 @@ let deps: [Package.Dependency] = []
 /// ---------- Products ----------
 let allProducts: [Product] = {
     let pureDrawProduct = Product.singleTargetLibrary("PureDraw")
-    let pureGeometryProduct = Product.singleTargetLibrary("PureGeometry")
-    let pureValidationProduct = Product.singleTargetLibrary("PureValidation")
-    let pureDrawCoreProduct = Product.singleTargetLibrary("PureDrawCore")
+    let geometryProduct = Product.singleTargetLibrary("Geometry")
+    let validationProduct = Product.singleTargetLibrary("Validation")
+    let coreProduct = Product.singleTargetLibrary("Core")
     let renderersProduct = Product.singleTargetLibrary("Renderers")
 
     return [
         pureDrawProduct,
-        pureGeometryProduct,
-        pureValidationProduct,
-        pureDrawCoreProduct,
+        geometryProduct,
+        validationProduct,
+        coreProduct,
         renderersProduct,
     ]
 }()
@@ -28,61 +28,61 @@ let allProducts: [Product] = {
 /// ---------- Targets ----------
 let targets: [Target] = {
     // ---------- Foundation Layer ----------
-    let pureGeometryTarget = Target.target(
-        name: "PureGeometry",
-        dependencies: ["PureValidation"],
-        path: "Sources/PureGeometry",
+    let geometryTarget = Target.target(
+        name: "Geometry",
+        dependencies: ["Validation"],
+        path: "Sources/Geometry",
     )
-    let pureGeometryTestsTarget = Target.testTarget(
-        name: "PureGeometryTests",
-        dependencies: ["PureGeometry"],
-        path: "Tests/PureGeometryTests",
+    let geometryTestsTarget = Target.testTarget(
+        name: "GeometryTests",
+        dependencies: ["Geometry"],
+        path: "Tests/GeometryTests",
     )
-    let pureValidationTarget = Target.target(
-        name: "PureValidation",
-        path: "Sources/PureValidation",
+    let validationTarget = Target.target(
+        name: "Validation",
+        path: "Sources/Validation",
     )
     let foundationTargets = [
-        pureGeometryTarget,
-        pureGeometryTestsTarget,
-        pureValidationTarget,
+        geometryTarget,
+        geometryTestsTarget,
+        validationTarget,
     ]
 
     // ---------- Core Layer ----------
-    let pureDrawCoreTarget = Target.target(
-        name: "PureDrawCore",
+    let coreTarget = Target.target(
+        name: "Core",
         dependencies: [
-            "PureGeometry",
-            "PureValidation",
+            "Geometry",
+            "Validation",
         ],
-        path: "Sources/PureDrawCore",
+        path: "Sources/Core",
     )
-    let pureDrawCoreTestsTarget = Target.testTarget(
-        name: "PureDrawCoreTests",
+    let coreTestsTarget = Target.testTarget(
+        name: "CoreTests",
         dependencies: [
-            "PureGeometry",
-            "PureValidation",
-            "PureDrawCore",
+            "Geometry",
+            "Validation",
+            "Core",
         ],
-        path: "Tests/PureDrawCoreTests",
+        path: "Tests/CoreTests",
     )
     let coreTargets = [
-        pureDrawCoreTarget,
-        pureDrawCoreTestsTarget,
+        coreTarget,
+        coreTestsTarget,
     ]
 
     // ---------- Infrastructure Layer (Renderers) ----------
     let renderersTarget = Target.target(
         name: "Renderers",
-        dependencies: ["PureDrawCore"],
+        dependencies: ["Core"],
         path: "Sources/Renderers",
     )
     let renderersTestsTarget = Target.testTarget(
         name: "RenderersTests",
         dependencies: [
-            "PureGeometry",
-            "PureValidation",
-            "PureDrawCore",
+            "Geometry",
+            "Validation",
+            "Core",
             "Renderers",
         ],
         path: "Tests/RenderersTests",
@@ -96,9 +96,9 @@ let targets: [Target] = {
     let pureDrawTarget = Target.target(
         name: "PureDraw",
         dependencies: [
-            "PureGeometry",
-            "PureValidation",
-            "PureDrawCore",
+            "Geometry",
+            "Validation",
+            "Core",
             "Renderers",
         ],
         path: "Sources/PureDraw",

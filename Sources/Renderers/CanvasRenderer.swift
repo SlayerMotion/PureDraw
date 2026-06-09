@@ -3,8 +3,8 @@
 //  PureDraw
 //
 
-import PureDrawCore
-import PureGeometry
+import Core
+import Geometry
 
 /// A renderer that translates a `GraphicsContext` drawing buffer into HTML5 Canvas 2D Context JavaScript code.
 public struct CanvasRenderer: Renderer {

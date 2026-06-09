@@ -3,9 +3,9 @@
 //  PureDraw
 //
 
+import Core
 import Foundation
-import PureDrawCore
-import PureGeometry
+import Geometry
 
 /// A renderer that exports a `GraphicsContext` drawing buffer as a PostScript Level 3 (EPS) XML/Text string.
 public struct PostScriptRenderer: Renderer {

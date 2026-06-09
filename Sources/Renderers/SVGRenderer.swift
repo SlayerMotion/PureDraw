@@ -3,9 +3,9 @@
 //  PureDraw
 //
 
+import Core
 import Foundation
-import PureDrawCore
-import PureGeometry
+import Geometry
 
 /// A renderer that exports a `GraphicsContext` drawing buffer as an SVG XML string.
 public struct SVGRenderer: Renderer {

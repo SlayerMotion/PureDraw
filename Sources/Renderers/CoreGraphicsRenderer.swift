@@ -4,9 +4,9 @@
 //
 
 #if canImport(CoreGraphics)
+    import Core
     import CoreGraphics
-    import PureDrawCore
-    import PureGeometry
+    import Geometry
 
     /// A renderer that executes the PureDraw command buffer on an Apple `CGContext`.
     public struct CoreGraphicsRenderer: Renderer, @unchecked Sendable {
