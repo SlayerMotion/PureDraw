@@ -14,32 +14,15 @@ let allProducts: [Product] = {
     let pureGeometryProduct = Product.singleTargetLibrary("PureGeometry")
     let pureValidationProduct = Product.singleTargetLibrary("PureValidation")
     let pureDrawCoreProduct = Product.singleTargetLibrary("PureDrawCore")
-    let svgRendererProduct = Product.singleTargetLibrary("SVGRenderer")
-    let canvasRendererProduct = Product.singleTargetLibrary("CanvasRenderer")
-    let pdfRendererProduct = Product.singleTargetLibrary("PDFRenderer")
-    let postScriptRendererProduct = Product.singleTargetLibrary("PostScriptRenderer")
+    let renderersProduct = Product.singleTargetLibrary("Renderers")
 
-    let baseProducts = [
+    return [
         pureDrawProduct,
         pureGeometryProduct,
         pureValidationProduct,
         pureDrawCoreProduct,
-        svgRendererProduct,
-        canvasRendererProduct,
-        pdfRendererProduct,
-        postScriptRendererProduct,
+        renderersProduct,
     ]
-
-    #if os(iOS) || os(macOS)
-        let coreGraphicsRendererProduct = Product.singleTargetLibrary("CoreGraphicsRenderer")
-        let appleOnlyProducts = [
-            coreGraphicsRendererProduct,
-        ]
-    #else
-        let appleOnlyProducts: [Product] = []
-    #endif
-
-    return baseProducts + appleOnlyProducts
 }()
 
 /// ---------- Targets ----------
@@ -89,88 +72,35 @@ let targets: [Target] = {
     ]
 
     // ---------- Infrastructure Layer (Renderers) ----------
-    let svgRendererTarget = Target.target(
-        name: "SVGRenderer",
+    let renderersTarget = Target.target(
+        name: "Renderers",
         dependencies: ["PureDrawCore"],
-        path: "Sources/SVGRenderer",
+        path: "Sources/Renderers",
     )
-    let canvasRendererTarget = Target.target(
-        name: "CanvasRenderer",
-        dependencies: ["PureDrawCore"],
-        path: "Sources/CanvasRenderer",
+    let renderersTestsTarget = Target.testTarget(
+        name: "RenderersTests",
+        dependencies: [
+            "PureGeometry",
+            "PureValidation",
+            "PureDrawCore",
+            "Renderers",
+        ],
+        path: "Tests/RenderersTests",
     )
-    let pdfRendererTarget = Target.target(
-        name: "PDFRenderer",
-        dependencies: ["PureDrawCore"],
-        path: "Sources/PDFRenderer",
-    )
-    let postScriptRendererTarget = Target.target(
-        name: "PostScriptRenderer",
-        dependencies: ["PureDrawCore"],
-        path: "Sources/PostScriptRenderer",
-    )
-
-    let baseRenderers = [
-        svgRendererTarget,
-        canvasRendererTarget,
-        pdfRendererTarget,
-        postScriptRendererTarget,
+    let rendererTargets = [
+        renderersTarget,
+        renderersTestsTarget,
     ]
-
-    #if os(iOS) || os(macOS)
-        let coreGraphicsRendererTarget = Target.target(
-            name: "CoreGraphicsRenderer",
-            dependencies: ["PureDrawCore"],
-            path: "Sources/CoreGraphicsRenderer",
-        )
-        let appleOnlyRenderers = [
-            coreGraphicsRendererTarget,
-        ]
-    #else
-        let appleOnlyRenderers: [Target] = []
-    #endif
-
-    // ---------- Unified Renderer Tests ----------
-    let rendererTestsTarget = Target.testTarget(
-        name: "RendererTests",
-        dependencies: {
-            var deps: [Target.Dependency] = [
-                "PureGeometry",
-                "PureValidation",
-                "PureDrawCore",
-                "SVGRenderer",
-                "CanvasRenderer",
-                "PDFRenderer",
-                "PostScriptRenderer",
-            ]
-            #if os(iOS) || os(macOS)
-                deps.append("CoreGraphicsRenderer")
-            #endif
-            return deps
-        }(),
-        path: "Tests/RendererTests",
-    )
-
-    let rendererTargets = baseRenderers + appleOnlyRenderers + [rendererTestsTarget]
 
     // ---------- Front-Door Layer (Umbrella Target) ----------
     let pureDrawTarget = Target.target(
         name: "PureDraw",
-        dependencies: {
-            var deps: [Target.Dependency] = [
-                "PureGeometry",
-                "PureValidation",
-                "PureDrawCore",
-                "SVGRenderer",
-                "CanvasRenderer",
-                "PDFRenderer",
-                "PostScriptRenderer",
-            ]
-            #if os(iOS) || os(macOS)
-                deps.append("CoreGraphicsRenderer")
-            #endif
-            return deps
-        }(),
+        dependencies: [
+            "PureGeometry",
+            "PureValidation",
+            "PureDrawCore",
+            "Renderers",
+        ],
         path: "Sources/PureDraw",
     )
     let frontDoorTargets = [

@@ -3,17 +3,11 @@
 //  PureDraw
 //
 
-import CanvasRenderer
 import Foundation
-import PDFRenderer
-import PostScriptRenderer
 import PureDrawCore
 import PureGeometry
 import PureValidation
-import SVGRenderer
-#if os(iOS) || os(macOS)
-    import CoreGraphicsRenderer
-#endif
+import Renderers
 import Testing
 
 #if canImport(CoreGraphics)
