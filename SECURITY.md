@@ -23,6 +23,4 @@ supported.
 
 ## Scope
 
-PureDraw generates static sites. The generated output is plain HTML, CSS, and
-client-side JavaScript for rich tiles. Reports about generated output (for
-example, missing output escaping that enables script injection) are in scope.
+PureDraw is a 2D graphics engine. The package parses paths, manages graphic state, and performs vector rendering to formats like PDF, SVG, and PostScript. Reports about security vulnerabilities in the parsing logic, memory handling, or renderer bounds enforcement are in scope.

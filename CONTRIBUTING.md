@@ -17,22 +17,15 @@ be Swift instead.
 
 ## Project status
 
-PureDraw is at the documentation and design stage. The engine package is not yet
-committed, so the `swift` commands below describe the intended workflow once the
-package lands; they will not run against the repo until then. The architecture is
-in [`docs/DESIGN.md`](docs/DESIGN.md).
+PureDraw is a fully implemented dependency-free 2D graphics engine. The architecture is in [`docs/DESIGN.md`](docs/DESIGN.md).
 
 ## Getting started
 
-Will require a recent Swift toolchain (Swift 6.1+). PureDraw is a monorepo: a
-workspace at the root, a single `Package.swift` under `Packages/`, and `Apps/`
-for app targets. Once the package is in:
+Requires a recent Swift toolchain (Swift 6.0+). PureDraw's package is defined by a single `Package.swift` at the root of the repository:
 
 ```sh
-cd Packages
 swift build
 swift test
-swift run puredraw            # renders a demo page to stdout
 ```
 
 Install the project git hooks once after cloning:
@@ -44,8 +37,7 @@ git config core.hooksPath .githooks
 This wires three hooks: `commit-msg` and `pre-commit` reject forbidden style tells
 (em dashes, tool-attribution) in messages and staged content, and `pre-push` runs
 the style, namespacing, format, lint, build, and test gates. The same gates run in
-GitHub CI (`.github/workflows/ci.yml`) as the backstop. The Swift gates are inert
-until the package lands.
+GitHub CI (`.github/workflows/ci.yml`) as the backstop.
 
 ## Conventions
 
@@ -105,4 +97,4 @@ For features, an issue is recommended when the scope is non-trivial.
 ## License
 
 By contributing, you agree that your contributions are licensed under the
-project's [GNU AGPL v3.0](LICENSE).
+project's [MIT License](LICENSE).

@@ -24,26 +24,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install toolchain dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
-      - name: Install swiftly
-        run: |
-          curl -L https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz > swiftly.tar.gz
-          tar zxf swiftly.tar.gz
-          ./swiftly init --quiet-shell-followup --assume-yes --skip-install
-      - name: Install Swift and the wasm SDK
-        run: |
-          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
-          swiftly install --use 6.3.2
-          swift sdk install https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
+      - uses: swiftwasm/setup-swiftwasm@v2
+        with:
+          swift-version: "6.0.3"
       - name: Build for WebAssembly
         run: |
-          . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
           if [ ! -f Package.swift ]; then
             echo "No Package.swift yet; skipping WASM build."
             exit 0
           fi
-          swift build --swift-sdk swift-6.3.2-RELEASE_wasm
-          swift build -c release --swift-sdk swift-6.3.2-RELEASE_wasm
+          swift build --triple wasm32-unknown-wasip1
+          swift build -c release --triple wasm32-unknown-wasip1
