@@ -15,7 +15,7 @@ import Foundation
 /// [ c   d   0 ]
 /// [ tx  ty  1 ]
 /// ```
-public struct AffineTransform: Equatable, Sendable {
+public struct AffineTransform: Equatable, Sendable, Validatable {
     public var a: Double
     public var b: Double
     public var c: Double

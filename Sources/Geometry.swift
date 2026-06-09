@@ -4,7 +4,7 @@
 //
 
 /// A point in a two-dimensional coordinate system.
-public struct Point: Equatable, Sendable {
+public struct Point: Equatable, Sendable, Validatable {
     public var x: Double
     public var y: Double
     
@@ -24,7 +24,7 @@ public struct Point: Equatable, Sendable {
 }
 
 /// A rectangle in a two-dimensional coordinate system.
-public struct Rect: Equatable, Sendable {
+public struct Rect: Equatable, Sendable, Validatable {
     public var origin: Point
     public var width: Double
     public var height: Double
