@@ -7,36 +7,36 @@
 public struct ValidationCodingKey: CodingKey, Sendable, CustomStringConvertible {
     public var stringValue: String
     public var intValue: Int?
-    
+
     public init(stringValue: String) {
         self.stringValue = stringValue
-        self.intValue = nil
+        intValue = nil
     }
-    
+
     public init(intValue: Int) {
-        self.stringValue = String(intValue)
+        stringValue = String(intValue)
         self.intValue = intValue
     }
-    
+
     public init(_ stringValue: String) {
         self.stringValue = stringValue
-        self.intValue = nil
+        intValue = nil
     }
-    
+
     public init(_ intValue: Int) {
-        self.stringValue = String(intValue)
+        stringValue = String(intValue)
         self.intValue = intValue
     }
-    
+
     public var description: String {
-        return stringValue
+        stringValue
     }
 }
 
-public extension Array where Element == CodingKey {
+public extension [CodingKey] {
     /// Formats the array of coding keys into a string, using dot-notation for keys and brackets for indices.
     var stringValue: String {
-        return self.map { key in
+        map { key in
             if let intValue = key.intValue {
                 return "[\(intValue)]"
             }
@@ -48,4 +48,3 @@ public extension Array where Element == CodingKey {
         }.joined()
     }
 }
-

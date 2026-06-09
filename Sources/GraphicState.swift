@@ -7,43 +7,43 @@
 public struct GraphicState: Equatable, Sendable, Validatable {
     /// The Current Transformation Matrix (CTM).
     public var transform: AffineTransform
-    
+
     /// The color used when stroking a path.
     public var strokeColor: Color
-    
+
     /// The color used when filling a path.
     public var fillColor: Color
-    
+
     /// The width of stroked lines.
     public var lineWidth: Double
-    
+
     /// The line cap style for stroked lines.
     public var lineCap: LineCap
-    
+
     /// The line join style for stroked path joints.
     public var lineJoin: LineJoin
-    
+
     /// The limit for miter joins.
     public var miterLimit: Double
-    
+
     /// The dash lengths for strokes. An empty array indicates a solid line.
     public var dashPattern: [Double]
-    
+
     /// The phase offset at which to start the dash pattern.
     public var dashPhase: Double
-    
+
     /// The opacity multiplier (0.0 to 1.0).
     public var alpha: Double
-    
+
     /// The blend mode.
     public var blendMode: BlendMode
-    
+
     /// The current accumulated clipping path.
     public var clipPath: Path?
-    
+
     /// The shadow properties to apply to drawing operations.
     public var shadow: Shadow?
-    
+
     public init(
         transform: AffineTransform = .identity,
         strokeColor: Color = .black,
@@ -57,7 +57,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         alpha: Double = 1.0,
         blendMode: BlendMode = .normal,
         clipPath: Path? = nil,
-        shadow: Shadow? = nil
+        shadow: Shadow? = nil,
     ) {
         self.transform = transform
         self.strokeColor = strokeColor
@@ -73,7 +73,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         self.clipPath = clipPath
         self.shadow = shadow
     }
-    
+
     public static var defaultValidator: Validator<GraphicState> {
         Validator().validating(.graphicStateIsValid)
     }

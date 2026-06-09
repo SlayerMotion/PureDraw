@@ -7,21 +7,21 @@
 public protocol Validatable: Sendable {
     /// The default validator for this type, containing standard checks.
     static var defaultValidator: Validator<Self> { get }
-    
+
     /// Internal helper to dynamically evaluate default validations during traversal.
     func runDefaultValidator(at codingPath: [CodingKey], in document: Any) -> [ValidationError]
 }
 
 public extension Validatable {
     static var defaultValidator: Validator<Self> {
-        return .blank
+        .blank
     }
-    
+
     func runDefaultValidator(at codingPath: [CodingKey], in document: Any) -> [ValidationError] {
         let doc = (document as? Self) ?? self
         return Self.defaultValidator.apply(to: self, at: codingPath, in: doc)
     }
-    
+
     /// Validates the object and all of its nested children using the provided validator.
     /// Throws a `ValidationErrorCollection` if any validations fail.
     func validate(using validator: Validator<Self> = .blank) throws {

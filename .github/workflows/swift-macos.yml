@@ -21,11 +21,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Format, lint, build, test
         run: |
-          if [ ! -f Packages/Package.swift ]; then
-            echo "No Packages/Package.swift yet; skipping Swift gates."
+          if [ ! -f Package.swift ]; then
+            echo "No Package.swift yet; skipping Swift gates."
             exit 0
           fi
           brew install swiftformat swiftlint
           swiftformat . --config .swiftformat --lint
           swiftlint --config .swiftlint.yml --strict
-          cd Packages && swift build && swift test
+          swift build && swift test

@@ -13,12 +13,12 @@ let package = Package(
     targets: [
         .target(
             name: "PureDraw",
-            path: "Sources"
+            path: "Sources",
         ),
         .testTarget(
             name: "PureDrawTests",
             dependencies: ["PureDraw"],
-            path: "Tests"
+            path: "Tests",
         ),
-    ]
+    ],
 )

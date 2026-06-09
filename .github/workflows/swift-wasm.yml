@@ -41,10 +41,9 @@ jobs:
       - name: Build for WebAssembly
         run: |
           . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
-          if [ ! -f Packages/Package.swift ]; then
-            echo "No Packages/Package.swift yet; skipping WASM build."
+          if [ ! -f Package.swift ]; then
+            echo "No Package.swift yet; skipping WASM build."
             exit 0
           fi
-          cd Packages
           swift build --swift-sdk swift-6.3.2-RELEASE_wasm
           swift build -c release --swift-sdk swift-6.3.2-RELEASE_wasm

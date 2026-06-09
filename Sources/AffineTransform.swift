@@ -1,4 +1,5 @@
 import Foundation
+
 //
 //  AffineTransform.swift
 //  PureDraw
@@ -51,7 +52,7 @@ public struct AffineTransform: Equatable, Sendable, Validatable {
         let cosine = cos(angle)
         return AffineTransform(a: cosine, b: sine, c: -sine, d: cosine, tx: 0, ty: 0)
     }
-    
+
     /// Creates a transform that skews/shears by `(x, y)` factors.
     public static func skew(x: Double, y: Double) -> AffineTransform {
         AffineTransform(a: 1, b: y, c: x, d: 1, tx: 0, ty: 0)
@@ -59,34 +60,34 @@ public struct AffineTransform: Equatable, Sendable, Validatable {
 
     /// Concatenates `t2` onto `self`. Mathematically, this is `self * t2`.
     public func concatenating(_ t2: AffineTransform) -> AffineTransform {
-        let newA = self.a * t2.a + self.b * t2.c
-        let newB = self.a * t2.b + self.b * t2.d
-        let newC = self.c * t2.a + self.d * t2.c
-        let newD = self.c * t2.b + self.d * t2.d
-        let newTx = self.tx * t2.a + self.ty * t2.c + t2.tx
-        let newTy = self.tx * t2.b + self.ty * t2.d + t2.ty
+        let newA = a * t2.a + b * t2.c
+        let newB = a * t2.b + b * t2.d
+        let newC = c * t2.a + d * t2.c
+        let newD = c * t2.b + d * t2.d
+        let newTx = tx * t2.a + ty * t2.c + t2.tx
+        let newTy = tx * t2.b + ty * t2.d + t2.ty
 
         return AffineTransform(a: newA, b: newB, c: newC, d: newD, tx: newTx, ty: newTy)
     }
-    
+
     /// Translates the transform by `(x, y)`.
     public func translatedBy(x: Double, y: Double) -> AffineTransform {
-        self.concatenating(.translation(x: x, y: y))
+        concatenating(.translation(x: x, y: y))
     }
-    
+
     /// Scales the transform by `(x, y)`.
     public func scaledBy(x: Double, y: Double) -> AffineTransform {
-        self.concatenating(.scale(x: x, y: y))
+        concatenating(.scale(x: x, y: y))
     }
-    
+
     /// Rotates the transform by `angle` radians.
     public func rotated(by angle: Double) -> AffineTransform {
-        self.concatenating(.rotation(angle: angle))
+        concatenating(.rotation(angle: angle))
     }
-    
+
     /// Skews the transform by `(x, y)` factors.
     public func skewedBy(x: Double, y: Double) -> AffineTransform {
-        self.concatenating(.skew(x: x, y: y))
+        concatenating(.skew(x: x, y: y))
     }
 }
 
@@ -95,7 +96,7 @@ public extension AffineTransform {
     ///
     /// If the determinant is 0, the matrix is singular and cannot be inverted.
     var determinant: Double {
-        return (a * d) - (b * c)
+        (a * d) - (b * c)
     }
 
     /// Returns the inverse of the affine transform.
@@ -108,17 +109,17 @@ public extension AffineTransform {
         if det == 0 {
             return self // Singular matrix fallback
         }
-        
+
         return AffineTransform(
             a: d / det,
             b: -b / det,
             c: -c / det,
             d: a / det,
             tx: (c * ty - d * tx) / det,
-            ty: (b * tx - a * ty) / det
+            ty: (b * tx - a * ty) / det,
         )
     }
-    
+
     static var defaultValidator: Validator<AffineTransform> {
         Validator()
             .validating(.matrixIsReversible)

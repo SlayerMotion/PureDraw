@@ -18,7 +18,7 @@ bash scripts/check-style.sh || FAIL=1
 bash scripts/check-namespacing.sh || FAIL=1
 
 # Swift gates, only when the package exists.
-if [ -f Packages/Package.swift ]; then
+if [ -f Package.swift ]; then
   if command -v swiftformat >/dev/null 2>&1; then
     swiftformat . --config .swiftformat --lint || FAIL=1
   else
@@ -29,7 +29,7 @@ if [ -f Packages/Package.swift ]; then
   else
     echo "pre-push: swiftlint not installed, skipping lint check" >&2
   fi
-  ( cd Packages && swift build && swift test ) || FAIL=1
+  ( swift build && swift test ) || FAIL=1
 fi
 
 if [ "$FAIL" -ne 0 ]; then

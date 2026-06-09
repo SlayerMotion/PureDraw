@@ -11,15 +11,15 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
         case drawLinearGradient(Gradient, start: Point, end: Point, options: GradientDrawingOptions)
         case drawRadialGradient(Gradient, startCenter: Point, startRadius: Double, endCenter: Point, endRadius: Double, options: GradientDrawingOptions)
     }
-    
+
     public let kind: Kind
     public let state: GraphicState
-    
+
     public init(kind: Kind, state: GraphicState) {
         self.kind = kind
         self.state = state
     }
-    
+
     public static var defaultValidator: Validator<DrawOperation> {
         Validator()
             .validating(.drawOperationPathIsNotEmpty)

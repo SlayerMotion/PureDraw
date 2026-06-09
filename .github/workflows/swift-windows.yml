@@ -29,10 +29,10 @@ jobs:
       - name: Build portable targets (debug and release)
         shell: bash
         run: |
-          if [ ! -f Packages/Package.swift ]; then
-            echo "No Packages/Package.swift yet; skipping Swift gates."
+          if [ ! -f Package.swift ]; then
+            echo "No Package.swift yet; skipping Swift gates."
             exit 0
           fi
           # Replace with the specific portable library targets if the package has
           # macOS-host-only targets that must be excluded on Windows.
-          cd Packages && swift build && swift build -c release
+          swift build && swift build -c release

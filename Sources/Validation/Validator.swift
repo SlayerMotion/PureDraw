@@ -6,54 +6,54 @@
 /// A coordinator that holds an active set of validation rules.
 public struct Validator<Document: Sendable>: Sendable {
     private var validations: [AnyValidation<Document>]
-    
+
     public init(validations: [AnyValidation<Document>] = []) {
         self.validations = validations
     }
-    
+
     /// A validator with no rules attached.
     public static var blank: Validator<Document> {
-        return Validator()
+        Validator()
     }
-    
+
     /// Adds a pre-constructed validation to this validator.
-    public func validating<Subject>(_ validation: Validation<Document, Subject>) -> Validator<Document> {
+    public func validating(_ validation: Validation<Document, some Any>) -> Validator<Document> {
         var copy = self
         copy.validations.append(AnyValidation(validation))
         return copy
     }
-    
+
     /// Adds a single-error boolean validation to this validator.
     public func validating<Subject>(
         _ description: String,
         check: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool,
-        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool = { _ in true }
+        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool = { _ in true },
     ) -> Validator<Document> {
-        return validating(Validation(description: description, check: check, when: predicate))
+        validating(Validation(description: description, check: check, when: predicate))
     }
-    
+
     /// Adds a validation closure that returns multiple validation errors.
     public func validating<Subject>(
-        _ validate: @escaping @Sendable (ValidationContext<Document, Subject>) -> [ValidationError]
+        _ validate: @escaping @Sendable (ValidationContext<Document, Subject>) -> [ValidationError],
     ) -> Validator<Document> {
-        return validating(Validation(check: validate, when: { _ in true }))
+        validating(Validation(check: validate, when: { _ in true }))
     }
-    
+
     /// Adds a validation closure and predicate that returns multiple validation errors.
     public func validating<Subject>(
         _ validate: @escaping @Sendable (ValidationContext<Document, Subject>) -> [ValidationError],
-        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool
+        when predicate: @escaping @Sendable (ValidationContext<Document, Subject>) -> Bool,
     ) -> Validator<Document> {
-        return validating(Validation(check: validate, when: predicate))
+        validating(Validation(check: validate, when: predicate))
     }
-    
+
     /// Returns the descriptions of all active rules in this validator.
     public var validationDescriptions: [String] {
-        return validations.map { $0.description }
+        validations.map(\.description)
     }
-    
+
     /// Applies all relevant validations to the given subject.
     public func apply(to subject: Any, at codingPath: [CodingKey], in document: Document) -> [ValidationError] {
-        return validations.flatMap { $0.apply(to: subject, at: codingPath, in: document) }
+        validations.flatMap { $0.apply(to: subject, at: codingPath, in: document) }
     }
 }
