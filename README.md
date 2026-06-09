@@ -51,8 +51,8 @@ classDef todo fill:#8e8e93,stroke:#000,color:#fff
 classDef blocked fill:#ff3b30,stroke:#000,color:#fff
 
 E0["E0 (#1): Mathematical Primitives"]:::done
-E1["E1 (#2): Path Construction"]:::active
-E2["E2 (#3): Graphic State Management"]:::todo
+E1["E1 (#2): Path Construction"]:::done
+E2["E2 (#3): Graphic State Management"]:::active
 E3["E3 (#4): Rendering Bridge"]:::todo
 
 E0 --> E1
