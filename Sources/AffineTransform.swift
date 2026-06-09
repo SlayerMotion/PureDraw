@@ -108,4 +108,8 @@ public extension AffineTransform {
             ty: (b * tx - a * ty) / det
         )
     }
+    
+    static var defaultValidator: Validator<AffineTransform> {
+        Validator().validating(.matrixIsReversible)
+    }
 }

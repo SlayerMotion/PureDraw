@@ -7,7 +7,7 @@
 ///
 /// This enumeration maps 1:1 with the fundamental path construction operators 
 /// defined in the PDF specification and Apple's CoreGraphics (\`CGPathElementType\`).
-public enum PathElement: Equatable, Sendable {
+public enum PathElement: Equatable, Sendable, Validatable {
     /// Begins a new subpath at the specified point. (PDF: \`m\`)
     case move(to: Point)
     

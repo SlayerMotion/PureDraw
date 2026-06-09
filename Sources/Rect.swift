@@ -42,4 +42,8 @@ public struct Rect: Equatable, Sendable, Validatable {
         
         return Rect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
+    
+    public static var defaultValidator: Validator<Rect> {
+        Validator().validating(.rectHasValidDimensions)
+    }
 }

@@ -21,4 +21,8 @@ public struct Point: Equatable, Sendable, Validatable {
         let newY = t.b * x + t.d * y + t.ty
         return Point(x: newX, y: newY)
     }
+    
+    public static var defaultValidator: Validator<Point> {
+        Validator().validating(.pointIsFinite)
+    }
 }
