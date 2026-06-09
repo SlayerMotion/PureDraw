@@ -28,3 +28,11 @@ PureDraw implements the mathematical foundation of 2D rendering:
 
 ## License
 MIT.
+
+## Community & Documentation
+
+- [CONTRIBUTING.md](CONTRIBUTING.md): Guidelines for submitting PRs and feature requests.
+- [SECURITY.md](SECURITY.md): Vulnerability reporting instructions.
+- [SUPPORT.md](SUPPORT.md): How to get help.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): Community standards.
+- [AGENTS.md](AGENTS.md): AI Agent instructions for working within this repository.
