@@ -11,7 +11,14 @@ let package = Package(
         .library(name: "PureDraw", targets: ["PureDraw"]),
     ],
     targets: [
-        .target(name: "PureDraw"),
-        .testTarget(name: "PureDrawTests", dependencies: ["PureDraw"]),
+        .target(
+            name: "PureDraw",
+            path: "Sources"
+        ),
+        .testTarget(
+            name: "PureDrawTests",
+            dependencies: ["PureDraw"],
+            path: "Tests"
+        ),
     ]
 )
