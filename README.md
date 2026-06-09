@@ -20,6 +20,46 @@ It provides a "Virtual PostScript Machine" API compatible with CoreGraphics (Qua
 
 It is a sibling project to [PureXML](https://github.com/mihaelamj/PureXML) and [PureYAML](https://github.com/mihaelamj/PureYAML).
 
+## Roadmap
+
+```mermaid
+flowchart TB
+classDef done fill:#34c759,stroke:#000,color:#fff
+classDef active fill:#007aff,stroke:#000,color:#fff
+classDef review fill:#ff9500,stroke:#000,color:#fff
+classDef todo fill:#8e8e93,stroke:#000,color:#fff
+classDef blocked fill:#ff3b30,stroke:#000,color:#fff
+
+L1["Done"]:::done
+L2["Active"]:::active
+L3["Review"]:::review
+L4["To Do"]:::todo
+L5["Blocked"]:::blocked
+
+L1 ~~~ L2
+L2 ~~~ L3
+L3 ~~~ L4
+L4 ~~~ L5
+```
+
+```mermaid
+flowchart TB
+classDef done fill:#34c759,stroke:#000,color:#fff
+classDef active fill:#007aff,stroke:#000,color:#fff
+classDef review fill:#ff9500,stroke:#000,color:#fff
+classDef todo fill:#8e8e93,stroke:#000,color:#fff
+classDef blocked fill:#ff3b30,stroke:#000,color:#fff
+
+E0["E0 (#1): Mathematical Primitives"]:::done
+E1["E1 (#2): Path Construction"]:::active
+E2["E2 (#3): Graphic State Management"]:::todo
+E3["E3 (#4): Rendering Bridge"]:::todo
+
+E0 --> E1
+E1 --> E2
+E2 --> E3
+```
+
 ## Philosophy
 PureDraw implements the mathematical foundation of 2D rendering:
 1. **Affine Transforms:** Full 3x3 Matrix math for coordinate space mapping.
