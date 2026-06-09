@@ -245,4 +245,21 @@ struct GraphicsContextTests {
         context.fillEllipse(in: rect)
         #expect(context.commands.count == 5)
     }
+
+    @Test func contextCurrentPoint() {
+        var context = GraphicsContext()
+        #expect(context.currentPoint == Point.zero)
+
+        context.move(to: Point(x: 15, y: 25))
+        #expect(context.currentPoint == Point(x: 15, y: 25))
+
+        context.addLine(to: Point(x: 50, y: 75))
+        #expect(context.currentPoint == Point(x: 50, y: 75))
+
+        context.closeSubpath()
+        #expect(context.currentPoint == Point(x: 15, y: 25))
+
+        context.strokePath()
+        #expect(context.currentPoint == Point.zero)
+    }
 }

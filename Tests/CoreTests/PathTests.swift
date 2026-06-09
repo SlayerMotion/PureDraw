@@ -147,4 +147,27 @@ struct PathTests {
             Issue.record("Expected .line")
         }
     }
+
+    @Test func pathCurrentPoint() {
+        var path = Path()
+        #expect(path.currentPoint == Point.zero)
+
+        path.move(to: Point(x: 10, y: 15))
+        #expect(path.currentPoint == Point(x: 10, y: 15))
+
+        path.addLine(to: Point(x: 100, y: 20))
+        #expect(path.currentPoint == Point(x: 100, y: 20))
+
+        path.addQuadCurve(to: Point(x: 200, y: 30), control: Point(x: 150, y: 25))
+        #expect(path.currentPoint == Point(x: 200, y: 30))
+
+        path.addCurve(to: Point(x: 300, y: 40), control1: Point(x: 220, y: 35), control2: Point(x: 280, y: 45))
+        #expect(path.currentPoint == Point(x: 300, y: 40))
+
+        path.closeSubpath()
+        #expect(path.currentPoint == Point(x: 10, y: 15))
+
+        path.move(to: Point(x: 50, y: 60))
+        #expect(path.currentPoint == Point(x: 50, y: 60))
+    }
 }

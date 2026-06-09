@@ -14,6 +14,20 @@ public struct Rect: Equatable, Sendable, Validatable {
 
     public static let zero = Rect(origin: Point.zero, width: 0, height: 0)
 
+    /// A null rectangle sentinel.
+    public static let null = Rect(
+        origin: Point(x: Double.infinity, y: Double.infinity),
+        width: 0.0,
+        height: 0.0
+    )
+
+    /// An infinite rectangle sentinel.
+    public static let infinite = Rect(
+        origin: Point(x: -Double.infinity, y: -Double.infinity),
+        width: Double.infinity,
+        height: Double.infinity
+    )
+
     public init(origin: Point, width: Double, height: Double) {
         self.origin = origin
         self.width = width
@@ -50,11 +64,23 @@ public struct Rect: Equatable, Sendable, Validatable {
         origin.y + height / 2.0
     }
 
+    /// Returns true if the rectangle is a null rectangle.
+    public var isNull: Bool {
+        origin.x == Double.infinity && origin.y == Double.infinity && width == 0.0 && height == 0.0
+    }
+
+    /// Returns true if the rectangle is an infinite rectangle.
+    public var isInfinite: Bool {
+        origin.x == -Double.infinity && origin.y == -Double.infinity && width == Double.infinity && height == Double.infinity
+    }
+
     public var isEmpty: Bool {
-        width <= 0.0 || height <= 0.0
+        isNull || width <= 0.0 || height <= 0.0
     }
 
     public func standardized() -> Rect {
+        if isNull { return .null }
+        if isInfinite { return .infinite }
         var r = self
         if r.width < 0 {
             r.origin.x += r.width
@@ -68,6 +94,8 @@ public struct Rect: Equatable, Sendable, Validatable {
     }
 
     public func integral() -> Rect {
+        if isNull { return .null }
+        if isInfinite { return .infinite }
         let std = standardized()
         let minX = floor(std.minX)
         let minY = floor(std.minY)
@@ -77,6 +105,8 @@ public struct Rect: Equatable, Sendable, Validatable {
     }
 
     public func insetBy(dx: Double, dy: Double) -> Rect {
+        if isNull { return .null }
+        if isInfinite { return .infinite }
         let std = standardized()
         return Rect(
             x: std.origin.x + dx,
@@ -87,7 +117,9 @@ public struct Rect: Equatable, Sendable, Validatable {
     }
 
     public func offsetBy(dx: Double, dy: Double) -> Rect {
-        Rect(
+        if isNull { return .null }
+        if isInfinite { return .infinite }
+        return Rect(
             origin: Point(x: origin.x + dx, y: origin.y + dy),
             width: width,
             height: height
@@ -95,6 +127,8 @@ public struct Rect: Equatable, Sendable, Validatable {
     }
 
     public func centered(in outer: Rect) -> Rect {
+        if isNull { return .null }
+        if isInfinite { return .infinite }
         let stdSelf = standardized()
         let stdOuter = outer.standardized()
         let newX = stdOuter.origin.x + floor((stdOuter.width - stdSelf.width) / 2.0)
@@ -103,6 +137,8 @@ public struct Rect: Equatable, Sendable, Validatable {
     }
 
     public func divided(at amount: Double, from edge: RectEdge) -> (slice: Rect, remainder: Rect) {
+        if isNull { return (.null, .null) }
+        if isInfinite { return (.infinite, .infinite) }
         let std = standardized()
         let sliceAmount = min(max(0.0, amount), (edge == .minX || edge == .maxX) ? std.width : std.height)
 
@@ -127,12 +163,17 @@ public struct Rect: Equatable, Sendable, Validatable {
     }
 
     public func contains(_ point: Point) -> Bool {
+        if isNull { return false }
+        if isInfinite { return point.x.isFinite && point.y.isFinite }
         let std = standardized()
         return point.x >= std.minX && point.x <= std.maxX &&
             point.y >= std.minY && point.y <= std.maxY
     }
 
     public func contains(_ other: Rect) -> Bool {
+        if isNull || other.isNull { return false }
+        if isInfinite { return true }
+        if other.isInfinite { return false }
         let std = standardized()
         let stdOther = other.standardized()
         return stdOther.minX >= std.minX && stdOther.maxX <= std.maxX &&
@@ -140,6 +181,8 @@ public struct Rect: Equatable, Sendable, Validatable {
     }
 
     public func intersects(_ other: Rect) -> Bool {
+        if isNull || other.isNull { return false }
+        if isInfinite || other.isInfinite { return true }
         let std = standardized()
         let stdOther = other.standardized()
         return std.minX < stdOther.maxX && stdOther.minX < std.maxX &&
@@ -147,6 +190,9 @@ public struct Rect: Equatable, Sendable, Validatable {
     }
 
     public func union(_ other: Rect) -> Rect {
+        if isNull { return other }
+        if other.isNull { return self }
+        if isInfinite || other.isInfinite { return .infinite }
         if isEmpty { return other }
         if other.isEmpty { return self }
         let std = standardized()
@@ -159,6 +205,9 @@ public struct Rect: Equatable, Sendable, Validatable {
     }
 
     public func intersection(_ other: Rect) -> Rect {
+        if isNull || other.isNull { return .null }
+        if isInfinite { return other.standardized() }
+        if other.isInfinite { return standardized() }
         let std = standardized()
         let stdOther = other.standardized()
         let minX = max(std.minX, stdOther.minX)
@@ -168,12 +217,14 @@ public struct Rect: Equatable, Sendable, Validatable {
         if minX < maxX, minY < maxY {
             return Rect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
         } else {
-            return .zero
+            return .null
         }
     }
 
     /// Returns the smallest rectangle that contains the original rectangle after the transformation is applied.
     public func applying(_ t: AffineTransform) -> Rect {
+        if isNull { return .null }
+        if isInfinite { return .infinite }
         let p1 = Point(x: minX, y: minY).applying(t)
         let p2 = Point(x: maxX, y: minY).applying(t)
         let p3 = Point(x: minX, y: maxY).applying(t)

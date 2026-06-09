@@ -72,6 +72,29 @@ public struct Path: Equatable, Sendable, Validatable {
         elements.isEmpty
     }
 
+    /// Returns the current point of the path, or Point.zero if empty.
+    public var currentPoint: Point {
+        var current = Point.zero
+        var subpathStart = Point.zero
+
+        for element in elements {
+            switch element {
+            case let .move(to):
+                current = to
+                subpathStart = to
+            case let .line(to):
+                current = to
+            case let .quadCurve(to, _):
+                current = to
+            case let .cubicCurve(to, _, _):
+                current = to
+            case .close:
+                current = subpathStart
+            }
+        }
+        return current
+    }
+
     /// Applies an affine transformation to all elements in the path, returning a new transformed path.
     public func applying(_ transform: Geometry.AffineTransform) -> Path {
         let transformedElements: [PathElement] = elements.map { element in

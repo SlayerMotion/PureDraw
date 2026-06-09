@@ -17,6 +17,11 @@ public struct GraphicsContext: Sendable, Validatable {
     /// The current path being built.
     public private(set) var currentPath: Path = .init()
 
+    /// The current point of the context's path.
+    public var currentPoint: Point {
+        currentPath.currentPoint
+    }
+
     /// The current active graphics state.
     public private(set) var currentState: GraphicState = .init()
 

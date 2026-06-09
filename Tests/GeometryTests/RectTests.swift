@@ -97,4 +97,53 @@ struct RectTests {
         let intersectRect = r1.intersection(r2)
         #expect(intersectRect.isEmpty == true)
     }
+
+    @Test func rectNullAndInfinite() {
+        let n = Rect.null
+        let inf = Rect.infinite
+
+        #expect(n.isNull == true)
+        #expect(n.isInfinite == false)
+        #expect(n.isEmpty == true)
+
+        #expect(inf.isNull == false)
+        #expect(inf.isInfinite == true)
+        #expect(inf.isEmpty == false)
+
+        // Union of null with any rect should be that rect
+        let r1 = Rect(x: 10, y: 20, width: 30, height: 40)
+        #expect(n.union(r1) == r1)
+        #expect(r1.union(n) == r1)
+
+        // Intersection of null with any rect should be null
+        #expect(n.intersection(r1).isNull == true)
+        #expect(r1.intersection(n).isNull == true)
+
+        // Union with infinite should be infinite
+        #expect(inf.union(r1).isInfinite == true)
+        #expect(r1.union(inf).isInfinite == true)
+
+        // Intersection with infinite should be the standardized rect
+        #expect(inf.intersection(r1) == r1.standardized())
+        #expect(r1.intersection(inf) == r1.standardized())
+
+        // Inset and offset on null / infinite should return null / infinite
+        #expect(n.insetBy(dx: 10, dy: 10).isNull == true)
+        #expect(n.offsetBy(dx: 10, dy: 10).isNull == true)
+        #expect(inf.insetBy(dx: 10, dy: 10).isInfinite == true)
+        #expect(inf.offsetBy(dx: 10, dy: 10).isInfinite == true)
+
+        // Contains point
+        #expect(n.contains(Point(x: 0, y: 0)) == false)
+        #expect(inf.contains(Point(x: 0, y: 0)) == true)
+
+        // Contains rect
+        #expect(n.contains(r1) == false)
+        #expect(inf.contains(r1) == true)
+        #expect(r1.contains(n) == false)
+
+        // Intersects
+        #expect(n.intersects(r1) == false)
+        #expect(inf.intersects(r1) == true)
+    }
 }
