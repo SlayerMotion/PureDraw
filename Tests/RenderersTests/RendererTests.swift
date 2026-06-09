@@ -507,6 +507,48 @@ struct RendererTests {
         context.strokePath()
         context.restoreGState()
 
+        // 3c. Draw a floating 3D sphere next to the cube (using a clipped radial gradient)
+        context.saveGState()
+
+        let sphereCenter3D = Point3D(x: -120, y: 20, z: 220)
+        let sphereRadius3D = 40.0
+
+        let sphereFactor = 300.0 / (sphereCenter3D.z + 300.0)
+        let sphereCenter2D = sphereCenter3D.projected(viewportSize: 500, cameraDistance: 300)
+        let sphereRadius2D = sphereRadius3D * sphereFactor
+
+        // Clip to the sphere's circle path
+        var spherePath = Path()
+        spherePath.addEllipse(in: Rect(
+            x: sphereCenter2D.x - sphereRadius2D,
+            y: sphereCenter2D.y - sphereRadius2D,
+            width: 2.0 * sphereRadius2D,
+            height: 2.0 * sphereRadius2D
+        ))
+        context.addPath(spherePath)
+        context.clip()
+
+        // Define a radial gradient from highlight (white) to sphere color (orange-red) to shadow (dark red)
+        let sphereStops = [
+            GradientStop(color: Color(red: 1.0, green: 0.9, blue: 0.9, alpha: 1.0), location: 0.0), // highlight
+            GradientStop(color: Color(red: 0.9, green: 0.3, blue: 0.1, alpha: 1.0), location: 0.6), // midtone
+            GradientStop(color: Color(red: 0.4, green: 0.1, blue: 0.05, alpha: 1.0), location: 1.0), // shadow
+        ]
+
+        let highlightCenter = Point(
+            x: sphereCenter2D.x - sphereRadius2D * 0.3,
+            y: sphereCenter2D.y - sphereRadius2D * 0.3
+        )
+
+        context.drawRadialGradient(
+            Gradient(stops: sphereStops),
+            startCenter: highlightCenter,
+            startRadius: 0.0,
+            endCenter: sphereCenter2D,
+            endRadius: sphereRadius2D
+        )
+        context.restoreGState()
+
         for (face, _) in sortedFaces {
             context.saveGState()
 

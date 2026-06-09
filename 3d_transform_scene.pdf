@@ -8,23 +8,39 @@ endobj
 3 0 obj
 << /Type /Page /Parent 2 0 R /MediaBox [ 0 0 500.0 500.0 ] /Contents 4 0 R /Resources <<
   /ExtGState <<
-    /GS9 << /Type /ExtGState /ca 0.9 /CA 0.4 /BM /Normal >>
-    /GS10 << /Type /ExtGState /ca 0.4 /CA 0.4 /BM /Normal >>
-    /GS12 << /Type /ExtGState /ca 0.0 /CA 0.0 /BM /Normal >>
+    /GS5 << /Type /ExtGState /ca 0.5 /CA 0.4 /BM /Normal >>
+    /GS7 << /Type /ExtGState /ca 0.7 /CA 0.9 /BM /Normal >>
     /GS4 << /Type /ExtGState /ca 0.85 /CA 1.0 /BM /Normal >>
+    /GS1 << /Type /ExtGState /ca 1.0 /CA 0.4 /BM /Normal >>
+    /GS13 << /Type /ExtGState /ca 0.9 /CA 0.6 /BM /Normal >>
+    /GS11 << /Type /ExtGState /ca 0.9 /CA 1.0 /BM /Normal >>
+    /GS12 << /Type /ExtGState /ca 0.0 /CA 0.0 /BM /Normal >>
     /GS6 << /Type /ExtGState /ca 0.25 /CA 0.85 /BM /Normal >>
+    /GS8 << /Type /ExtGState /ca 0.7 /CA 0.85 /BM /Normal >>
+    /GS10 << /Type /ExtGState /ca 0.4 /CA 0.4 /BM /Normal >>
+    /GS3 << /Type /ExtGState /ca 0.45 /CA 0.45 /BM /Normal >>
+    /GS9 << /Type /ExtGState /ca 0.9 /CA 0.4 /BM /Normal >>
+    /GS2 << /Type /ExtGState /ca 0.85 /CA 0.4 /BM /Normal >>
     /GS15 << /Type /ExtGState /ca 0.8 /CA 0.4 /BM /Multiply >>
     /GS14 << /Type /ExtGState /ca 0.8 /CA 0.4 /BM /Normal >>
-    /GS5 << /Type /ExtGState /ca 0.5 /CA 0.4 /BM /Normal >>
-    /GS11 << /Type /ExtGState /ca 0.9 /CA 1.0 /BM /Normal >>
-    /GS13 << /Type /ExtGState /ca 0.9 /CA 0.6 /BM /Normal >>
-    /GS2 << /Type /ExtGState /ca 0.85 /CA 0.4 /BM /Normal >>
-    /GS3 << /Type /ExtGState /ca 0.45 /CA 0.45 /BM /Normal >>
-    /GS1 << /Type /ExtGState /ca 1.0 /CA 0.4 /BM /Normal >>
-    /GS8 << /Type /ExtGState /ca 0.7 /CA 0.85 /BM /Normal >>
-    /GS7 << /Type /ExtGState /ca 0.7 /CA 0.9 /BM /Normal >>
   >>
   /Shading <<
+    /Sh2 <<
+  /ShadingType 3
+  /ColorSpace /DeviceRGB
+  /Coords [ 173.84615384615384 254.6153846153846 0.0 180.76923076923077 261.53846153846155 23.076923076923073 ]
+  /Function <<
+  /FunctionType 3
+  /Domain [ 0 1 ]
+  /Functions [
+    << /FunctionType 2 /Domain [ 0 1 ] /C0 [ 1.0 0.9 0.9 ] /C1 [ 0.9 0.3 0.1 ] /N 1 >>
+    << /FunctionType 2 /Domain [ 0 1 ] /C0 [ 0.9 0.3 0.1 ] /C1 [ 0.4 0.1 0.05 ] /N 1 >>
+  ]
+  /Bounds [ 0.6 ]
+  /Encode [ 0 1 0 1 ]
+>>
+  /Extend [ false false ]
+>>
     /Sh1 <<
   /ShadingType 2
   /ColorSpace /DeviceRGB
@@ -36,7 +52,7 @@ endobj
 >> >>
 endobj
 4 0 obj
-<< /Length 111165 >>
+<< /Length 111722 >>
 stream
 1 0 0 -1 0 500.0 cm
 q
@@ -619,6 +635,23 @@ q
 349.74993593228186 280.2670016452859 l
 h
 S
+Q
+q
+/GS1 gs
+1.0 w
+0 J
+0 j
+10.0 M
+0.6 i
+[] 0 d
+203.84615384615384 261.53846153846155 m
+203.84615384615384 274.2834942268645 193.5142634576337 284.61538461538464 180.76923076923077 284.61538461538464 c
+168.02419808082786 284.61538461538464 157.6923076923077 274.2834942268645 157.6923076923077 261.53846153846155 c
+157.6923076923077 248.79342885005863 168.02419808082786 238.46153846153848 180.76923076923077 238.46153846153848 c
+193.5142634576337 238.46153846153848 203.84615384615384 248.79342885005863 203.84615384615384 261.53846153846155 c
+h
+W n
+/Sh2 sh
 Q
 q
 /GS7 gs
@@ -3398,12 +3431,12 @@ xref
 0000000009 00000 n 
 0000000058 00000 n 
 0000000117 00000 n 
-0000001398 00000 n 
+0000001881 00000 n 
 trailer
 <<
   /Size 5
   /Root 1 0 R
 >>
 startxref
-112617
+113657
 %%EOF
