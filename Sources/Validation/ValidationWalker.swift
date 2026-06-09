@@ -9,6 +9,14 @@ struct ValidationWalker<Document: Sendable> {
     let document: Document
     
     func walk(_ value: Any, at codingPath: [CodingKey]) -> [ValidationError] {
+        let mirror = Mirror(reflecting: value)
+        if mirror.displayStyle == .optional {
+            if let firstChild = mirror.children.first {
+                return walk(firstChild.value, at: codingPath)
+            }
+            return []
+        }
+        
         var errors: [ValidationError] = []
         
         // 1. If the value is Validatable, run the validator and default validations
@@ -20,7 +28,7 @@ struct ValidationWalker<Document: Sendable> {
         }
         
         // 2. Recurse into children
-        let mirror = Mirror(reflecting: value)
+        
         
         if let array = value as? [Any] {
             for (index, element) in array.enumerated() {

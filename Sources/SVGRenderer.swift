@@ -21,12 +21,18 @@ public struct SVGRenderer: Renderer {
     }
     
     public func render(_ context: GraphicsContext) throws -> String {
-        // 1. Gather all unique clip paths
+        // 1. Gather all unique clip paths and shadows
         var uniqueClipPaths: [Path] = []
+        var uniqueShadows: [Shadow] = []
         for op in context.commands {
             if let clip = op.state.clipPath {
                 if !uniqueClipPaths.contains(clip) {
                     uniqueClipPaths.append(clip)
+                }
+            }
+            if let shadow = op.state.shadow {
+                if !uniqueShadows.contains(shadow) {
+                    uniqueShadows.append(shadow)
                 }
             }
         }
@@ -51,8 +57,22 @@ public struct SVGRenderer: Renderer {
             for op in context.commands {
                 let path: Path
                 switch op.kind {
-                case .fill(let p, _): path = p
-                case .stroke(let p): path = p
+                case .fill(let p, _):
+                    path = p
+                case .stroke(let p):
+                    path = p
+                case .drawLinearGradient(_, _, _, _):
+                    if let clip = op.state.clipPath {
+                        path = clip
+                    } else {
+                        continue
+                    }
+                case .drawRadialGradient(_, _, _, _, _, _):
+                    if let clip = op.state.clipPath {
+                        path = clip
+                    } else {
+                        continue
+                    }
                 }
                 
                 let transformedPath = path.applying(op.state.transform)
@@ -73,7 +93,7 @@ public struct SVGRenderer: Renderer {
             viewBoxHeight = max(0.0, maxY - viewBoxMinY)
         }
         
-        // 3. Serialize clip paths
+        // 3. Serialize clip paths, shadows, and gradients into defs
         var defs: [String] = []
         for (index, clipPath) in uniqueClipPaths.enumerated() {
             let pathStr = svgPathString(for: clipPath)
@@ -81,29 +101,63 @@ public struct SVGRenderer: Renderer {
             defs.append("      <path d=\"\(pathStr)\" />")
             defs.append("    </clipPath>")
         }
+        for (index, shadow) in uniqueShadows.enumerated() {
+            let floodHex = hexColor(shadow.color)
+            let floodAlpha = shadow.color.alpha
+            defs.append("    <filter id=\"shadow-\(index)\">")
+            defs.append("      <feDropShadow dx=\"\(shadow.offset.x)\" dy=\"\(shadow.offset.y)\" stdDeviation=\"\(shadow.blur / 2.0)\" flood-color=\"\(floodHex)\" flood-opacity=\"\(floodAlpha)\" />")
+            defs.append("    </filter>")
+        }
+        for (opIndex, op) in context.commands.enumerated() {
+            switch op.kind {
+            case .drawLinearGradient(let grad, let start, let end, _):
+                defs.append("    <linearGradient id=\"grad-\(opIndex)\" x1=\"\(start.x)\" y1=\"\(start.y)\" x2=\"\(end.x)\" y2=\"\(end.y)\" gradientUnits=\"userSpaceOnUse\" spreadMethod=\"pad\">")
+                for stop in grad.stops {
+                    let colorHex = hexColor(stop.color)
+                    defs.append("      <stop offset=\"\(stop.location)\" stop-color=\"\(colorHex)\" stop-opacity=\"\(stop.color.alpha)\" />")
+                }
+                defs.append("    </linearGradient>")
+            case .drawRadialGradient(let grad, let startCenter, let startRadius, let endCenter, let endRadius, _):
+                defs.append("    <radialGradient id=\"grad-\(opIndex)\" cx=\"\(endCenter.x)\" cy=\"\(endCenter.y)\" r=\"\(endRadius)\" fx=\"\(startCenter.x)\" fy=\"\(startCenter.y)\" fr=\"\(startRadius)\" gradientUnits=\"userSpaceOnUse\" spreadMethod=\"pad\">")
+                for stop in grad.stops {
+                    let colorHex = hexColor(stop.color)
+                    defs.append("      <stop offset=\"\(stop.location)\" stop-color=\"\(colorHex)\" stop-opacity=\"\(stop.color.alpha)\" />")
+                }
+                defs.append("    </radialGradient>")
+            default:
+                break
+            }
+        }
         
         // 4. Render drawing operations
         var elements: [String] = []
-        for op in context.commands {
-            let path: Path
-            let isFill: Bool
-            let fillRule: FillRule?
-            
+        for (opIndex, op) in context.commands.enumerated() {
             switch op.kind {
             case .fill(let p, let rule):
-                path = p
-                isFill = true
-                fillRule = rule
+                let pathStr = svgPathString(for: p)
+                let attrs = styleAttributes(for: op.state, hasFill: true, fillRule: rule, uniqueClipPaths: uniqueClipPaths, uniqueShadows: uniqueShadows)
+                let attrsStr = attrs.joined(separator: " ")
+                elements.append("  <path d=\"\(pathStr)\" \(attrsStr) />")
             case .stroke(let p):
-                path = p
-                isFill = false
-                fillRule = nil
+                let pathStr = svgPathString(for: p)
+                let attrs = styleAttributes(for: op.state, hasFill: false, fillRule: nil, uniqueClipPaths: uniqueClipPaths, uniqueShadows: uniqueShadows)
+                let attrsStr = attrs.joined(separator: " ")
+                elements.append("  <path d=\"\(pathStr)\" \(attrsStr) />")
+            case .drawLinearGradient, .drawRadialGradient:
+                if let clip = op.state.clipPath {
+                    let pathStr = svgPathString(for: clip)
+                    var attrs = styleAttributes(for: op.state, hasFill: false, fillRule: nil, uniqueClipPaths: uniqueClipPaths, uniqueShadows: uniqueShadows)
+                    attrs.append("fill=\"url(#grad-\(opIndex))\"")
+                    let attrsStr = attrs.joined(separator: " ")
+                    elements.append("  <path d=\"\(pathStr)\" \(attrsStr) />")
+                } else {
+                    var attrs = styleAttributes(for: op.state, hasFill: false, fillRule: nil, uniqueClipPaths: uniqueClipPaths, uniqueShadows: uniqueShadows)
+                    attrs.append("x=\"\(viewBoxMinX)\" y=\"\(viewBoxMinY)\" width=\"\(viewBoxWidth)\" height=\"\(viewBoxHeight)\"")
+                    attrs.append("fill=\"url(#grad-\(opIndex))\"")
+                    let attrsStr = attrs.joined(separator: " ")
+                    elements.append("  <rect \(attrsStr) />")
+                }
             }
-            
-            let pathStr = svgPathString(for: path)
-            let attrs = styleAttributes(for: op.state, hasFill: isFill, fillRule: fillRule, uniqueClipPaths: uniqueClipPaths)
-            let attrsStr = attrs.joined(separator: " ")
-            elements.append("  <path d=\"\(pathStr)\" \(attrsStr) />")
         }
         
         // 5. Assemble final XML
@@ -157,7 +211,8 @@ public struct SVGRenderer: Renderer {
         for state: GraphicState,
         hasFill: Bool,
         fillRule: FillRule?,
-        uniqueClipPaths: [Path]
+        uniqueClipPaths: [Path],
+        uniqueShadows: [Shadow]
     ) -> [String] {
         var attrs: [String] = []
         
@@ -225,6 +280,11 @@ public struct SVGRenderer: Renderer {
         // Clipping
         if let clip = state.clipPath, let clipIndex = uniqueClipPaths.firstIndex(of: clip) {
             attrs.append("clip-path=\"url(#clip-\(clipIndex))\"")
+        }
+        
+        // Shadow
+        if let shadow = state.shadow, let shadowIndex = uniqueShadows.firstIndex(of: shadow) {
+            attrs.append("filter=\"url(#shadow-\(shadowIndex))\"")
         }
         
         return attrs

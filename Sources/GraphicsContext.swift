@@ -190,6 +190,57 @@ public struct GraphicsContext: Sendable, Validatable {
     
     // MARK: - Drawing Actions
     
+    /// Sets the shadow properties for subsequent drawing operations.
+    public mutating func setShadow(offset: Point, blur: Double, color: Color) {
+        currentState.shadow = Shadow(offset: offset, blur: blur, color: color)
+    }
+    
+    /// Clears the shadow from the current graphics state.
+    public mutating func clearShadow() {
+        currentState.shadow = nil
+    }
+    
+    /// Records a linear gradient drawing operation.
+    /// The gradient fills the current clipping path of the context.
+    public mutating func drawLinearGradient(
+        _ gradient: Gradient,
+        start: Point,
+        end: Point,
+        options: GradientDrawingOptions = []
+    ) {
+        commands.append(
+            DrawOperation(
+                kind: .drawLinearGradient(gradient, start: start, end: end, options: options),
+                state: currentState
+            )
+        )
+    }
+    
+    /// Records a radial gradient drawing operation.
+    /// The gradient fills the current clipping path of the context.
+    public mutating func drawRadialGradient(
+        _ gradient: Gradient,
+        startCenter: Point,
+        startRadius: Double,
+        endCenter: Point,
+        endRadius: Double,
+        options: GradientDrawingOptions = []
+    ) {
+        commands.append(
+            DrawOperation(
+                kind: .drawRadialGradient(
+                    gradient,
+                    startCenter: startCenter,
+                    startRadius: startRadius,
+                    endCenter: endCenter,
+                    endRadius: endRadius,
+                    options: options
+                ),
+                state: currentState
+            )
+        )
+    }
+    
     /// Records a stroke command in the buffer using the current state and clears the current path.
     public mutating func strokePath() {
         guard !currentPath.isEmpty else { return }

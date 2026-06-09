@@ -72,4 +72,54 @@ struct TraversalValidationTests {
             Issue.record("Unexpected error: \(error)")
         }
     }
+    
+    @Test func gradientAndShadowValidationRules() throws {
+        // 1. Invalid GradientStop
+        let badStop = GradientStop(color: .white, location: 1.5)
+        do {
+            try badStop.validate()
+            Issue.record("Expected GradientStop validation to fail")
+        } catch let errors as ValidationErrorCollection {
+            #expect(errors.values.count == 1)
+            #expect(errors.values[0].reason == "Failed to satisfy: Gradient stop location is between 0.0 and 1.0")
+        }
+        
+        // 2. Invalid Gradient (1 stop)
+        let badGrad = Gradient(stops: [GradientStop(color: .white, location: 0.0)])
+        do {
+            try badGrad.validate()
+            Issue.record("Expected Gradient validation to fail")
+        } catch let errors as ValidationErrorCollection {
+            #expect(errors.values.count == 1)
+            #expect(errors.values[0].reason == "Failed to satisfy: Gradient contains at least two stops")
+        }
+        
+        // 3. Invalid Shadow (negative blur)
+        let badShadow = Shadow(offset: Point(x: 0, y: 0), blur: -2.0, color: .black)
+        do {
+            try badShadow.validate()
+            Issue.record("Expected Shadow validation to fail")
+        } catch let errors as ValidationErrorCollection {
+            #expect(errors.values.count == 1)
+            #expect(errors.values[0].reason == "Failed to satisfy: Shadow blur radius is non-negative")
+        }
+        
+        // 4. Deep traversal context validation
+        var context = GraphicsContext()
+        context.setShadow(offset: Point(x: 0, y: 0), blur: -5.0, color: .black)
+        let stops = [
+            GradientStop(color: .white, location: -0.1),
+            GradientStop(color: .black, location: 1.0)
+        ]
+        context.drawLinearGradient(Gradient(stops: stops), start: Point(x: 0, y: 0), end: Point(x: 10, y: 10))
+        
+        do {
+            try context.validate()
+            Issue.record("Expected context validation to fail")
+        } catch let errors as ValidationErrorCollection {
+            let descriptions = errors.values.map { $0.description }
+            #expect(descriptions.contains { $0.contains("shadow") && $0.contains("blur") })
+            #expect(descriptions.contains { $0.contains("stops") && $0.contains("location") })
+        }
+    }
 }

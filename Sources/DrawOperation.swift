@@ -8,6 +8,8 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
     public enum Kind: Equatable, Sendable {
         case fill(Path, rule: FillRule)
         case stroke(Path)
+        case drawLinearGradient(Gradient, start: Point, end: Point, options: GradientDrawingOptions)
+        case drawRadialGradient(Gradient, startCenter: Point, startRadius: Double, endCenter: Point, endRadius: Double, options: GradientDrawingOptions)
     }
     
     public let kind: Kind

@@ -47,6 +47,24 @@ public struct CoreGraphicsRenderer: Renderer, @unchecked Sendable {
                 )
             }
             
+            // Apply Shadow if present
+            if let shadow = operation.state.shadow {
+                let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+                let components = [
+                    CGFloat(shadow.color.red),
+                    CGFloat(shadow.color.green),
+                    CGFloat(shadow.color.blue),
+                    CGFloat(shadow.color.alpha)
+                ]
+                if let cgColor = CGColor(colorSpace: colorSpace, components: components) {
+                    targetContext.setShadow(
+                        offset: CGSize(width: CGFloat(shadow.offset.x), height: CGFloat(shadow.offset.y)),
+                        blur: CGFloat(shadow.blur),
+                        color: cgColor
+                    )
+                }
+            }
+            
             // 4. Apply Clip Path (if defined)
             if let clip = operation.state.clipPath {
                 let cgPath = try createCGPath(from: clip)
@@ -82,11 +100,71 @@ public struct CoreGraphicsRenderer: Renderer, @unchecked Sendable {
                     alpha: CGFloat(strokeCol.alpha)
                 )
                 targetContext.strokePath()
+                
+            case .drawLinearGradient(let grad, let start, let end, let options):
+                let cgGradient = try createCGGradient(from: grad)
+                var cgOptions: CGGradientDrawingOptions = []
+                if options.contains(.drawsBeforeStartLocation) {
+                    cgOptions.insert(.drawsBeforeStartLocation)
+                }
+                if options.contains(.drawsAfterEndLocation) {
+                    cgOptions.insert(.drawsAfterEndLocation)
+                }
+                targetContext.drawLinearGradient(
+                    cgGradient,
+                    start: CGPoint(x: CGFloat(start.x), y: CGFloat(start.y)),
+                    end: CGPoint(x: CGFloat(end.x), y: CGFloat(end.y)),
+                    options: cgOptions
+                )
+                
+            case .drawRadialGradient(let grad, let startCenter, let startRadius, let endCenter, let endRadius, let options):
+                let cgGradient = try createCGGradient(from: grad)
+                var cgOptions: CGGradientDrawingOptions = []
+                if options.contains(.drawsBeforeStartLocation) {
+                    cgOptions.insert(.drawsBeforeStartLocation)
+                }
+                if options.contains(.drawsAfterEndLocation) {
+                    cgOptions.insert(.drawsAfterEndLocation)
+                }
+                targetContext.drawRadialGradient(
+                    cgGradient,
+                    startCenter: CGPoint(x: CGFloat(startCenter.x), y: CGFloat(startCenter.y)),
+                    startRadius: CGFloat(startRadius),
+                    endCenter: CGPoint(x: CGFloat(endCenter.x), y: CGFloat(endCenter.y)),
+                    endRadius: CGFloat(endRadius),
+                    options: cgOptions
+                )
             }
             
             // 6. Pop Graphics State
             targetContext.restoreGState()
         }
+    }
+    
+    private enum RenderingError: Error {
+        case cannotCreateColorSpace
+        case cannotCreateGradient
+    }
+    
+    private func createCGGradient(from gradient: Gradient) throws -> CGGradient {
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        let cgColors = gradient.stops.map { stop in
+            CGColor(colorSpace: colorSpace, components: [
+                CGFloat(stop.color.red),
+                CGFloat(stop.color.green),
+                CGFloat(stop.color.blue),
+                CGFloat(stop.color.alpha)
+            ])! as AnyObject
+        }
+        let locations = gradient.stops.map { CGFloat($0.location) }
+        guard let cgGradient = CGGradient(
+            colorsSpace: colorSpace,
+            colors: cgColors as CFArray,
+            locations: locations
+        ) else {
+            throw RenderingError.cannotCreateGradient
+        }
+        return cgGradient
     }
     
     private func createCGPath(from path: Path) throws -> CGPath {

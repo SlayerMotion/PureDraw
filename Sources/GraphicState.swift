@@ -41,6 +41,9 @@ public struct GraphicState: Equatable, Sendable, Validatable {
     /// The current accumulated clipping path.
     public var clipPath: Path?
     
+    /// The shadow properties to apply to drawing operations.
+    public var shadow: Shadow?
+    
     public init(
         transform: AffineTransform = .identity,
         strokeColor: Color = .black,
@@ -53,7 +56,8 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         dashPhase: Double = 0.0,
         alpha: Double = 1.0,
         blendMode: BlendMode = .normal,
-        clipPath: Path? = nil
+        clipPath: Path? = nil,
+        shadow: Shadow? = nil
     ) {
         self.transform = transform
         self.strokeColor = strokeColor
@@ -67,6 +71,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         self.alpha = alpha
         self.blendMode = blendMode
         self.clipPath = clipPath
+        self.shadow = shadow
     }
     
     public static var defaultValidator: Validator<GraphicState> {

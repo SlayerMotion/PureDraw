@@ -116,4 +116,84 @@ struct RendererTests {
         // Skip on non-Apple platforms
         #endif
     }
+    
+    @Test func pdfRendererOutputStructure() throws {
+        var context = GraphicsContext()
+        context.setFillColor(Color(red: 1.0, green: 0.0, blue: 0.0)) // Red
+        context.setStrokeColor(Color(red: 0.0, green: 0.0, blue: 1.0)) // Blue
+        context.setLineWidth(4.0)
+        
+        // Draw a rect
+        context.addRect(Rect(x: 10, y: 15, width: 100, height: 200))
+        context.fillPath()
+        
+        // Draw a line
+        context.move(to: Point(x: 0, y: 0))
+        context.addLine(to: Point(x: 50, y: 50))
+        context.strokePath()
+        
+        // Render PDF
+        let pdfData = try PDFRenderer(width: 500, height: 500).render(context)
+        
+        // Verify PDF Header and Footer
+        let pdfString = String(data: pdfData, encoding: .ascii) ?? ""
+        #expect(pdfString.hasPrefix("%PDF-1.4"))
+        #expect(pdfString.contains("%%EOF"))
+        #expect(pdfString.contains("/Type /Catalog"))
+        #expect(pdfString.contains("/Type /Page"))
+        #expect(pdfString.contains("stream"))
+        #expect(pdfString.contains("endstream"))
+    }
+    
+    @Test func svgAndCGRendererGradientsAndShadows() throws {
+        var context = GraphicsContext()
+        
+        // Set Shadow
+        context.setShadow(offset: Point(x: 5, y: 5), blur: 3.0, color: Color(red: 0, green: 0, blue: 0, alpha: 0.5))
+        
+        // Create Gradient
+        let stops = [
+            GradientStop(color: .white, location: 0.0),
+            GradientStop(color: .black, location: 1.0)
+        ]
+        let grad = Gradient(stops: stops)
+        
+        // Draw linear gradient
+        context.drawLinearGradient(grad, start: Point(x: 0, y: 0), end: Point(x: 100, y: 100))
+        
+        // Draw radial gradient
+        context.drawRadialGradient(grad, startCenter: Point(x: 50, y: 50), startRadius: 0.0, endCenter: Point(x: 50, y: 50), endRadius: 50.0)
+        
+        // Render SVG and assert
+        let svg = try SVGRenderer().render(context)
+        #expect(svg.contains("<linearGradient id=\"grad-0\""))
+        #expect(svg.contains("<radialGradient id=\"grad-1\""))
+        #expect(svg.contains("<filter id=\"shadow-0\">"))
+        #expect(svg.contains("filter=\"url(#shadow-0)\""))
+        
+        // Render PDF and assert
+        let pdfData = try PDFRenderer().render(context)
+        let pdfString = String(data: pdfData, encoding: .ascii) ?? ""
+        #expect(pdfString.contains("/ShadingType 2")) // Linear Shading
+        #expect(pdfString.contains("/ShadingType 3")) // Radial Shading
+        
+        #if canImport(CoreGraphics)
+        // Render to CGContext and assert no throws
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        if let cgContext = CGContext(
+            data: nil,
+            width: 100,
+            height: 100,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) {
+            let renderer = CoreGraphicsRenderer(context: cgContext)
+            #expect(throws: Never.self) {
+                try renderer.render(context)
+            }
+        }
+        #endif
+    }
 }

@@ -91,4 +91,35 @@ extension Validation {
             }
         )
     }
+    
+    /// Validates that a gradient stop has its location in the normalized 0.0 ... 1.0 range.
+    public static var gradientStopIsValid: Validation<Document, GradientStop> {
+        .init(
+            description: "Gradient stop location is between 0.0 and 1.0",
+            check: { context in
+                (0.0...1.0).contains(context.subject.location)
+            }
+        )
+    }
+    
+    /// Validates that a gradient contains at least two stops.
+    public static var gradientIsValid: Validation<Document, Gradient> {
+        .init(
+            description: "Gradient contains at least two stops",
+            check: { context in
+                context.subject.stops.count >= 2
+            }
+        )
+    }
+    
+    /// Validates that a shadow configuration is valid (e.g. non-negative blur).
+    public static var shadowIsValid: Validation<Document, Shadow> {
+        .init(
+            description: "Shadow blur radius is non-negative",
+            check: { context in
+                context.subject.blur >= 0
+            }
+        )
+    }
 }
+
