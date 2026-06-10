@@ -105,7 +105,7 @@ public struct PDFRenderer: Renderer {
                     extGStates[shadowKey] = sgsName
                 }
                 contentStream += "/\(sgsName) gs\n"
-                contentStream += "\(shadow.color.red) \(shadow.color.green) \(shadow.color.blue) rg\n"
+                contentStream += pdfFillColorString(for: shadow.color)
 
                 switch op.kind {
                 case let .fill(path, rule):
@@ -117,7 +117,7 @@ public struct PDFRenderer: Renderer {
                         contentStream += "f\n"
                     }
                 case let .stroke(path):
-                    contentStream += "\(shadow.color.red) \(shadow.color.green) \(shadow.color.blue) RG\n"
+                    contentStream += pdfStrokeColorString(for: shadow.color)
                     let pathStr = pdfPathString(for: path)
                     contentStream += pathStr
                     contentStream += "S\n"
@@ -136,7 +136,7 @@ public struct PDFRenderer: Renderer {
             // 5. Draw
             switch op.kind {
             case let .fill(path, rule):
-                contentStream += "\(op.state.fillColor.red) \(op.state.fillColor.green) \(op.state.fillColor.blue) rg\n"
+                contentStream += pdfFillColorString(for: op.state.fillColor)
                 let pathStr = pdfPathString(for: path)
                 contentStream += pathStr
                 if rule == .evenOdd {
@@ -145,7 +145,7 @@ public struct PDFRenderer: Renderer {
                     contentStream += "f\n"
                 }
             case let .stroke(path):
-                contentStream += "\(op.state.strokeColor.red) \(op.state.strokeColor.green) \(op.state.strokeColor.blue) RG\n"
+                contentStream += pdfStrokeColorString(for: op.state.strokeColor)
                 let pathStr = pdfPathString(for: path)
                 contentStream += pathStr
                 contentStream += "S\n"
@@ -240,6 +240,28 @@ public struct PDFRenderer: Renderer {
         _ = writer.append("<< /Length \(contentStream.data(using: .utf8)?.count ?? 0) >>\nstream\n\(contentStream)\nendstream")
 
         return writer.buildData()
+    }
+
+    private func pdfFillColorString(for color: Color) -> String {
+        switch color.colorSpace {
+        case .deviceRGB:
+            "\(color.components[0]) \(color.components[1]) \(color.components[2]) rg\n"
+        case .deviceGray:
+            "\(color.components[0]) g\n"
+        case .deviceCMYK:
+            "\(color.components[0]) \(color.components[1]) \(color.components[2]) \(color.components[3]) k\n"
+        }
+    }
+
+    private func pdfStrokeColorString(for color: Color) -> String {
+        switch color.colorSpace {
+        case .deviceRGB:
+            "\(color.components[0]) \(color.components[1]) \(color.components[2]) RG\n"
+        case .deviceGray:
+            "\(color.components[0]) G\n"
+        case .deviceCMYK:
+            "\(color.components[0]) \(color.components[1]) \(color.components[2]) \(color.components[3]) K\n"
+        }
     }
 
     private func pdfPathString(for path: Path) -> String {

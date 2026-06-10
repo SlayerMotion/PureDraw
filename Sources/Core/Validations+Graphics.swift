@@ -12,11 +12,12 @@ public extension Validation {
         .init(
             description: "Color components are within 0.0 and 1.0",
             check: { context in
-                let c = context.subject
-                return (0.0 ... 1.0).contains(c.red) &&
-                    (0.0 ... 1.0).contains(c.green) &&
-                    (0.0 ... 1.0).contains(c.blue) &&
-                    (0.0 ... 1.0).contains(c.alpha)
+                for comp in context.subject.components {
+                    if !(0.0 ... 1.0).contains(comp) {
+                        return false
+                    }
+                }
+                return true
             }
         )
     }
@@ -85,10 +86,7 @@ public extension Validation {
                 }
 
                 // Validate colors
-                let strokeColorValid = (0.0 ... 1.0).contains(s.strokeColor.red) &&
-                    (0.0 ... 1.0).contains(s.strokeColor.green) &&
-                    (0.0 ... 1.0).contains(s.strokeColor.blue) &&
-                    (0.0 ... 1.0).contains(s.strokeColor.alpha)
+                let strokeColorValid = s.strokeColor.components.allSatisfy { (0.0 ... 1.0).contains($0) }
                 if !strokeColorValid {
                     errors.append(ValidationError(
                         reason: "strokeColor components must be between 0.0 and 1.0",
@@ -96,10 +94,7 @@ public extension Validation {
                     ))
                 }
 
-                let fillColorValid = (0.0 ... 1.0).contains(s.fillColor.red) &&
-                    (0.0 ... 1.0).contains(s.fillColor.green) &&
-                    (0.0 ... 1.0).contains(s.fillColor.blue) &&
-                    (0.0 ... 1.0).contains(s.fillColor.alpha)
+                let fillColorValid = s.fillColor.components.allSatisfy { (0.0 ... 1.0).contains($0) }
                 if !fillColorValid {
                     errors.append(ValidationError(
                         reason: "fillColor components must be between 0.0 and 1.0",

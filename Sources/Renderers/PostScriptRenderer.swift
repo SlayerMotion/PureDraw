@@ -135,7 +135,7 @@ public struct PostScriptRenderer: Renderer {
             if let shadow = op.state.shadow {
                 ps += "gsave\n"
                 ps += "\(shadow.offset.x) \(shadow.offset.y) translate\n"
-                ps += "\(shadow.color.red) \(shadow.color.green) \(shadow.color.blue) setrgbcolor\n"
+                ps += psColorString(for: shadow.color)
                 switch op.kind {
                 case let .fill(path, rule):
                     ps += psPathString(for: path)
@@ -159,7 +159,7 @@ public struct PostScriptRenderer: Renderer {
             // 4. Draw
             switch op.kind {
             case let .fill(path, rule):
-                ps += "\(op.state.fillColor.red) \(op.state.fillColor.green) \(op.state.fillColor.blue) setrgbcolor\n"
+                ps += psColorString(for: op.state.fillColor)
                 ps += psPathString(for: path)
                 if rule == .evenOdd {
                     ps += "eofill\n"
@@ -167,7 +167,7 @@ public struct PostScriptRenderer: Renderer {
                     ps += "fill\n"
                 }
             case let .stroke(path):
-                ps += "\(op.state.strokeColor.red) \(op.state.strokeColor.green) \(op.state.strokeColor.blue) setrgbcolor\n"
+                ps += psColorString(for: op.state.strokeColor)
                 ps += psPathString(for: path)
                 ps += "stroke\n"
             case let .drawLinearGradient(grad, start, end, options):
@@ -204,6 +204,17 @@ public struct PostScriptRenderer: Renderer {
         }
 
         return ps
+    }
+
+    private func psColorString(for color: Color) -> String {
+        switch color.colorSpace {
+        case .deviceRGB:
+            "\(color.components[0]) \(color.components[1]) \(color.components[2]) setrgbcolor\n"
+        case .deviceGray:
+            "\(color.components[0]) setgray\n"
+        case .deviceCMYK:
+            "\(color.components[0]) \(color.components[1]) \(color.components[2]) \(color.components[3]) setcmykcolor\n"
+        }
     }
 
     private func psPathString(for path: Path) -> String {

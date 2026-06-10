@@ -132,26 +132,14 @@
                         targetContext.addPath(cgPath)
                         let cgFillRule = (rule == .evenOdd) ? CGPathFillRule.evenOdd : CGPathFillRule.winding
 
-                        let fillCol = operation.state.fillColor
-                        targetContext.setFillColor(
-                            red: CGFloat(fillCol.red),
-                            green: CGFloat(fillCol.green),
-                            blue: CGFloat(fillCol.blue),
-                            alpha: CGFloat(fillCol.alpha)
-                        )
+                        applyFillColor(operation.state.fillColor)
                         targetContext.fillPath(using: cgFillRule)
 
                     case let .stroke(path):
                         let cgPath = try createCGPath(from: path)
                         targetContext.addPath(cgPath)
 
-                        let strokeCol = operation.state.strokeColor
-                        targetContext.setStrokeColor(
-                            red: CGFloat(strokeCol.red),
-                            green: CGFloat(strokeCol.green),
-                            blue: CGFloat(strokeCol.blue),
-                            alpha: CGFloat(strokeCol.alpha)
-                        )
+                        applyStrokeColor(operation.state.strokeColor)
                         targetContext.strokePath()
 
                     case let .drawLinearGradient(grad, start, end, options):
@@ -201,6 +189,50 @@
         private enum RenderingError: Error {
             case cannotCreateColorSpace
             case cannotCreateGradient
+        }
+
+        private func applyFillColor(_ color: Color) {
+            switch color.colorSpace {
+            case .deviceRGB:
+                targetContext.setFillColor(
+                    red: CGFloat(color.components[0]),
+                    green: CGFloat(color.components[1]),
+                    blue: CGFloat(color.components[2]),
+                    alpha: CGFloat(color.components[3])
+                )
+            case .deviceGray:
+                let colorSpace = CGColorSpaceCreateDeviceGray()
+                if let cgColor = CGColor(colorSpace: colorSpace, components: [CGFloat(color.components[0]), CGFloat(color.components[1])]) {
+                    targetContext.setFillColor(cgColor)
+                }
+            case .deviceCMYK:
+                let colorSpace = CGColorSpaceCreateDeviceCMYK()
+                if let cgColor = CGColor(colorSpace: colorSpace, components: color.components.map { CGFloat($0) }) {
+                    targetContext.setFillColor(cgColor)
+                }
+            }
+        }
+
+        private func applyStrokeColor(_ color: Color) {
+            switch color.colorSpace {
+            case .deviceRGB:
+                targetContext.setStrokeColor(
+                    red: CGFloat(color.components[0]),
+                    green: CGFloat(color.components[1]),
+                    blue: CGFloat(color.components[2]),
+                    alpha: CGFloat(color.components[3])
+                )
+            case .deviceGray:
+                let colorSpace = CGColorSpaceCreateDeviceGray()
+                if let cgColor = CGColor(colorSpace: colorSpace, components: [CGFloat(color.components[0]), CGFloat(color.components[1])]) {
+                    targetContext.setStrokeColor(cgColor)
+                }
+            case .deviceCMYK:
+                let colorSpace = CGColorSpaceCreateDeviceCMYK()
+                if let cgColor = CGColor(colorSpace: colorSpace, components: color.components.map { CGFloat($0) }) {
+                    targetContext.setStrokeColor(cgColor)
+                }
+            }
         }
 
         private func createCGGradient(from gradient: Gradient) throws -> CGGradient {
