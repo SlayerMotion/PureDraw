@@ -164,6 +164,24 @@ struct BitmapRendererTests {
         #expect(data[rightIndex + 3] == 0)
     }
 
+    @Test func bilinearImageSamplingBlendsNeighbors() throws {
+        // One black and one white pixel, stretched across ten columns.
+        let imgData: [UInt8] = [0, 0, 0, 255, 255, 255, 255, 255]
+        let testImage = try Image(width: 2, height: 1, data: imgData)
+
+        var context = GraphicsContext()
+        context.draw(testImage, in: Rect(x: 0, y: 0, width: 10, height: 1))
+
+        let image = try BitmapRenderer(width: 10, height: 1).render(context)
+        let data = image.data
+
+        // The default quality interpolates: endpoints stay pure, the middle blends.
+        #expect(data[0 * 4] < 10, "left edge should stay black, got \(data[0])")
+        #expect(data[9 * 4] > 245, "right edge should stay white, got \(data[9 * 4])")
+        let middle = Int(data[5 * 4])
+        #expect(middle > 120 && middle < 190, "expected a blended midtone at x=5, got \(middle)")
+    }
+
     @Test func openStrokeHasNoPhantomClosingSegment() throws {
         var context = GraphicsContext()
         context.setStrokeColor(Color(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0))
@@ -229,6 +247,8 @@ struct BitmapRendererTests {
         let testImage = try Image(width: 2, height: 2, data: imgData)
 
         var context = GraphicsContext()
+        // Nearest-neighbor sampling keeps the scaled blocks hard-edged.
+        context.setInterpolationQuality(.none)
         // Draw the 2x2 image scaled to fill 4x4 rect starting at (2, 2) in a 8x8 context
         context.draw(testImage, in: Rect(x: 2, y: 2, width: 4, height: 4))
 

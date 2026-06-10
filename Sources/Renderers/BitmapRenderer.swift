@@ -564,10 +564,7 @@ public final class BitmapRenderer: Renderer, Sendable {
                     let u = rect.width > 0 ? (userPt.x - rect.minX) / rect.width : 0.0
                     let v = rect.height > 0 ? (userPt.y - rect.minY) / rect.height : 0.0
 
-                    let srcX = min(image.width - 1, max(0, Int(u * Double(image.width))))
-                    let srcY = min(image.height - 1, max(0, Int(v * Double(image.height))))
-
-                    let color = image.pixelColor(x: srcX, y: srcY)
+                    let color = image.sampledColor(u: u, v: v, quality: state.interpolationQuality)
                     blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
                 }
             }

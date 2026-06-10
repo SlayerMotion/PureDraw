@@ -75,6 +75,7 @@
                     targetContext.setBlendMode(CGBlendMode(from: operation.state.blendMode))
 
                     // 3. Apply Style Parameters
+                    targetContext.interpolationQuality = CGInterpolationQuality(from: operation.state.interpolationQuality)
                     targetContext.setLineWidth(CGFloat(operation.state.lineWidth))
                     targetContext.setLineCap(CGLineCap(from: operation.state.lineCap))
                     targetContext.setLineJoin(CGLineJoin(from: operation.state.lineJoin))
@@ -251,7 +252,7 @@
                 bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
                 provider: provider,
                 decode: nil,
-                shouldInterpolate: true,
+                shouldInterpolate: false,
                 intent: .defaultIntent
             )
         }
@@ -447,6 +448,18 @@
             case .xor: self = .xor
             case .plusDarker: self = .plusDarker
             case .plusLighter: self = .plusLighter
+            }
+        }
+    }
+
+    private extension CGInterpolationQuality {
+        init(from quality: InterpolationQuality) {
+            switch quality {
+            case .default: self = .default
+            case .none: self = .none
+            case .low: self = .low
+            case .medium: self = .medium
+            case .high: self = .high
             }
         }
     }

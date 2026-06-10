@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   round joins keep their disk. The whole stroke renders as one
   winding-consistent shape, so overlapping segments blend exactly once even
   with translucent stroke colors.
+- `Image.sampledColor(u:v:quality:)` samples at normalized coordinates with
+  nearest-neighbor for `.none` and premultiplied bilinear filtering for every
+  other `InterpolationQuality`. `BitmapRenderer` image drawing now honors the
+  state's interpolation quality (the default interpolates, matching
+  CoreGraphics), and `CoreGraphicsRenderer` forwards the quality to its
+  `CGContext`. Mask sampling stays nearest-neighbor in both renderers.
 - Image-based clipping masks: `GraphicsContext.clip(to:mask:)`, honored by
   `BitmapRenderer` and `CoreGraphicsRenderer`.
 - Color masking on `Image` via `maskingColors`, applied consistently by both
