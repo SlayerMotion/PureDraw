@@ -27,8 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dispatches operator callbacks with parsed operand stacks.
 - `Font`, a pure Swift TrueType parser: `cmap` formats 0/4/6/12, short and
   long `loca`, simple and composite `glyf` outlines decoded to `Path` values
-  in font units, `hmtx` advance widths, and `.ttc` collections. CFF-outlined
-  OpenType fonts are rejected with a clear error.
+  in font units, `hmtx` advance widths, and `.ttc` collections.
+- CFF / OpenType (`OTTO`) outline support: a CFF table parser (INDEX, DICT,
+  charstrings, subroutines) and a Type 2 charstring interpreter feed glyph
+  outlines through the same `Font.outline` API, so PostScript-outlined fonts
+  work alongside TrueType ones.
 - Text state and showing: `font`, `fontSize`, `characterSpacing`, and
   `textDrawingMode` on the graphics state, `textMatrix`/`textPosition` on the
   context, and `showText(_:at:)`/`showGlyphs(_:at:)` which record glyph
