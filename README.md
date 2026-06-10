@@ -21,7 +21,7 @@ It provides a "Virtual PostScript Machine" API compatible with CoreGraphics (Qua
 
 ## Preview
 
-A capability showcase rendered entirely by PureDraw to a vector PDF: circular, continuous, and pixel-exact Apple corners; linear, radial, and function-sampled gradients; multiply blending; translucent drop shadows; the non-linear crumple deformer; a translucent, depth-sorted 3D cube with a projective grid texture; and a flowing scarf of overlapping wavy bands in Apple system colors.
+A capability showcase rendered entirely by PureDraw to a vector PDF: a character drawn from bezier paths with a continuous-corner (squircle) head; linear, radial, and function-sampled gradients; multiply blending; translucent drop shadows; the non-linear crumple deformer; a translucent, depth-sorted 3D cube with a projective grid texture; and a flowing scarf of overlapping wavy bands in Apple system colors.
 
 ![PureDraw capability showcase](puredraw_showcase_preview.png)
 

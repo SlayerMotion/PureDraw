@@ -27,7 +27,7 @@ struct ShowcaseGenerationTests {
 
         drawBackground(&ctx, width: width, height: height)
         drawTitle(&ctx, font: font, width: width)
-        drawCornerShowcase(&ctx, font: font, originY: 96)
+        drawCharacter(&ctx, font: font, originY: 96)
         drawGradientAndBlend(&ctx, font: font, originY: 270)
         drawShadowTransparency(&ctx, font: font, originY: 270)
         drawCrumple(&ctx, font: font, originY: 452)
@@ -72,43 +72,98 @@ struct ShowcaseGenerationTests {
         ctx.showText("dependency-free swift 2d graphics", at: Point(x: 42, y: 78))
     }
 
-    /// Circular vs tunable-continuous vs exact-Apple corners, each gradient
-    /// filled with a soft drop shadow.
-    private func drawCornerShowcase(_ ctx: inout GraphicsContext, font: Font?, originY: Double) {
-        label(&ctx, font: font, "CORNERS  circular / continuous / apple-exact", x: 40, y: originY)
-        let tile = Rect(x: 0, y: 0, width: 150, height: 130)
-        let radius = 46.0
-        let labels = ["circular", "continuous", "apple"]
-        for index in 0 ..< 3 {
-            let ox = 40 + Double(index) * 178
-            let oy = originY + 14
-            var shape = Path()
-            let box = Rect(x: ox, y: oy, width: tile.width, height: tile.height)
-            switch index {
-            case 0: shape.addRoundedRect(in: box, cornerWidth: radius, cornerHeight: radius)
-            case 1: shape.addContinuousRoundedRect(in: box, cornerRadius: radius, smoothing: 0.6)
-            default: shape.addAppleRoundedRect(in: box, cornerRadius: radius)
-            }
+    /// A cat character drawn from bezier paths: a squircle head with a
+    /// gradient, ears, eyes, nose, whiskers, translucent cheeks, and a soft
+    /// drop shadow.
+    private func drawCharacter(_ ctx: inout GraphicsContext, font: Font?, originY: Double) {
+        label(&ctx, font: font, "CHARACTER  (paths + gradient + transparency)", x: 40, y: originY)
+        let cx = 306.0
+        let cy = originY + 86
+        let headW = 150.0
+        let headH = 128.0
+        let head = Rect(x: cx - headW / 2, y: cy - headH / 2, width: headW, height: headH)
 
-            // Skew the middle tile into a parallelogram (an affine shear about
-            // its vertical center), so the row is not three identical squares.
-            if index == 1 {
-                let cy = oy + tile.height / 2
-                let k = 0.34
-                shape = shape.applying(Geometry.AffineTransform(a: 1, b: 0, c: k, d: 1, tx: -k * cy, ty: 0))
-            }
+        func fillTriangle(_ a: Point, _ b: Point, _ c: Point, _ color: Color) {
+            var t = Path()
+            t.move(to: a)
+            t.addLine(to: b)
+            t.addLine(to: c)
+            t.closeSubpath()
+            ctx.setFillColor(color)
+            ctx.addPath(t)
+            ctx.fillPath()
+        }
 
-            ctx.saveGState()
-            ctx.setShadow(offset: Point(x: 0, y: 8), blur: 14, color: Color(red: 0, green: 0, blue: 0, alpha: 0.55))
-            ctx.addPath(shape)
-            ctx.clip()
-            let grad = Gradient(stops: [
-                GradientStop(color: tileColor(index, 0), location: 0),
-                GradientStop(color: tileColor(index, 1), location: 1),
-            ])
-            ctx.drawLinearGradient(grad, start: Point(x: ox, y: oy), end: Point(x: ox + tile.width, y: oy + tile.height))
-            ctx.restoreGState()
-            smallLabel(&ctx, font: font, labels[index], x: ox + 8, y: oy + tile.height + 16)
+        let darkOrange = Color(red: 0.85, green: 0.40, blue: 0.05)
+        let pink = Color(red: 1.0, green: 0.35, blue: 0.45)
+
+        // Ears (behind the head), with pink inner triangles.
+        fillTriangle(Point(x: cx - 58, y: head.minY + 18), Point(x: cx - 70, y: head.minY - 34), Point(x: cx - 14, y: head.minY + 8), darkOrange)
+        fillTriangle(Point(x: cx + 58, y: head.minY + 18), Point(x: cx + 70, y: head.minY - 34), Point(x: cx + 14, y: head.minY + 8), darkOrange)
+        fillTriangle(Point(x: cx - 52, y: head.minY + 12), Point(x: cx - 60, y: head.minY - 18), Point(x: cx - 28, y: head.minY + 6), pink)
+        fillTriangle(Point(x: cx + 52, y: head.minY + 12), Point(x: cx + 60, y: head.minY - 18), Point(x: cx + 28, y: head.minY + 6), pink)
+
+        // Head: a squircle with a soft drop shadow and an orange gradient.
+        var headPath = Path()
+        headPath.addContinuousRoundedRect(in: head, cornerRadius: 56, smoothing: 0.6)
+        ctx.saveGState()
+        ctx.setShadow(offset: Point(x: 0, y: 9), blur: 16, color: Color(red: 0, green: 0, blue: 0, alpha: 0.5))
+        ctx.addPath(headPath)
+        ctx.clip()
+        let headGrad = Gradient(stops: [
+            GradientStop(color: Color(red: 1.0, green: 0.66, blue: 0.2), location: 0),
+            GradientStop(color: darkOrange, location: 1),
+        ])
+        ctx.drawLinearGradient(headGrad, start: Point(x: head.minX, y: head.minY), end: Point(x: head.minX, y: head.maxY))
+        ctx.restoreGState()
+
+        // Translucent cheeks.
+        for sign in [-1.0, 1.0] {
+            ctx.setFillColor(Color(red: 1.0, green: 0.4, blue: 0.5, alpha: 0.4))
+            ctx.addEllipse(in: Rect(x: cx + sign * 44 - 13, y: cy + 14 - 8, width: 26, height: 16))
+            ctx.fillPath()
+        }
+
+        // Eyes: white sclera, dark pupil, white highlight.
+        for sign in [-1.0, 1.0] {
+            let ex = cx + sign * 30
+            ctx.setFillColor(.white)
+            ctx.addEllipse(in: Rect(x: ex - 18, y: cy - 24, width: 36, height: 46))
+            ctx.fillPath()
+            ctx.setFillColor(Color(red: 0.10, green: 0.10, blue: 0.16))
+            ctx.addEllipse(in: Rect(x: ex - 9, y: cy - 14, width: 18, height: 30))
+            ctx.fillPath()
+            ctx.setFillColor(.white)
+            ctx.addEllipse(in: Rect(x: ex - 5, y: cy - 11, width: 8, height: 8))
+            ctx.fillPath()
+        }
+
+        // Nose.
+        fillTriangle(Point(x: cx - 8, y: cy + 22), Point(x: cx + 8, y: cy + 22), Point(x: cx, y: cy + 33), pink)
+
+        // Mouth: two small arcs from under the nose.
+        ctx.setStrokeColor(Color(red: 0.4, green: 0.18, blue: 0.05))
+        ctx.setLineWidth(2)
+        ctx.setLineCap(.round)
+        var mouth = Path()
+        mouth.move(to: Point(x: cx, y: cy + 33))
+        mouth.addQuadCurve(to: Point(x: cx - 16, y: cy + 42), control: Point(x: cx - 8, y: cy + 44))
+        mouth.move(to: Point(x: cx, y: cy + 33))
+        mouth.addQuadCurve(to: Point(x: cx + 16, y: cy + 42), control: Point(x: cx + 8, y: cy + 44))
+        ctx.addPath(mouth)
+        ctx.strokePath()
+
+        // Whiskers.
+        ctx.setStrokeColor(Color(red: 1, green: 1, blue: 1, alpha: 0.7))
+        ctx.setLineWidth(1.5)
+        for sign in [-1.0, 1.0] {
+            for dy in [-7.0, 0.0, 7.0] {
+                var w = Path()
+                w.move(to: Point(x: cx + sign * 24, y: cy + 26 + dy * 0.4))
+                w.addLine(to: Point(x: cx + sign * 78, y: cy + 20 + dy))
+                ctx.addPath(w)
+                ctx.strokePath()
+            }
         }
     }
 
@@ -357,15 +412,6 @@ struct ShowcaseGenerationTests {
     }
 
     // MARK: - Helpers
-
-    private func tileColor(_ index: Int, _ end: Int) -> Color {
-        let palette: [[Color]] = [
-            [Color(red: 0.40, green: 0.50, blue: 0.95), Color(red: 0.20, green: 0.28, blue: 0.65)],
-            [Color(red: 0.95, green: 0.45, blue: 0.65), Color(red: 0.60, green: 0.20, blue: 0.55)],
-            [Color(red: 0.30, green: 0.85, blue: 0.70), Color(red: 0.15, green: 0.55, blue: 0.55)],
-        ]
-        return palette[index][end]
-    }
 
     private func label(_ ctx: inout GraphicsContext, font: Font?, _ text: String, x: Double, y: Double) {
         guard let font else { return }
