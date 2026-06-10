@@ -8,6 +8,10 @@ import Geometry
 @testable import Renderers
 import Testing
 
+#if canImport(CoreGraphics)
+    import CoreGraphics
+#endif
+
 struct MaskRenderingTests {
     @Test func grayscaleMaskClipsFill() throws {
         // Left mask column is white (reveal), right is black (hide).
@@ -142,6 +146,61 @@ struct MaskRenderingTests {
         #expect(data[leftIndex + 3] == 0, "white source pixel should be masked out")
         #expect(data[rightIndex + 2] == 255, "blue source pixel should draw")
         #expect(data[rightIndex + 3] == 255)
+    }
+
+    @Test func coreGraphicsMaskIsCorrectAcrossRepeatedOperations() throws {
+        #if canImport(CoreGraphics)
+            // Left mask column reveals, right hides. Two fills share the mask.
+            let mask = try Image(
+                width: 2,
+                height: 1,
+                bitsPerPixel: 8,
+                colorSpace: .deviceGray,
+                alphaInfo: .none,
+                data: [255, 0]
+            )
+
+            var context = GraphicsContext()
+            context.clip(to: Rect(x: 0, y: 0, width: 10, height: 10), mask: mask)
+            context.setFillColor(Color(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0))
+            context.addRect(Rect(x: 0, y: 0, width: 10, height: 5))
+            context.fillPath()
+            context.addRect(Rect(x: 0, y: 5, width: 10, height: 5))
+            context.fillPath()
+
+            let colorSpace = CGColorSpaceCreateDeviceRGB()
+            guard let cgContext = CGContext(
+                data: nil,
+                width: 10,
+                height: 10,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else {
+                Issue.record("Failed to create offscreen CGContext")
+                return
+            }
+
+            try CoreGraphicsRenderer(context: cgContext).render(context)
+
+            guard let buffer = cgContext.data else {
+                Issue.record("Offscreen CGContext has no backing data")
+                return
+            }
+            let bytesPerRow = cgContext.bytesPerRow
+            let pixels = buffer.assumingMemoryBound(to: UInt8.self)
+
+            // Both fills land on the revealed left half and are masked out on the right.
+            for y in [2, 7] {
+                let revealed = y * bytesPerRow + 2 * 4
+                #expect(pixels[revealed] == 255, "expected red at (2, \(y))")
+                #expect(pixels[revealed + 3] == 255, "expected opaque at (2, \(y))")
+
+                let hidden = y * bytesPerRow + 7 * 4
+                #expect(pixels[hidden + 3] == 0, "expected masked-out pixel at (7, \(y))")
+            }
+        #endif
     }
 
     @Test func renderRejectsInvalidContext() {

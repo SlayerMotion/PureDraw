@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `CoreGraphicsRenderer` mask clipping rendered nothing: the vertical flip was
+  composed with CoreGraphics ordering on `AffineTransform` builders that append
+  instead of prepending, pushing the clip off-canvas. The mask and drawing
+  transforms now compose in the correct order.
 - `BitmapRenderer` now evaluates the clip path in device space when stroking
   segments and square caps; previously a non-identity CTM clipped strokes
   against the untransformed clip path.

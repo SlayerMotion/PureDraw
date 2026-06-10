@@ -192,15 +192,21 @@
                let maskTransform = state.maskTransform,
                let cgMask = createMaskCGImage(from: maskImage)
             {
+                // AffineTransform builders append (self first, then step), unlike
+                // their CoreGraphics namesakes which prepend: flip = scale, then
+                // translate, mapping clip-space y' to maskRect.maxY - y'.
                 let flip = Geometry.AffineTransform.identity
-                    .translatedBy(x: maskRect.origin.x, y: maskRect.origin.y + maskRect.height)
                     .scaledBy(x: 1.0, y: -1.0)
+                    .translatedBy(x: maskRect.origin.x, y: maskRect.origin.y + maskRect.height)
 
-                let clipCTM = maskTransform.concatenating(flip)
+                // Clip space -> user space (flip) -> device space (mask CTM).
+                let clipCTM = flip.concatenating(maskTransform)
                 targetContext.concatenate(CGAffineTransform(clipCTM))
                 targetContext.clip(to: CGRect(x: 0, y: 0, width: CGFloat(maskRect.width), height: CGFloat(maskRect.height)), mask: cgMask)
 
-                let remaining = clipCTM.inverted().concatenating(t)
+                // Replace clipCTM with the drawing transform: t composed with
+                // clipCTM's inverse, in that order.
+                let remaining = t.concatenating(clipCTM.inverted())
                 targetContext.concatenate(CGAffineTransform(remaining))
             } else {
                 targetContext.concatenate(CGAffineTransform(t))
