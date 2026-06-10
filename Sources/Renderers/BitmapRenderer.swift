@@ -46,6 +46,9 @@ public final class BitmapRenderer: Renderer, Sendable {
         var beginOpStack: [DrawOperation] = []
         // Each layer rasterizes once per pass; stamps reuse the cached image.
         var layerCache: [ObjectIdentifier: Image] = [:]
+        // Reused across operations so repeated identical clips (pattern tiles)
+        // rasterize their clip coverage once per pass instead of once per op.
+        let clipCache = ClipCache()
 
         for op in context.commands {
             switch op.kind {
@@ -63,13 +66,13 @@ public final class BitmapRenderer: Renderer, Sendable {
                 currentBuffer = newParentBuffer
 
             case let .fill(path, rule):
-                rasterizeFill(path: path, state: op.state, color: op.state.fillColor, rule: rule, buffer: &currentBuffer)
+                rasterizeFill(path: path, state: op.state, color: op.state.fillColor, rule: rule, clipCache: clipCache, buffer: &currentBuffer)
 
             case let .stroke(path):
-                rasterizeStroke(path: path, state: op.state, color: op.state.strokeColor, buffer: &currentBuffer)
+                rasterizeStroke(path: path, state: op.state, color: op.state.strokeColor, clipCache: clipCache, buffer: &currentBuffer)
 
             case let .drawLinearGradient(grad, start, end, _):
-                rasterizeLinearGradient(grad: grad, start: start, end: end, state: op.state, buffer: &currentBuffer)
+                rasterizeLinearGradient(grad: grad, start: start, end: end, state: op.state, clipCache: clipCache, buffer: &currentBuffer)
 
             case let .drawRadialGradient(grad, startCenter, startRadius, endCenter, endRadius, _):
                 rasterizeRadialGradient(
@@ -79,11 +82,12 @@ public final class BitmapRenderer: Renderer, Sendable {
                     endCenter: endCenter,
                     endRadius: endRadius,
                     state: op.state,
+                    clipCache: clipCache,
                     buffer: &currentBuffer
                 )
 
             case let .drawImage(image, rect):
-                rasterizeImage(image, in: rect, state: op.state, buffer: &currentBuffer)
+                rasterizeImage(image, in: rect, state: op.state, clipCache: clipCache, buffer: &currentBuffer)
 
             case let .drawLayer(layer, rect):
                 guard layerDepth < 8, layer.width > 0, layer.height > 0 else { continue }
@@ -101,7 +105,7 @@ public final class BitmapRenderer: Renderer, Sendable {
                     stamp = try layerRenderer.draw(layer.context)
                     layerCache[key] = stamp
                 }
-                rasterizeImage(stamp, in: rect, state: op.state, buffer: &currentBuffer)
+                rasterizeImage(stamp, in: rect, state: op.state, clipCache: clipCache, buffer: &currentBuffer)
             }
         }
 
@@ -119,14 +123,14 @@ public final class BitmapRenderer: Renderer, Sendable {
 
     // MARK: - Rasterization Helpers
 
-    private func rasterizeFill(path: Path, state: GraphicState, color: Color, rule: FillRule, buffer: inout [UInt8]) {
+    private func rasterizeFill(path: Path, state: GraphicState, color: Color, rule: FillRule, clipCache: ClipCache, buffer: inout [UInt8]) {
         let transformedPath = path.applying(state.transform)
         let rasterizer = CoverageRasterizer(canvasWidth: width, canvasHeight: height)
         guard let pathCoverage = rasterizer.coverage(of: transformedPath, rule: rule, antialiased: state.shouldAntialias) else { return }
 
         var clipCoverage: CoverageRasterizer.CoverageMap?
         if let clip = state.clipPath?.applying(state.transform) {
-            guard let coverage = rasterizer.coverage(of: clip, rule: .winding, antialiased: state.shouldAntialias) else { return }
+            guard let coverage = cachedClipCoverage(clip, antialiased: state.shouldAntialias, cache: clipCache) else { return }
             clipCoverage = coverage
         }
 
@@ -143,7 +147,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         }
     }
 
-    private func rasterizeStroke(path: Path, state: GraphicState, color: Color, buffer: inout [UInt8]) {
+    private func rasterizeStroke(path: Path, state: GraphicState, color: Color, clipCache: ClipCache, buffer: inout [UInt8]) {
         let scale = sqrt(abs(state.transform.a * state.transform.d - state.transform.b * state.transform.c))
         let deviceLineWidth = max(0.5, state.lineWidth * scale)
         let halfW = deviceLineWidth / 2.0
@@ -171,7 +175,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         var strokeState = state
         strokeState.transform = .identity
         strokeState.clipPath = state.clipPath?.applying(state.transform)
-        rasterizeFill(path: strokeShape, state: strokeState, color: color, rule: .winding, buffer: &buffer)
+        rasterizeFill(path: strokeShape, state: strokeState, color: color, rule: .winding, clipCache: clipCache, buffer: &buffer)
     }
 
     private func appendStrokeGeometry(
@@ -337,17 +341,34 @@ public final class BitmapRenderer: Renderer, Sendable {
         }
     }
 
-    /// A binary (pixel-center) coverage map for a device-space clip path,
-    /// computed once per operation. Lookup replaces per-pixel
-    /// `Path.contains`, which is O(pixels x edges); the pixel-center rule
-    /// matches `contains(center, .winding)` exactly, so output is unchanged.
-    private func clipCoverageMap(_ clipPath: Path?) -> CoverageRasterizer.CoverageMap? {
-        guard let clipPath else { return nil }
-        return CoverageRasterizer(canvasWidth: width, canvasHeight: height)
-            .coverage(of: clipPath, rule: .winding, antialiased: false)
+    /// A one-entry cache of the most recent device-space clip coverage. Pattern
+    /// tiles and other repeated clips share an identical device-space clip path,
+    /// so this hits every time after the first and skips re-rasterizing it.
+    final class ClipCache {
+        var path: Path?
+        var antialiased = false
+        var coverage: CoverageRasterizer.CoverageMap?
+        var valid = false
     }
 
-    private func rasterizeLinearGradient(grad: Gradient, start: Point, end: Point, state: GraphicState, buffer: inout [UInt8]) {
+    /// The clip's coverage map, reused when the device path and antialias mode
+    /// match the cached entry. The pixel-center (aliased) rule matches
+    /// `contains(center, .winding)` exactly, so gradient/image output is
+    /// unchanged.
+    private func cachedClipCoverage(_ devicePath: Path, antialiased: Bool, cache: ClipCache) -> CoverageRasterizer.CoverageMap? {
+        if cache.valid, cache.antialiased == antialiased, cache.path == devicePath {
+            return cache.coverage
+        }
+        let coverage = CoverageRasterizer(canvasWidth: width, canvasHeight: height)
+            .coverage(of: devicePath, rule: .winding, antialiased: antialiased)
+        cache.path = devicePath
+        cache.antialiased = antialiased
+        cache.coverage = coverage
+        cache.valid = true
+        return coverage
+    }
+
+    private func rasterizeLinearGradient(grad: Gradient, start: Point, end: Point, state: GraphicState, clipCache: ClipCache, buffer: inout [UInt8]) {
         let clipPath = state.clipPath?.applying(state.transform)
         let bounds = clipPath?.boundingBox ?? Rect(x: 0, y: 0, width: Double(width), height: Double(height))
 
@@ -362,7 +383,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         let gradLenSq = gradVec.x * gradVec.x + gradVec.y * gradVec.y
         guard gradLenSq > 1e-9 else { return }
 
-        let clipCoverage = clipCoverageMap(clipPath)
+        let clipCoverage = clipPath.flatMap { cachedClipCoverage($0, antialiased: false, cache: clipCache) }
         if clipPath != nil, clipCoverage == nil { return }
 
         let invTransform = state.transform.inverted()
@@ -387,7 +408,16 @@ public final class BitmapRenderer: Renderer, Sendable {
         }
     }
 
-    private func rasterizeRadialGradient(grad: Gradient, startCenter: Point, startRadius: Double, endCenter: Point, endRadius: Double, state: GraphicState, buffer: inout [UInt8]) {
+    private func rasterizeRadialGradient(
+        grad: Gradient,
+        startCenter: Point,
+        startRadius: Double,
+        endCenter: Point,
+        endRadius: Double,
+        state: GraphicState,
+        clipCache: ClipCache,
+        buffer: inout [UInt8]
+    ) {
         let clipPath = state.clipPath?.applying(state.transform)
         let bounds = clipPath?.boundingBox ?? Rect(x: 0, y: 0, width: Double(width), height: Double(height))
 
@@ -404,7 +434,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         let dcLenSq = diffCenter.x * diffCenter.x + diffCenter.y * diffCenter.y
         let coeffA = dcLenSq - diffRadius * diffRadius
 
-        let clipCoverage = clipCoverageMap(clipPath)
+        let clipCoverage = clipPath.flatMap { cachedClipCoverage($0, antialiased: false, cache: clipCache) }
         if clipPath != nil, clipCoverage == nil { return }
 
         let invTransform = state.transform.inverted()
@@ -582,7 +612,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         buffer[index + 3] = UInt8(min(255, max(0, Int(round(outA * 255.0)))))
     }
 
-    private func rasterizeImage(_ image: Image, in rect: Rect, state: GraphicState, buffer: inout [UInt8]) {
+    private func rasterizeImage(_ image: Image, in rect: Rect, state: GraphicState, clipCache: ClipCache, buffer: inout [UInt8]) {
         let p0 = Point(x: rect.minX, y: rect.minY)
         let p1 = Point(x: rect.maxX, y: rect.minY)
         let p2 = Point(x: rect.maxX, y: rect.maxY)
@@ -602,7 +632,7 @@ public final class BitmapRenderer: Renderer, Sendable {
 
         let invTransform = state.transform.inverted()
         let clipPath = state.clipPath?.applying(state.transform)
-        let clipCoverage = clipCoverageMap(clipPath)
+        let clipCoverage = clipPath.flatMap { cachedClipCoverage($0, antialiased: false, cache: clipCache) }
         if clipPath != nil, clipCoverage == nil { return }
 
         for y in minY ... maxY {
