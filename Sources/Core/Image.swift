@@ -17,6 +17,10 @@ public struct Image: Sendable, Equatable {
     public let maskingColors: [Double]?
     public let data: [UInt8]
 
+    /// Creates an image over the given pixel buffer.
+    ///
+    /// - Throws: `ValidationError` when `data` is smaller than `height * bytesPerRow`,
+    ///   so an image whose buffer cannot back its declared layout is unrepresentable.
     public init(
         width: Int,
         height: Int,
@@ -27,10 +31,15 @@ public struct Image: Sendable, Equatable {
         alphaInfo: AlphaInfo = .premultipliedLast,
         maskingColors: [Double]? = nil,
         data: [UInt8]
-    ) {
+    ) throws {
         let computedBytesPerRow = bytesPerRow ?? (width * bitsPerPixel / 8)
         let minBytes = height * computedBytesPerRow
-        precondition(data.count >= minBytes, "Data buffer is too small for the requested image dimensions and layout.")
+        guard data.count >= minBytes else {
+            throw ValidationError(
+                reason: "data buffer size is smaller than height * bytesPerRow",
+                at: [ValidationCodingKey("data")]
+            )
+        }
 
         self.width = width
         self.height = height

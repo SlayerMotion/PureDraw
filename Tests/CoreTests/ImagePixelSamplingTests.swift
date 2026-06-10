@@ -9,8 +9,8 @@ import Testing
 import Validation
 
 struct ImagePixelSamplingTests {
-    @Test func straightAlphaRGBA() {
-        let image = Image(
+    @Test func straightAlphaRGBA() throws {
+        let image = try Image(
             width: 1,
             height: 1,
             alphaInfo: .last,
@@ -23,8 +23,8 @@ struct ImagePixelSamplingTests {
         #expect(abs(color.alpha - 128.0 / 255.0) < 0.001)
     }
 
-    @Test func premultipliedRGBAIsUnpremultiplied() {
-        let image = Image(
+    @Test func premultipliedRGBAIsUnpremultiplied() throws {
+        let image = try Image(
             width: 1,
             height: 1,
             alphaInfo: .premultipliedLast,
@@ -35,8 +35,8 @@ struct ImagePixelSamplingTests {
         #expect(abs(color.alpha - 128.0 / 255.0) < 0.001)
     }
 
-    @Test func alphaFirstRGBA() {
-        let image = Image(
+    @Test func alphaFirstRGBA() throws {
+        let image = try Image(
             width: 1,
             height: 1,
             alphaInfo: .first,
@@ -47,8 +47,8 @@ struct ImagePixelSamplingTests {
         #expect(abs(color.alpha - 128.0 / 255.0) < 0.001)
     }
 
-    @Test func skippedAlphaByteIsOpaque() {
-        let image = Image(
+    @Test func skippedAlphaByteIsOpaque() throws {
+        let image = try Image(
             width: 1,
             height: 1,
             alphaInfo: .noneSkipLast,
@@ -59,8 +59,8 @@ struct ImagePixelSamplingTests {
         #expect(color.alpha == 1.0)
     }
 
-    @Test func grayWithAndWithoutAlpha() {
-        let opaque = Image(
+    @Test func grayWithAndWithoutAlpha() throws {
+        let opaque = try Image(
             width: 1,
             height: 1,
             bitsPerPixel: 8,
@@ -72,7 +72,7 @@ struct ImagePixelSamplingTests {
         #expect(abs(opaqueColor.red - 0.2) < 0.001)
         #expect(opaqueColor.alpha == 1.0)
 
-        let translucent = Image(
+        let translucent = try Image(
             width: 1,
             height: 1,
             bitsPerPixel: 16,
@@ -83,8 +83,8 @@ struct ImagePixelSamplingTests {
         #expect(abs(translucent.pixelColor(x: 0, y: 0).alpha - 128.0 / 255.0) < 0.001)
     }
 
-    @Test func cmykSampling() {
-        let image = Image(
+    @Test func cmykSampling() throws {
+        let image = try Image(
             width: 1,
             height: 1,
             colorSpace: .deviceCMYK,
@@ -97,9 +97,9 @@ struct ImagePixelSamplingTests {
         #expect(color.alpha == 1.0)
     }
 
-    @Test func bytesPerRowPaddingIsHonored() {
+    @Test func bytesPerRowPaddingIsHonored() throws {
         // 1 pixel per row, 8 bytes per row: the second row starts at byte 8, not byte 4.
-        let image = Image(
+        let image = try Image(
             width: 1,
             height: 2,
             bytesPerRow: 8,
@@ -110,14 +110,14 @@ struct ImagePixelSamplingTests {
         #expect(image.pixelColor(x: 0, y: 1).blue == 1.0)
     }
 
-    @Test func outOfBoundsSamplingIsClear() {
-        let image = Image(width: 1, height: 1, data: [255, 255, 255, 255])
+    @Test func outOfBoundsSamplingIsClear() throws {
+        let image = try Image(width: 1, height: 1, data: [255, 255, 255, 255])
         #expect(image.pixelColor(x: 5, y: 5) == .clear)
     }
 
-    @Test func maskingColorsHideMatchingPixelsWithoutAlpha() {
+    @Test func maskingColorsHideMatchingPixelsWithoutAlpha() throws {
         // White pixels are masked out, the blue pixel stays.
-        let masked = Image(
+        let masked = try Image(
             width: 2,
             height: 1,
             alphaInfo: .noneSkipLast,
@@ -128,9 +128,9 @@ struct ImagePixelSamplingTests {
         #expect(masked.pixelColor(x: 1, y: 0).blue == 1.0)
     }
 
-    @Test func maskingColorsAreIgnoredOnAlphaImages() {
+    @Test func maskingColorsAreIgnoredOnAlphaImages() throws {
         // CoreGraphics only masks images without alpha; the white pixel must survive here.
-        let image = Image(
+        let image = try Image(
             width: 1,
             height: 1,
             alphaInfo: .last,
@@ -140,8 +140,8 @@ struct ImagePixelSamplingTests {
         #expect(image.pixelColor(x: 0, y: 0) != .clear)
     }
 
-    @Test func maskCoverageUsesAlphaWhenPresent() {
-        let image = Image(
+    @Test func maskCoverageUsesAlphaWhenPresent() throws {
+        let image = try Image(
             width: 1,
             height: 1,
             alphaInfo: .last,
@@ -150,8 +150,8 @@ struct ImagePixelSamplingTests {
         #expect(abs(image.maskCoverage(x: 0, y: 0) - 128.0 / 255.0) < 0.001)
     }
 
-    @Test func maskCoverageUsesLuminanceWithoutAlpha() {
-        let image = Image(
+    @Test func maskCoverageUsesLuminanceWithoutAlpha() throws {
+        let image = try Image(
             width: 2,
             height: 1,
             alphaInfo: .noneSkipLast,
@@ -176,11 +176,11 @@ struct ImagePixelSamplingTests {
         #expect(!AlphaInfo.last.isPremultiplied)
     }
 
-    @Test func maskingColorsValidation() {
+    @Test func maskingColorsValidation() throws {
         let data: [UInt8] = [255, 255, 255, 0]
 
         // Wrong component count for RGB.
-        let wrongCount = Image(
+        let wrongCount = try Image(
             width: 1,
             height: 1,
             alphaInfo: .noneSkipLast,
@@ -192,7 +192,7 @@ struct ImagePixelSamplingTests {
         }
 
         // Out-of-range component.
-        let outOfRange = Image(
+        let outOfRange = try Image(
             width: 1,
             height: 1,
             alphaInfo: .noneSkipLast,
@@ -204,7 +204,7 @@ struct ImagePixelSamplingTests {
         }
 
         // Masking colors on an image with alpha.
-        let alphaImage = Image(
+        let alphaImage = try Image(
             width: 1,
             height: 1,
             alphaInfo: .premultipliedLast,
@@ -216,7 +216,7 @@ struct ImagePixelSamplingTests {
         }
 
         // A valid no-alpha configuration passes.
-        let valid = Image(
+        let valid = try Image(
             width: 1,
             height: 1,
             alphaInfo: .noneSkipLast,
@@ -228,8 +228,8 @@ struct ImagePixelSamplingTests {
         }
     }
 
-    @Test func maskStateValidation() {
-        let mask = Image(width: 1, height: 1, data: [255, 255, 255, 255])
+    @Test func maskStateValidation() throws {
+        let mask = try Image(width: 1, height: 1, data: [255, 255, 255, 255])
 
         // maskImage without maskRect and maskTransform is invalid.
         let incomplete = GraphicState(maskImage: mask)

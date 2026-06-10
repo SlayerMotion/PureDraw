@@ -245,9 +245,9 @@ public extension Validation {
                     ))
                 }
 
-                if img.bitsPerComponent <= 0 {
+                if img.bitsPerComponent != 8 {
                     errors.append(ValidationError(
-                        reason: "bitsPerComponent must be positive",
+                        reason: "bitsPerComponent must be 8; pixel decoding supports no other component depth yet",
                         at: context.codingPath + [ValidationCodingKey("bitsPerComponent")]
                     ))
                 }

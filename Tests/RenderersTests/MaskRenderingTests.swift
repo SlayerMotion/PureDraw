@@ -11,7 +11,7 @@ import Testing
 struct MaskRenderingTests {
     @Test func grayscaleMaskClipsFill() throws {
         // Left mask column is white (reveal), right is black (hide).
-        let mask = Image(
+        let mask = try Image(
             width: 2,
             height: 1,
             bitsPerPixel: 8,
@@ -44,7 +44,7 @@ struct MaskRenderingTests {
 
     @Test func alphaMaskUsesAlphaChannel() throws {
         // Both mask pixels are white, but the right one is fully transparent.
-        let mask = Image(
+        let mask = try Image(
             width: 2,
             height: 1,
             alphaInfo: .last,
@@ -68,7 +68,7 @@ struct MaskRenderingTests {
     }
 
     @Test func pixelsOutsideMaskRectAreHidden() throws {
-        let mask = Image(
+        let mask = try Image(
             width: 1,
             height: 1,
             bitsPerPixel: 8,
@@ -96,7 +96,7 @@ struct MaskRenderingTests {
     @Test func maskRespectsTransformAtClipTime() throws {
         // The mask is anchored where the CTM was when clip(to:mask:) was called;
         // a translation applied afterwards must not move the mask.
-        let mask = Image(
+        let mask = try Image(
             width: 1,
             height: 1,
             bitsPerPixel: 8,
@@ -123,7 +123,7 @@ struct MaskRenderingTests {
 
     @Test func maskingColorsAffectDrawnImages() throws {
         // Two-pixel source image: white (masked out) and blue (kept).
-        let source = Image(
+        let source = try Image(
             width: 2,
             height: 1,
             alphaInfo: .noneSkipLast,

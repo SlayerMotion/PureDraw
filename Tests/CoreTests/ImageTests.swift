@@ -9,13 +9,13 @@ import Testing
 import Validation
 
 struct ImageTests {
-    @Test func imageInitialization() {
+    @Test func imageInitialization() throws {
         let width = 4
         let height = 4
         let bytesPerRow = width * 4
         let pixelData = [UInt8](repeating: 255, count: height * bytesPerRow)
 
-        let image = Image(
+        let image = try Image(
             width: width,
             height: height,
             bitsPerComponent: 8,
@@ -36,12 +36,12 @@ struct ImageTests {
         #expect(image.data == pixelData)
     }
 
-    @Test func imageDefaultArguments() {
+    @Test func imageDefaultArguments() throws {
         let width = 2
         let height = 2
         let correctData = [UInt8](repeating: 0, count: 16) // 2 * 2 * 4 = 16 bytes
 
-        let image = Image(width: width, height: height, data: correctData)
+        let image = try Image(width: width, height: height, data: correctData)
 
         #expect(image.bitsPerComponent == 8)
         #expect(image.bitsPerPixel == 32)
@@ -52,15 +52,32 @@ struct ImageTests {
 
     @Test func imageValidation() throws {
         let correctData = [UInt8](repeating: 0, count: 16)
-        let image = Image(width: 2, height: 2, data: correctData)
+        let image = try Image(width: 2, height: 2, data: correctData)
 
         // A correct image must validate without throwing errors
         try image.validate()
 
         // Create an invalid image (negative dimension) and expect validation failure
-        let invalidImage = Image(width: -1, height: 2, bytesPerRow: 8, data: correctData)
+        let invalidImage = try Image(width: -1, height: 2, bytesPerRow: 8, data: correctData)
         #expect(throws: ValidationErrorCollection.self) {
             try invalidImage.validate()
+        }
+    }
+
+    @Test func undersizedBufferThrowsOnInit() {
+        let tooSmall = [UInt8](repeating: 0, count: 15) // 2 * 2 * 4 = 16 bytes needed
+
+        #expect(throws: ValidationError.self) {
+            _ = try Image(width: 2, height: 2, data: tooSmall)
+        }
+    }
+
+    @Test func nonEightBitComponentsFailValidation() throws {
+        let data = [UInt8](repeating: 0, count: 32)
+        let image = try Image(width: 2, height: 2, bitsPerComponent: 16, bitsPerPixel: 64, data: data)
+
+        #expect(throws: ValidationErrorCollection.self) {
+            try image.validate()
         }
     }
 }

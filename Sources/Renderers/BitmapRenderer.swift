@@ -66,7 +66,7 @@ public final class BitmapRenderer: Renderer, Sendable {
             }
         }
 
-        return Image(
+        return try Image(
             width: width,
             height: height,
             bitsPerComponent: 8,

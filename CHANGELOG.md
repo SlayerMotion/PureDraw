@@ -17,9 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sampling across gray, RGB, and CMYK layouts.
 - `AlphaInfo.hasAlpha`, `AlphaInfo.isAlphaFirst`, and
   `AlphaInfo.isPremultiplied`.
+- Validation now rejects images whose `bitsPerComponent` is not 8, making the
+  assumption baked into pixel decoding explicit.
 
 ### Changed
 
+- **Breaking:** `Image.init` throws `ValidationError` when the data buffer is
+  smaller than `height * bytesPerRow`, instead of trapping via `precondition`.
+  Construction sites must use `try`.
 - **Breaking:** `Renderer` now requires `draw(_:)` instead of `render(_:)`.
   `render(_:)` is provided by a protocol extension that validates the context
   first and throws `ValidationErrorCollection` for invalid input, so every

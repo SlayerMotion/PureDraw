@@ -97,7 +97,7 @@ struct BitmapRendererTests {
             0, 0, 255, 255, // Blue
             255, 255, 0, 128, // Yellow (half alpha)
         ]
-        let testImage = Image(width: 2, height: 2, data: imgData)
+        let testImage = try Image(width: 2, height: 2, data: imgData)
 
         var context = GraphicsContext()
         // Draw the 2x2 image scaled to fill 4x4 rect starting at (2, 2) in a 8x8 context
