@@ -89,6 +89,15 @@ struct ShowcaseGenerationTests {
             case 1: shape.addContinuousRoundedRect(in: box, cornerRadius: radius, smoothing: 0.6)
             default: shape.addAppleRoundedRect(in: box, cornerRadius: radius)
             }
+
+            // Skew the middle tile into a parallelogram (an affine shear about
+            // its vertical center), so the row is not three identical squares.
+            if index == 1 {
+                let cy = oy + tile.height / 2
+                let k = 0.34
+                shape = shape.applying(Geometry.AffineTransform(a: 1, b: 0, c: k, d: 1, tx: -k * cy, ty: 0))
+            }
+
             ctx.saveGState()
             ctx.setShadow(offset: Point(x: 0, y: 8), blur: 14, color: Color(red: 0, green: 0, blue: 0, alpha: 0.55))
             ctx.addPath(shape)
@@ -194,11 +203,11 @@ struct ShowcaseGenerationTests {
     /// texture on its front face. Ported from PureDraw's 3D perspective scene.
     private func drawPerspective(_ ctx: inout GraphicsContext, font: Font?, originY: Double) {
         label(&ctx, font: font, "3D CUBE  (translucent + projective)", x: 320, y: originY)
-        let center = Point(x: 446, y: originY + 92)
+        let center = Point(x: 452, y: originY + 96)
         let half = 60.0
         let camera = 300.0
         let translateZ = 200.0
-        let scale = 0.62
+        let scale = 0.95
         let rotY = 0.52
         let rotX = 0.35
 
