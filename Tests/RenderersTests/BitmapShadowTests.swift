@@ -37,6 +37,22 @@ struct BitmapShadowTests {
         #expect(rgba(data, 50, 50, width: 60).a == 0)
     }
 
+    @Test func groupAlphaFadesTheShadow() throws {
+        var context = GraphicsContext()
+        context.setShadow(offset: Point(x: 10, y: 10), blur: 0, color: Color(red: 0, green: 0, blue: 0, alpha: 1))
+        context.setAlpha(0.5) // group opacity, applied when the layer composites
+        context.beginTransparencyLayer()
+        context.setFillColor(Color(red: 1, green: 0, blue: 0, alpha: 1))
+        context.addRect(Rect(x: 10, y: 10, width: 20, height: 20))
+        context.fillPath()
+        context.endTransparencyLayer()
+
+        let image = try BitmapRenderer(width: 60, height: 60).render(context)
+        // The shadow fades with the group: at half group opacity its alpha is ~half.
+        let shadow = rgba(image.data, 35, 35, width: 60)
+        #expect(shadow.a > 110 && shadow.a < 145)
+    }
+
     @Test func blurSpreadsTheShadowBeyondTheSilhouette() throws {
         var context = GraphicsContext()
         context.setShadow(offset: Point(x: 0, y: 0), blur: 4, color: Color(red: 0, green: 0, blue: 0, alpha: 1))

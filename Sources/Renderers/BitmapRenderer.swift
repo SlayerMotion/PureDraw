@@ -529,8 +529,10 @@ public final class BitmapRenderer: Renderer, Sendable {
     private func compositeLayer(_ layer: [UInt8], into parent: inout [UInt8], state: GraphicState) {
         // A transparency layer's shadow is cast by the composited silhouette: blur
         // and offset the layer's alpha, then paint it in the shadow color beneath
-        // the content. Matches CoreGraphicsRenderer's order (shadow set before the
-        // layer composites), approximating its Gaussian blur with a box blur.
+        // the content. Matches CoreGraphicsRenderer's ordering (shadow set before the
+        // layer composites); the group alpha fades the shadow together with the
+        // content, and the Gaussian blur is approximated by a box blur, so the
+        // result is structurally equivalent to the hardware path, not pixel-exact.
         if let shadow = state.shadow {
             compositeShadow(of: layer, shadow: shadow, state: state, into: &parent)
         }
@@ -559,9 +561,18 @@ public final class BitmapRenderer: Renderer, Sendable {
         for i in 0 ..< width * height {
             coverage[i] = Double(layer[i * 4 + 3]) / 255.0
         }
-        let blurred = boxBlurredAlpha(coverage, radius: Int(shadow.blur.rounded()))
+        // Clamp the radius so an adversarial blur cannot run an unbounded inner loop.
+        let radius = min(Int(shadow.blur.rounded()), max(width, height))
+        let blurred = boxBlurredAlpha(coverage, radius: radius)
         let dx = Int(shadow.offset.x.rounded())
         let dy = Int(shadow.offset.y.rounded())
+        // The shadow keeps the group alpha (so it fades with the content) but drops
+        // the layer's own mask: an offset shadow may legitimately fall outside the
+        // masked content and should not be re-clipped by it.
+        var shadowState = state
+        shadowState.maskImage = nil
+        shadowState.maskRect = nil
+        shadowState.maskTransform = nil
         for y in 0 ..< height {
             for x in 0 ..< width {
                 let sx = x - dx
@@ -570,7 +581,7 @@ public final class BitmapRenderer: Renderer, Sendable {
                 let alpha = blurred[sy * width + sx]
                 // blendPixel ignores state.shadow, so the shadow does not recurse.
                 if alpha > 0 {
-                    blendPixel(x: x, y: y, color: shadow.color, state: state, coverage: alpha, buffer: &parent)
+                    blendPixel(x: x, y: y, color: shadow.color, state: shadowState, coverage: alpha, buffer: &parent)
                 }
             }
         }
