@@ -527,6 +527,13 @@ public final class BitmapRenderer: Renderer, Sendable {
     }
 
     private func compositeLayer(_ layer: [UInt8], into parent: inout [UInt8], state: GraphicState) {
+        // A transparency layer's shadow is cast by the composited silhouette: blur
+        // and offset the layer's alpha, then paint it in the shadow color beneath
+        // the content. Matches CoreGraphicsRenderer's order (shadow set before the
+        // layer composites), approximating its Gaussian blur with a box blur.
+        if let shadow = state.shadow {
+            compositeShadow(of: layer, shadow: shadow, state: state, into: &parent)
+        }
         for y in 0 ..< height {
             for x in 0 ..< width {
                 let index = (y * width + x) * 4
@@ -541,6 +548,62 @@ public final class BitmapRenderer: Renderer, Sendable {
                 }
             }
         }
+    }
+
+    /// Composites a blurred, offset silhouette of `layer`'s alpha in the shadow
+    /// color beneath the layer's content. The box blur approximates CoreGraphics's
+    /// Gaussian shadow: the software path is structurally equivalent, not
+    /// pixel-identical (as is already the case among PureDraw's other renderers).
+    private func compositeShadow(of layer: [UInt8], shadow: Shadow, state: GraphicState, into parent: inout [UInt8]) {
+        var coverage = [Double](repeating: 0, count: width * height)
+        for i in 0 ..< width * height {
+            coverage[i] = Double(layer[i * 4 + 3]) / 255.0
+        }
+        let blurred = boxBlurredAlpha(coverage, radius: Int(shadow.blur.rounded()))
+        let dx = Int(shadow.offset.x.rounded())
+        let dy = Int(shadow.offset.y.rounded())
+        for y in 0 ..< height {
+            for x in 0 ..< width {
+                let sx = x - dx
+                let sy = y - dy
+                guard sx >= 0, sx < width, sy >= 0, sy < height else { continue }
+                let alpha = blurred[sy * width + sx]
+                // blendPixel ignores state.shadow, so the shadow does not recurse.
+                if alpha > 0 {
+                    blendPixel(x: x, y: y, color: shadow.color, state: state, coverage: alpha, buffer: &parent)
+                }
+            }
+        }
+    }
+
+    /// A separable box blur of an alpha plane, clamping at the edges. The identity
+    /// when `radius <= 0`.
+    private func boxBlurredAlpha(_ source: [Double], radius: Int) -> [Double] {
+        guard radius > 0 else { return source }
+        let window = Double(radius * 2 + 1)
+        var horizontal = [Double](repeating: 0, count: source.count)
+        for y in 0 ..< height {
+            for x in 0 ..< width {
+                var sum = 0.0
+                for k in -radius ... radius {
+                    let xx = min(width - 1, max(0, x + k))
+                    sum += source[y * width + xx]
+                }
+                horizontal[y * width + x] = sum / window
+            }
+        }
+        var blurred = [Double](repeating: 0, count: source.count)
+        for x in 0 ..< width {
+            for y in 0 ..< height {
+                var sum = 0.0
+                for k in -radius ... radius {
+                    let yy = min(height - 1, max(0, y + k))
+                    sum += horizontal[yy * width + x]
+                }
+                blurred[y * width + x] = sum / window
+            }
+        }
+        return blurred
     }
 
     private func blendPixel(x: Int, y: Int, color: Color, state: GraphicState, coverage: Double = 1.0, buffer: inout [UInt8]) {
