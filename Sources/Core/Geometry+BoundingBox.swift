@@ -120,15 +120,16 @@ extension Path {
         return []
     }
 
-    /// Finds the \`t\` values (0...1) where the first derivative of the cubic curve is zero.
+    /// Finds the `t` values (0...1) where the first derivative of the cubic curve is zero.
     private func cubicExtrema(p0: Double, p1: Double, p2: Double, p3: Double) -> [Double] {
         // Derivative of cubic is a quadratic equation: At^2 + Bt + C = 0
         let a = 3.0 * (-p0 + 3.0 * p1 - 3.0 * p2 + p3)
         let b = 6.0 * (p0 - 2.0 * p1 + p2)
         let c = 3.0 * (p1 - p0)
 
-        if a == 0 {
-            if b == 0 { return [] }
+        // If a is extremely close to zero, solve as linear Bt + C = 0
+        if abs(a) < 1e-12 {
+            if abs(b) < 1e-12 { return [] }
             let t = -c / b
             return (t > 0.0 && t < 1.0) ? [t] : []
         }
@@ -137,13 +138,18 @@ extension Path {
         if discriminant < 0 { return [] } // No real roots
 
         let sqrtD = sqrt(discriminant)
-        let t1 = (-b + sqrtD) / (2.0 * a)
-        let t2 = (-b - sqrtD) / (2.0 * a)
+
+        // Stable quadratic formula:
+        let sgnB = b >= 0.0 ? 1.0 : -1.0
+        let q = -0.5 * (b + sgnB * sqrtD)
 
         var roots: [Double] = []
-        if t1 > 0.0, t1 < 1.0 { roots.append(t1) }
-        if t2 > 0.0, t2 < 1.0 { roots.append(t2) }
-
+        if q != 0.0 {
+            let t1 = q / a
+            let t2 = c / q
+            if t1 > 0.0, t1 < 1.0 { roots.append(t1) }
+            if t2 > 0.0, t2 < 1.0 { roots.append(t2) }
+        }
         return roots
     }
 }
