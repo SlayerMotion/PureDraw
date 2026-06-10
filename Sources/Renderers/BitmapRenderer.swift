@@ -413,13 +413,7 @@ public final class BitmapRenderer: Renderer, Sendable {
                 let v = maskRect.height > 0 ? (userPt.y - maskRect.minY) / maskRect.height : 0.0
                 let srcX = min(maskImage.width - 1, max(0, Int(u * Double(maskImage.width))))
                 let srcY = min(maskImage.height - 1, max(0, Int(v * Double(maskImage.height))))
-                let maskColor = extractPixelColor(from: maskImage, x: srcX, y: srcY)
-
-                if maskImage.alphaInfo.hasAlpha {
-                    maskAlpha = maskColor.alpha
-                } else {
-                    maskAlpha = 0.2126 * maskColor.red + 0.7152 * maskColor.green + 0.0722 * maskColor.blue
-                }
+                maskAlpha = maskImage.maskCoverage(x: srcX, y: srcY)
             } else {
                 maskAlpha = 0.0
             }
@@ -516,146 +510,10 @@ public final class BitmapRenderer: Renderer, Sendable {
                     let srcX = min(image.width - 1, max(0, Int(u * Double(image.width))))
                     let srcY = min(image.height - 1, max(0, Int(v * Double(image.height))))
 
-                    let color = extractPixelColor(from: image, x: srcX, y: srcY)
+                    let color = image.pixelColor(x: srcX, y: srcY)
                     blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
                 }
             }
-        }
-    }
-
-    private func extractPixelColor(from image: Image, x: Int, y: Int) -> Color {
-        let bytesPerPixel = image.bitsPerPixel / 8
-        let index = y * image.bytesPerRow + x * bytesPerPixel
-        guard index + bytesPerPixel <= image.data.count else { return .clear }
-
-        let alphaFirst = image.alphaInfo.isAlphaFirst
-        let hasAlpha = image.alphaInfo.hasAlpha
-
-        var rawComponents: [Double] = []
-        var rawAlpha = 1.0
-
-        switch image.colorSpace {
-        case .deviceGray:
-            if bytesPerPixel >= 2 {
-                if alphaFirst {
-                    rawAlpha = Double(image.data[index]) / 255.0
-                    rawComponents = [Double(image.data[index + 1]) / 255.0]
-                } else {
-                    rawComponents = [Double(image.data[index]) / 255.0]
-                    rawAlpha = Double(image.data[index + 1]) / 255.0
-                }
-            } else if bytesPerPixel == 1 {
-                rawComponents = [Double(image.data[index]) / 255.0]
-                rawAlpha = 1.0
-            } else {
-                return .clear
-            }
-
-        case .deviceRGB:
-            if bytesPerPixel >= 4 {
-                if alphaFirst {
-                    rawAlpha = Double(image.data[index]) / 255.0
-                    rawComponents = [
-                        Double(image.data[index + 1]) / 255.0,
-                        Double(image.data[index + 2]) / 255.0,
-                        Double(image.data[index + 3]) / 255.0,
-                    ]
-                } else {
-                    rawComponents = [
-                        Double(image.data[index]) / 255.0,
-                        Double(image.data[index + 1]) / 255.0,
-                        Double(image.data[index + 2]) / 255.0,
-                    ]
-                    rawAlpha = Double(image.data[index + 3]) / 255.0
-                }
-            } else if bytesPerPixel == 3 {
-                rawComponents = [
-                    Double(image.data[index]) / 255.0,
-                    Double(image.data[index + 1]) / 255.0,
-                    Double(image.data[index + 2]) / 255.0,
-                ]
-                rawAlpha = 1.0
-            } else {
-                return .clear
-            }
-
-        case .deviceCMYK:
-            if bytesPerPixel >= 5 {
-                if alphaFirst {
-                    rawAlpha = Double(image.data[index]) / 255.0
-                    rawComponents = [
-                        Double(image.data[index + 1]) / 255.0,
-                        Double(image.data[index + 2]) / 255.0,
-                        Double(image.data[index + 3]) / 255.0,
-                        Double(image.data[index + 4]) / 255.0,
-                    ]
-                } else {
-                    rawComponents = [
-                        Double(image.data[index]) / 255.0,
-                        Double(image.data[index + 1]) / 255.0,
-                        Double(image.data[index + 2]) / 255.0,
-                        Double(image.data[index + 3]) / 255.0,
-                    ]
-                    rawAlpha = Double(image.data[index + 4]) / 255.0
-                }
-            } else if bytesPerPixel >= 4 {
-                rawComponents = [
-                    Double(image.data[index]) / 255.0,
-                    Double(image.data[index + 1]) / 255.0,
-                    Double(image.data[index + 2]) / 255.0,
-                    Double(image.data[index + 3]) / 255.0,
-                ]
-                rawAlpha = 1.0
-            } else {
-                return .clear
-            }
-        }
-
-        // CoreGraphics applies masking colors only to images without alpha; match that here.
-        if let masking = image.maskingColors, !hasAlpha, masking.count == rawComponents.count * 2 {
-            var allMatch = true
-            for i in 0 ..< rawComponents.count {
-                let val = rawComponents[i]
-                let minVal = masking[2 * i]
-                let maxVal = masking[2 * i + 1]
-                if val < minVal || val > maxVal {
-                    allMatch = false
-                    break
-                }
-            }
-            if allMatch {
-                return .clear
-            }
-        }
-
-        let finalAlpha = hasAlpha ? rawAlpha : 1.0
-        let isPremultiplied = image.alphaInfo.isPremultiplied
-
-        switch image.colorSpace {
-        case .deviceGray:
-            let g = rawComponents[0]
-            let finalGray = (isPremultiplied && finalAlpha > 0) ? (g / finalAlpha) : g
-            return Color(gray: finalGray, alpha: finalAlpha)
-
-        case .deviceRGB:
-            let r = rawComponents[0]
-            let g = rawComponents[1]
-            let b = rawComponents[2]
-            let finalR = (isPremultiplied && finalAlpha > 0) ? (r / finalAlpha) : r
-            let finalG = (isPremultiplied && finalAlpha > 0) ? (g / finalAlpha) : g
-            let finalB = (isPremultiplied && finalAlpha > 0) ? (b / finalAlpha) : b
-            return Color(red: finalR, green: finalG, blue: finalB, alpha: finalAlpha)
-
-        case .deviceCMYK:
-            let c = rawComponents[0]
-            let m = rawComponents[1]
-            let y = rawComponents[2]
-            let k = rawComponents[3]
-            let finalC = (isPremultiplied && finalAlpha > 0) ? (c / finalAlpha) : c
-            let finalM = (isPremultiplied && finalAlpha > 0) ? (m / finalAlpha) : m
-            let finalY = (isPremultiplied && finalAlpha > 0) ? (y / finalAlpha) : y
-            let finalK = (isPremultiplied && finalAlpha > 0) ? (k / finalAlpha) : k
-            return Color(cyan: finalC, magenta: finalM, yellow: finalY, black: finalK, alpha: finalAlpha)
         }
     }
 }

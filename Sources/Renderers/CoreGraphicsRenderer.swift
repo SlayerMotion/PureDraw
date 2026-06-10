@@ -190,7 +190,7 @@
             if let maskImage = state.maskImage,
                let maskRect = state.maskRect,
                let maskTransform = state.maskTransform,
-               let cgMask = createCGImage(from: maskImage)
+               let cgMask = createMaskCGImage(from: maskImage)
             {
                 let flip = Geometry.AffineTransform.identity
                     .translatedBy(x: maskRect.origin.x, y: maskRect.origin.y + maskRect.height)
@@ -205,6 +205,34 @@
             } else {
                 targetContext.concatenate(CGAffineTransform(t))
             }
+        }
+
+        /// Builds the DeviceGray, no-alpha image that `CGContext.clip(to:mask:)` requires.
+        /// Coverage matches `BitmapRenderer`: the mask's alpha channel when present, luminance otherwise.
+        private func createMaskCGImage(from image: Image) -> CGImage? {
+            var grayData = [UInt8]()
+            grayData.reserveCapacity(image.width * image.height)
+            for y in 0 ..< image.height {
+                for x in 0 ..< image.width {
+                    grayData.append(UInt8((image.maskCoverage(x: x, y: y) * 255.0).rounded()))
+                }
+            }
+            guard let provider = CGDataProvider(data: Data(grayData) as CFData) else {
+                return nil
+            }
+            return CGImage(
+                width: image.width,
+                height: image.height,
+                bitsPerComponent: 8,
+                bitsPerPixel: 8,
+                bytesPerRow: image.width,
+                space: CGColorSpaceCreateDeviceGray(),
+                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+                provider: provider,
+                decode: nil,
+                shouldInterpolate: true,
+                intent: .defaultIntent
+            )
         }
 
         private func createCGImage(from image: Image) -> CGImage? {
