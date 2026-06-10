@@ -59,6 +59,14 @@ public struct PostScriptRenderer: Renderer {
                     } else {
                         continue
                     }
+                case let .drawImage(_, rect):
+                    var p = Path()
+                    p.move(to: Point(x: rect.minX, y: rect.minY))
+                    p.addLine(to: Point(x: rect.maxX, y: rect.minY))
+                    p.addLine(to: Point(x: rect.maxX, y: rect.maxY))
+                    p.addLine(to: Point(x: rect.minX, y: rect.maxY))
+                    p.closeSubpath()
+                    path = p
                 case .beginTransparencyLayer, .endTransparencyLayer:
                     continue
                 }
@@ -194,6 +202,59 @@ public struct PostScriptRenderer: Renderer {
                   /Function \(psFunction(for: grad))
                   /Extend [ \(extendStart) \(extendEnd) ]
                 >> shfill
+
+                """
+            case let .drawImage(image, rect):
+                var hexString = ""
+                hexString.reserveCapacity(image.width * image.height * 6)
+
+                for index in stride(from: 0, to: image.data.count, by: 4) {
+                    guard index + 3 < image.data.count else { break }
+                    let r = Double(image.data[index]) / 255.0
+                    let g = Double(image.data[index + 1]) / 255.0
+                    let b = Double(image.data[index + 2]) / 255.0
+                    let a = Double(image.data[index + 3]) / 255.0
+
+                    var outR = r
+                    var outG = g
+                    var outB = b
+
+                    switch image.alphaInfo {
+                    case .premultipliedLast, .premultipliedFirst:
+                        if a > 0 {
+                            outR = r / a
+                            outG = g / a
+                            outB = b / a
+                        }
+                    case .last, .first:
+                        break
+                    case .none, .noneSkipLast, .noneSkipFirst:
+                        break
+                    }
+
+                    let byteR = UInt8(min(255, max(0, Int(round(outR * 255.0)))))
+                    let byteG = UInt8(min(255, max(0, Int(round(outG * 255.0)))))
+                    let byteB = UInt8(min(255, max(0, Int(round(outB * 255.0)))))
+
+                    hexString += String(format: "%02X%02X%02X", byteR, byteG, byteB)
+                }
+
+                ps += """
+                gsave
+                /DeviceRGB setcolorspace
+                \(rect.origin.x) \(rect.origin.y) translate
+                \(rect.width) \(rect.height) scale
+                <<
+                  /ImageType 1
+                  /Width \(image.width)
+                  /Height \(image.height)
+                  /BitsPerComponent 8
+                  /Decode [ 0 1 0 1 0 1 ]
+                  /ImageMatrix [ \(image.width) 0 0 \(image.height) 0 0 ]
+                  /DataSource currentfile /ASCIIHexDecode filter
+                >> image
+                \(hexString)>
+                grestore
 
                 """
             case .beginTransparencyLayer, .endTransparencyLayer:

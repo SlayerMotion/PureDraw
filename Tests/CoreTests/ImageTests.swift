@@ -6,6 +6,7 @@
 @testable import Core
 import Geometry
 import Testing
+import Validation
 
 struct ImageTests {
     @Test func imageInitialization() {
@@ -47,5 +48,19 @@ struct ImageTests {
         #expect(image.bytesPerRow == 8) // width * bitsPerPixel / 8 = 8
         #expect(image.colorSpace == .deviceRGB)
         #expect(image.alphaInfo == .premultipliedLast)
+    }
+
+    @Test func imageValidation() throws {
+        let correctData = [UInt8](repeating: 0, count: 16)
+        let image = Image(width: 2, height: 2, data: correctData)
+
+        // A correct image must validate without throwing errors
+        try image.validate()
+
+        // Create an invalid image (negative dimension) and expect validation failure
+        let invalidImage = Image(width: -1, height: 2, bytesPerRow: 8, data: correctData)
+        #expect(throws: ValidationErrorCollection.self) {
+            try invalidImage.validate()
+        }
     }
 }

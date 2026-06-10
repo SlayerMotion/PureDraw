@@ -60,6 +60,9 @@ public final class BitmapRenderer: Renderer, Sendable {
                     state: op.state,
                     buffer: &currentBuffer
                 )
+
+            case let .drawImage(image, rect):
+                rasterizeImage(image, in: rect, state: op.state, buffer: &currentBuffer)
             }
         }
 
@@ -451,5 +454,71 @@ public final class BitmapRenderer: Renderer, Sendable {
         buffer[index + 1] = UInt8(min(255, max(0, Int(round(outG * 255.0)))))
         buffer[index + 2] = UInt8(min(255, max(0, Int(round(outB * 255.0)))))
         buffer[index + 3] = UInt8(min(255, max(0, Int(round(outA * 255.0)))))
+    }
+
+    private func rasterizeImage(_ image: Image, in rect: Rect, state: GraphicState, buffer: inout [UInt8]) {
+        let p0 = Point(x: rect.minX, y: rect.minY)
+        let p1 = Point(x: rect.maxX, y: rect.minY)
+        let p2 = Point(x: rect.maxX, y: rect.maxY)
+        let p3 = Point(x: rect.minX, y: rect.maxY)
+
+        let dp0 = p0.applying(state.transform)
+        let dp1 = p1.applying(state.transform)
+        let dp2 = p2.applying(state.transform)
+        let dp3 = p3.applying(state.transform)
+
+        let minX = max(0, Int(floor(min(dp0.x, dp1.x, dp2.x, dp3.x))))
+        let maxX = min(width - 1, Int(ceil(max(dp0.x, dp1.x, dp2.x, dp3.x))))
+        let minY = max(0, Int(floor(min(dp0.y, dp1.y, dp2.y, dp3.y))))
+        let maxY = min(height - 1, Int(ceil(max(dp0.y, dp1.y, dp2.y, dp3.y))))
+
+        guard minX <= maxX, minY <= maxY else { return }
+
+        let invTransform = state.transform.inverted()
+        let clipPath = state.clipPath?.applying(state.transform)
+
+        for y in minY ... maxY {
+            for x in minX ... maxX {
+                let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
+
+                if let clip = clipPath {
+                    guard clip.contains(pt, using: .winding) else { continue }
+                }
+
+                let userPt = pt.applying(invTransform)
+
+                if rect.contains(userPt) {
+                    let u = rect.width > 0 ? (userPt.x - rect.minX) / rect.width : 0.0
+                    let v = rect.height > 0 ? (userPt.y - rect.minY) / rect.height : 0.0
+
+                    let srcX = min(image.width - 1, max(0, Int(u * Double(image.width))))
+                    let srcY = min(image.height - 1, max(0, Int(v * Double(image.height))))
+
+                    let color = extractPixelColor(from: image, x: srcX, y: srcY)
+                    blendPixel(x: x, y: y, color: color, stateAlpha: state.alpha, blendMode: state.blendMode, buffer: &buffer)
+                }
+            }
+        }
+    }
+
+    private func extractPixelColor(from image: Image, x: Int, y: Int) -> Color {
+        let index = (y * image.width + x) * 4
+        guard index + 3 < image.data.count else { return .clear }
+
+        let r = Double(image.data[index]) / 255.0
+        let g = Double(image.data[index + 1]) / 255.0
+        let b = Double(image.data[index + 2]) / 255.0
+        let a = Double(image.data[index + 3]) / 255.0
+
+        switch image.alphaInfo {
+        case .premultipliedLast:
+            return Color(red: a > 0 ? r / a : 0.0, green: a > 0 ? g / a : 0.0, blue: a > 0 ? b / a : 0.0, alpha: a)
+        case .premultipliedFirst:
+            return Color(red: a > 0 ? r / a : 0.0, green: a > 0 ? g / a : 0.0, blue: a > 0 ? b / a : 0.0, alpha: a)
+        case .last, .first:
+            return Color(red: r, green: g, blue: b, alpha: a)
+        case .none, .noneSkipLast, .noneSkipFirst:
+            return Color(red: r, green: g, blue: b, alpha: 1.0)
+        }
     }
 }

@@ -6,6 +6,7 @@
 #if canImport(CoreGraphics)
     import Core
     import CoreGraphics
+    import Foundation
     import Geometry
 
     /// A renderer that executes the PureDraw command buffer on an Apple `CGContext`.
@@ -175,6 +176,48 @@
                             endRadius: CGFloat(endRadius),
                             options: cgOptions
                         )
+
+                    case let .drawImage(image, rect):
+                        guard let provider = CGDataProvider(data: Data(image.data) as CFData) else {
+                            break
+                        }
+                        let cgColorSpace: CGColorSpace = switch image.colorSpace {
+                        case .deviceRGB:
+                            CGColorSpaceCreateDeviceRGB()
+                        case .deviceCMYK:
+                            CGColorSpaceCreateDeviceCMYK()
+                        case .deviceGray:
+                            CGColorSpaceCreateDeviceGray()
+                        }
+                        let cgAlphaInfo: CGImageAlphaInfo = switch image.alphaInfo {
+                        case .none: .none
+                        case .premultipliedLast: .premultipliedLast
+                        case .premultipliedFirst: .premultipliedFirst
+                        case .last: .last
+                        case .first: .first
+                        case .noneSkipLast: .noneSkipLast
+                        case .noneSkipFirst: .noneSkipFirst
+                        }
+                        let bitmapInfo = CGBitmapInfo(rawValue: cgAlphaInfo.rawValue)
+                        if let cgImage = CGImage(
+                            width: image.width,
+                            height: image.height,
+                            bitsPerComponent: image.bitsPerComponent,
+                            bitsPerPixel: image.bitsPerPixel,
+                            bytesPerRow: image.bytesPerRow,
+                            space: cgColorSpace,
+                            bitmapInfo: bitmapInfo,
+                            provider: provider,
+                            decode: nil,
+                            shouldInterpolate: true,
+                            intent: .defaultIntent
+                        ) {
+                            targetContext.saveGState()
+                            targetContext.translateBy(x: CGFloat(rect.origin.x), y: CGFloat(rect.origin.y + rect.height))
+                            targetContext.scaleBy(x: 1.0, y: -1.0)
+                            targetContext.draw(cgImage, in: CGRect(x: 0, y: 0, width: CGFloat(rect.width), height: CGFloat(rect.height)))
+                            targetContext.restoreGState()
+                        }
 
                     case .beginTransparencyLayer, .endTransparencyLayer:
                         break

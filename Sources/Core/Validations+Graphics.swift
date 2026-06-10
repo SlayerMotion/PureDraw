@@ -150,7 +150,7 @@ public extension Validation {
                             at: context.codingPath + [ValidationCodingKey("kind")]
                         )]
                     }
-                case .drawLinearGradient, .drawRadialGradient, .beginTransparencyLayer, .endTransparencyLayer:
+                case .drawLinearGradient, .drawRadialGradient, .beginTransparencyLayer, .endTransparencyLayer, .drawImage:
                     break
                 }
                 return []
@@ -204,6 +204,62 @@ public extension Validation {
                     return errors
                 }
                 return []
+            }
+        )
+    }
+
+    /// Validates that an image's dimensions, bits, and bytes are valid and matches data buffer size.
+    static var imageIsValid: Validation<Document, Image> {
+        .init(
+            description: "Image dimensions and data are valid",
+            check: { context in
+                var errors: [ValidationError] = []
+                let img = context.subject
+
+                if img.width <= 0 {
+                    errors.append(ValidationError(
+                        reason: "width must be positive",
+                        at: context.codingPath + [ValidationCodingKey("width")]
+                    ))
+                }
+
+                if img.height <= 0 {
+                    errors.append(ValidationError(
+                        reason: "height must be positive",
+                        at: context.codingPath + [ValidationCodingKey("height")]
+                    ))
+                }
+
+                if img.bitsPerComponent <= 0 {
+                    errors.append(ValidationError(
+                        reason: "bitsPerComponent must be positive",
+                        at: context.codingPath + [ValidationCodingKey("bitsPerComponent")]
+                    ))
+                }
+
+                if img.bitsPerPixel <= 0 {
+                    errors.append(ValidationError(
+                        reason: "bitsPerPixel must be positive",
+                        at: context.codingPath + [ValidationCodingKey("bitsPerPixel")]
+                    ))
+                }
+
+                if img.bytesPerRow <= 0 {
+                    errors.append(ValidationError(
+                        reason: "bytesPerRow must be positive",
+                        at: context.codingPath + [ValidationCodingKey("bytesPerRow")]
+                    ))
+                }
+
+                let minBytes = img.height * img.bytesPerRow
+                if img.data.count < minBytes {
+                    errors.append(ValidationError(
+                        reason: "data buffer size is smaller than height * bytesPerRow",
+                        at: context.codingPath + [ValidationCodingKey("data")]
+                    ))
+                }
+
+                return errors
             }
         )
     }

@@ -435,4 +435,9 @@ public struct GraphicsContext: Sendable, Validatable {
         currentState.blendMode = originalState.blendMode
         commands.append(DrawOperation(kind: .endTransparencyLayer, state: currentState))
     }
+
+    /// Draws the specified image scaled within the target rect frame.
+    public mutating func draw(_ image: Image, in rect: Rect) {
+        commands.append(DrawOperation(kind: .drawImage(image, rect: rect), state: currentState))
+    }
 }

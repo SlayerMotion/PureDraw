@@ -4,6 +4,7 @@
 //
 
 import Core
+import Foundation
 import Geometry
 
 /// A renderer that translates a `GraphicsContext` drawing buffer into HTML5 Canvas 2D Context JavaScript code.
@@ -135,6 +136,19 @@ public struct CanvasRenderer: Renderer {
 
                 case .beginTransparencyLayer, .endTransparencyLayer:
                     break
+
+                case let .drawImage(image, rect):
+                    let canvasVar = "imgCanvas_\(opIndex)"
+                    let ctxVar = "imgCtx_\(opIndex)"
+                    let dataVar = "imgData_\(opIndex)"
+                    js.append("const \(canvasVar) = document.createElement('canvas');")
+                    js.append("\(canvasVar).width = \(image.width);")
+                    js.append("\(canvasVar).height = \(image.height);")
+                    js.append("const \(ctxVar) = \(canvasVar).getContext('2d');")
+                    js.append("const \(dataVar) = \(ctxVar).createImageData(\(image.width), \(image.height));")
+                    js.append("\(dataVar).data.set([\(canvasImageDataArray(for: image))]);")
+                    js.append("\(ctxVar).putImageData(\(dataVar), 0, 0);")
+                    js.append("\(contextName).drawImage(\(canvasVar), \(rect.origin.x), \(rect.origin.y), \(rect.width), \(rect.height));")
                 }
 
                 js.append("\(contextName).restore();")
@@ -246,5 +260,44 @@ public struct CanvasRenderer: Renderer {
         case .plusDarker: "darker"
         default: mode.rawValue
         }
+    }
+
+    private func canvasImageDataArray(for image: Image) -> String {
+        var values: [String] = []
+        let pixelCount = image.width * image.height
+        values.reserveCapacity(pixelCount * 4)
+
+        for index in stride(from: 0, to: image.data.count, by: 4) {
+            guard index + 3 < image.data.count else { break }
+            let r = Double(image.data[index]) / 255.0
+            let g = Double(image.data[index + 1]) / 255.0
+            let b = Double(image.data[index + 2]) / 255.0
+            let a = Double(image.data[index + 3]) / 255.0
+
+            var outR = r
+            var outG = g
+            var outB = b
+            var outA = a
+
+            switch image.alphaInfo {
+            case .premultipliedLast, .premultipliedFirst:
+                if a > 0 {
+                    outR = r / a
+                    outG = g / a
+                    outB = b / a
+                }
+            case .last, .first:
+                break
+            case .none, .noneSkipLast, .noneSkipFirst:
+                outA = 1.0
+            }
+
+            values.append(String(Int(round(outR * 255.0))))
+            values.append(String(Int(round(outG * 255.0))))
+            values.append(String(Int(round(outB * 255.0))))
+            values.append(String(Int(round(outA * 255.0))))
+        }
+
+        return values.joined(separator: ",")
     }
 }

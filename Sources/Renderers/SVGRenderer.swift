@@ -75,6 +75,14 @@ public struct SVGRenderer: Renderer {
                     } else {
                         continue
                     }
+                case let .drawImage(_, rect):
+                    var p = Path()
+                    p.move(to: Point(x: rect.minX, y: rect.minY))
+                    p.addLine(to: Point(x: rect.maxX, y: rect.minY))
+                    p.addLine(to: Point(x: rect.maxX, y: rect.maxY))
+                    p.addLine(to: Point(x: rect.minX, y: rect.maxY))
+                    p.closeSubpath()
+                    path = p
                 case .beginTransparencyLayer, .endTransparencyLayer:
                     continue
                 }
@@ -170,6 +178,14 @@ public struct SVGRenderer: Renderer {
                     let attrsStr = attrs.joined(separator: " ")
                     elements.append("  <rect \(attrsStr) />")
                 }
+            case let .drawImage(image, rect):
+                let bmpData = createBMPData(from: image)
+                let base64String = bmpData.base64EncodedString()
+                var attrs = styleAttributes(for: op.state, hasFill: false, fillRule: nil, uniqueClipPaths: uniqueClipPaths, uniqueShadows: uniqueShadows)
+                attrs.append("x=\"\(rect.origin.x)\" y=\"\(rect.origin.y)\" width=\"\(rect.width)\" height=\"\(rect.height)\"")
+                attrs.append("href=\"data:image/bmp;base64,\(base64String)\"")
+                let attrsStr = attrs.joined(separator: " ")
+                elements.append("  <image \(attrsStr) />")
             case .beginTransparencyLayer:
                 let attrs = styleAttributes(for: op.state, hasFill: false, fillRule: nil, uniqueClipPaths: uniqueClipPaths, uniqueShadows: uniqueShadows)
                 let attrsStr = attrs.joined(separator: " ")
@@ -310,5 +326,107 @@ public struct SVGRenderer: Renderer {
         }
 
         return attrs
+    }
+
+    private func createBMPData(from image: Image) -> Data {
+        let width = image.width
+        let height = image.height
+
+        let headerSize = 108 // BITMAPV4HEADER
+        let fileHeaderSize = 14
+        let totalHeaderSize = fileHeaderSize + headerSize
+        let pixelDataSize = width * height * 4
+        let fileSize = totalHeaderSize + pixelDataSize
+
+        var data = Data(capacity: fileSize)
+
+        // --- FILE HEADER (14 bytes) ---
+        data.append(contentsOf: [0x42, 0x4D]) // bfType: "BM"
+        appendUInt32(UInt32(fileSize), to: &data) // bfSize
+        appendUInt16(0, to: &data) // bfReserved1
+        appendUInt16(0, to: &data) // bfReserved2
+        appendUInt32(UInt32(totalHeaderSize), to: &data) // bfOffBits
+
+        // --- BITMAPV4HEADER (108 bytes) ---
+        appendUInt32(UInt32(headerSize), to: &data) // bV4Size
+        appendInt32(Int32(width), to: &data) // bV4Width
+        appendInt32(-Int32(height), to: &data) // bV4Height (negative for top-down)
+        appendUInt16(1, to: &data) // bV4Planes
+        appendUInt16(32, to: &data) // bV4BitCount
+        appendUInt32(3, to: &data) // bV4V4Compression (BI_BITFIELDS)
+        appendUInt32(UInt32(pixelDataSize), to: &data) // bV4SizeImage
+        appendInt32(2835, to: &data) // bV4XPelsPerMeter
+        appendInt32(2835, to: &data) // bV4YPelsPerMeter
+        appendUInt32(0, to: &data) // bV4ClrUsed
+        appendUInt32(0, to: &data) // bV4ClrImportant
+
+        // Color masks (Red, Green, Blue, Alpha)
+        appendUInt32(0x00FF_0000, to: &data) // bV4RedMask
+        appendUInt32(0x0000_FF00, to: &data) // bV4GreenMask
+        appendUInt32(0x0000_00FF, to: &data) // bV4BlueMask
+        appendUInt32(0xFF00_0000, to: &data) // bV4AlphaMask
+
+        // bV4CSType: "sRGB" (0x73524742)
+        appendUInt32(0x7352_4742, to: &data)
+
+        // bV4Endpoints: 36 bytes of 0
+        data.append(contentsOf: Array(repeating: UInt8(0), count: 36))
+
+        // Gamma Red, Green, Blue
+        appendUInt32(0, to: &data)
+        appendUInt32(0, to: &data)
+        appendUInt32(0, to: &data)
+
+        // --- PIXEL DATA ---
+        for index in stride(from: 0, to: image.data.count, by: 4) {
+            guard index + 3 < image.data.count else { break }
+            let r = Double(image.data[index]) / 255.0
+            let g = Double(image.data[index + 1]) / 255.0
+            let b = Double(image.data[index + 2]) / 255.0
+            let a = Double(image.data[index + 3]) / 255.0
+
+            var outR = r
+            var outG = g
+            var outB = b
+            var outA = a
+
+            switch image.alphaInfo {
+            case .premultipliedLast, .premultipliedFirst:
+                if a > 0 {
+                    outR = r / a
+                    outG = g / a
+                    outB = b / a
+                }
+            case .last, .first:
+                break
+            case .none, .noneSkipLast, .noneSkipFirst:
+                outA = 1.0
+            }
+
+            let byteB = UInt8(min(255, max(0, Int(round(outB * 255.0)))))
+            let byteG = UInt8(min(255, max(0, Int(round(outG * 255.0)))))
+            let byteR = UInt8(min(255, max(0, Int(round(outR * 255.0)))))
+            let byteA = UInt8(min(255, max(0, Int(round(outA * 255.0)))))
+
+            data.append(contentsOf: [byteB, byteG, byteR, byteA])
+        }
+
+        return data
+    }
+
+    private func appendUInt32(_ value: UInt32, to data: inout Data) {
+        data.append(UInt8(value & 0xFF))
+        data.append(UInt8((value >> 8) & 0xFF))
+        data.append(UInt8((value >> 16) & 0xFF))
+        data.append(UInt8((value >> 24) & 0xFF))
+    }
+
+    private func appendInt32(_ value: Int32, to data: inout Data) {
+        appendUInt32(UInt32(bitPattern: value), to: &data)
+    }
+
+    private func appendUInt16(_ value: UInt16, to data: inout Data) {
+        data.append(UInt8(value & 0xFF))
+        data.append(UInt8((value >> 8) & 0xFF))
     }
 }

@@ -1,3 +1,5 @@
+import Validation
+
 //
 //  Image.swift
 //  PureDraw
@@ -36,5 +38,12 @@ public struct Image: Sendable, Equatable {
         self.colorSpace = colorSpace
         self.alphaInfo = alphaInfo
         self.data = data
+    }
+}
+
+extension Image: Validatable {
+    public static var defaultValidator: Validator<Image> {
+        Validator()
+            .validating(.imageIsValid)
     }
 }

@@ -24,6 +24,7 @@ public struct PDFRenderer: Renderer {
 
         var extGStates: [ExtGStateKey: String] = [:]
         var shadings: [String: String] = [:] // shading dictionary content -> name
+        var images: [String: Int] = [:] // image name -> object ID
 
         var contentStream = ""
 
@@ -32,7 +33,7 @@ public struct PDFRenderer: Renderer {
         // We concatenate a transform to flip the Y axis.
         contentStream += "1 0 0 -1 0 \(height) cm\n"
 
-        for op in context.commands {
+        for (opIndex, op) in context.commands.enumerated() {
             contentStream += "q\n"
 
             // 1. Transform
@@ -127,7 +128,7 @@ public struct PDFRenderer: Renderer {
                         contentStream += pathStr
                         contentStream += "f\n"
                     }
-                case .beginTransparencyLayer, .endTransparencyLayer:
+                case .beginTransparencyLayer, .endTransparencyLayer, .drawImage:
                     break
                 }
                 contentStream += "Q\n"
@@ -189,6 +190,103 @@ public struct PDFRenderer: Renderer {
                     shadings[shadingDict] = shName
                 }
                 contentStream += "/\(shName) sh\n"
+            case let .drawImage(image, rect):
+                var rgbData = Data()
+                var alphaData = Data()
+                rgbData.reserveCapacity(image.width * image.height * 3)
+                alphaData.reserveCapacity(image.width * image.height)
+
+                let hasAlpha = image.alphaInfo != .none
+
+                for index in stride(from: 0, to: image.data.count, by: 4) {
+                    guard index + 3 < image.data.count else { break }
+                    let r = Double(image.data[index]) / 255.0
+                    let g = Double(image.data[index + 1]) / 255.0
+                    let b = Double(image.data[index + 2]) / 255.0
+                    let a = Double(image.data[index + 3]) / 255.0
+
+                    var outR = r
+                    var outG = g
+                    var outB = b
+                    var outA = a
+
+                    switch image.alphaInfo {
+                    case .premultipliedLast, .premultipliedFirst:
+                        if a > 0 {
+                            outR = r / a
+                            outG = g / a
+                            outB = b / a
+                        }
+                    case .last, .first:
+                        break
+                    case .none, .noneSkipLast, .noneSkipFirst:
+                        outA = 1.0
+                    }
+
+                    rgbData.append(UInt8(min(255, max(0, Int(round(outR * 255.0))))))
+                    rgbData.append(UInt8(min(255, max(0, Int(round(outG * 255.0))))))
+                    rgbData.append(UInt8(min(255, max(0, Int(round(outB * 255.0))))))
+                    alphaData.append(UInt8(min(255, max(0, Int(round(outA * 255.0))))))
+                }
+
+                var rgbCompressed: Data? = nil
+                if #available(macOS 10.15, iOS 13.0, *) {
+                    rgbCompressed = try? (rgbData as NSData).compressed(using: .zlib) as Data
+                }
+
+                var smaskObjId: Int? = nil
+                if hasAlpha {
+                    var alphaCompressed: Data? = nil
+                    if #available(macOS 10.15, iOS 13.0, *) {
+                        alphaCompressed = try? (alphaData as NSData).compressed(using: .zlib) as Data
+                    }
+                    var maskHeader = """
+                    <<
+                      /Type /XObject
+                      /Subtype /Image
+                      /Width \(image.width)
+                      /Height \(image.height)
+                      /ColorSpace /DeviceGray
+                      /BitsPerComponent 8
+                    """
+                    if let comp = alphaCompressed {
+                        maskHeader += "\n  /Filter /FlateDecode\n  /Length \(comp.count)\n>>"
+                        smaskObjId = writer.append(header: maskHeader, stream: comp)
+                    } else {
+                        maskHeader += "\n  /Length \(alphaData.count)\n>>"
+                        smaskObjId = writer.append(header: maskHeader, stream: alphaData)
+                    }
+                }
+
+                var imgHeader = """
+                <<
+                  /Type /XObject
+                  /Subtype /Image
+                  /Width \(image.width)
+                  /Height \(image.height)
+                  /ColorSpace /DeviceRGB
+                  /BitsPerComponent 8
+                """
+                if let maskId = smaskObjId {
+                    imgHeader += "\n  /SMask \(maskId) 0 R"
+                }
+
+                let imgObjId: Int
+                if let comp = rgbCompressed {
+                    imgHeader += "\n  /Filter /FlateDecode\n  /Length \(comp.count)\n>>"
+                    imgObjId = writer.append(header: imgHeader, stream: comp)
+                } else {
+                    imgHeader += "\n  /Length \(rgbData.count)\n>>"
+                    imgObjId = writer.append(header: imgHeader, stream: rgbData)
+                }
+
+                let imgName = "Img\(opIndex)"
+                images[imgName] = imgObjId
+
+                contentStream += "q\n"
+                contentStream += "\(rect.width) 0 0 \(rect.height) \(rect.origin.x) \(rect.origin.y) cm\n"
+                contentStream += "/\(imgName) Do\n"
+                contentStream += "Q\n"
             case .beginTransparencyLayer, .endTransparencyLayer:
                 break
             }
@@ -231,6 +329,13 @@ public struct PDFRenderer: Renderer {
             resourcesStr += "\n  /Shading <<"
             for (key, shName) in shadings {
                 resourcesStr += "\n    /\(shName) \(key)"
+            }
+            resourcesStr += "\n  >>"
+        }
+        if !images.isEmpty {
+            resourcesStr += "\n  /XObject <<"
+            for (name, objId) in images {
+                resourcesStr += "\n    /\(name) \(objId) 0 R"
             }
             resourcesStr += "\n  >>"
         }
@@ -343,12 +448,22 @@ public struct PDFRenderer: Renderer {
     }
 
     private class PDFWriter {
-        var objects: [String] = []
+        var objects: [Data] = []
 
         func append(_ objectContent: String) -> Int {
             let objIndex = objects.count + 1
             let fullObject = "\(objIndex) 0 obj\n\(objectContent)\nendobj\n"
-            objects.append(fullObject)
+            objects.append(Data(fullObject.utf8))
+            return objIndex
+        }
+
+        func append(header: String, stream: Data) -> Int {
+            let objIndex = objects.count + 1
+            var data = Data()
+            data.append(Data("\(objIndex) 0 obj\n\(header)\nstream\n".utf8))
+            data.append(stream)
+            data.append(Data("\nendstream\nendobj\n".utf8))
+            objects.append(data)
             return objIndex
         }
 
@@ -363,9 +478,8 @@ public struct PDFRenderer: Renderer {
 
             for obj in objects {
                 objectOffsets.append(currentOffset)
-                let objData = Data(obj.utf8)
-                data.append(objData)
-                currentOffset += objData.count
+                data.append(obj)
+                currentOffset += obj.count
             }
 
             let xrefOffset = currentOffset

@@ -15,6 +15,7 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
         case drawRadialGradient(Gradient, startCenter: Point, startRadius: Double, endCenter: Point, endRadius: Double, options: GradientDrawingOptions)
         case beginTransparencyLayer
         case endTransparencyLayer
+        case drawImage(Image, rect: Rect)
     }
 
     public let kind: Kind
