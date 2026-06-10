@@ -337,6 +337,16 @@ public final class BitmapRenderer: Renderer, Sendable {
         }
     }
 
+    /// A binary (pixel-center) coverage map for a device-space clip path,
+    /// computed once per operation. Lookup replaces per-pixel
+    /// `Path.contains`, which is O(pixels x edges); the pixel-center rule
+    /// matches `contains(center, .winding)` exactly, so output is unchanged.
+    private func clipCoverageMap(_ clipPath: Path?) -> CoverageRasterizer.CoverageMap? {
+        guard let clipPath else { return nil }
+        return CoverageRasterizer(canvasWidth: width, canvasHeight: height)
+            .coverage(of: clipPath, rule: .winding, antialiased: false)
+    }
+
     private func rasterizeLinearGradient(grad: Gradient, start: Point, end: Point, state: GraphicState, buffer: inout [UInt8]) {
         let clipPath = state.clipPath?.applying(state.transform)
         let bounds = clipPath?.boundingBox ?? Rect(x: 0, y: 0, width: Double(width), height: Double(height))
@@ -352,16 +362,18 @@ public final class BitmapRenderer: Renderer, Sendable {
         let gradLenSq = gradVec.x * gradVec.x + gradVec.y * gradVec.y
         guard gradLenSq > 1e-9 else { return }
 
+        let clipCoverage = clipCoverageMap(clipPath)
+        if clipPath != nil, clipCoverage == nil { return }
+
         let invTransform = state.transform.inverted()
 
         for y in minY ... maxY {
             for x in minX ... maxX {
-                let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
-
-                if let clip = clipPath {
-                    guard clip.contains(pt, using: .winding) else { continue }
+                if let clipCoverage {
+                    guard clipCoverage.value(atX: x, y: y) > 0 else { continue }
                 }
 
+                let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
                 let userPt = pt.applying(invTransform)
                 let projX = userPt.x - start.x
                 let projY = userPt.y - start.y
@@ -392,16 +404,18 @@ public final class BitmapRenderer: Renderer, Sendable {
         let dcLenSq = diffCenter.x * diffCenter.x + diffCenter.y * diffCenter.y
         let coeffA = dcLenSq - diffRadius * diffRadius
 
+        let clipCoverage = clipCoverageMap(clipPath)
+        if clipPath != nil, clipCoverage == nil { return }
+
         let invTransform = state.transform.inverted()
 
         for y in minY ... maxY {
             for x in minX ... maxX {
-                let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
-
-                if let clip = clipPath {
-                    guard clip.contains(pt, using: .winding) else { continue }
+                if let clipCoverage {
+                    guard clipCoverage.value(atX: x, y: y) > 0 else { continue }
                 }
 
+                let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
                 let userPt = pt.applying(invTransform)
                 let v = Point(x: userPt.x - startCenter.x, y: userPt.y - startCenter.y)
 
@@ -588,15 +602,16 @@ public final class BitmapRenderer: Renderer, Sendable {
 
         let invTransform = state.transform.inverted()
         let clipPath = state.clipPath?.applying(state.transform)
+        let clipCoverage = clipCoverageMap(clipPath)
+        if clipPath != nil, clipCoverage == nil { return }
 
         for y in minY ... maxY {
             for x in minX ... maxX {
-                let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
-
-                if let clip = clipPath {
-                    guard clip.contains(pt, using: .winding) else { continue }
+                if let clipCoverage {
+                    guard clipCoverage.value(atX: x, y: y) > 0 else { continue }
                 }
 
+                let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
                 let userPt = pt.applying(invTransform)
 
                 if rect.contains(userPt) {

@@ -80,6 +80,38 @@ func fillScenario(antialiased: Bool) -> GraphicsContext {
     return context
 }
 
+func complexFillScenario() -> GraphicsContext {
+    // A single high-edge-count star covering most of the canvas: many edges
+    // cross every scanline, the case the active edge table targets.
+    var context = GraphicsContext()
+    context.setFillColor(Color(red: 0.2, green: 0.5, blue: 0.9, alpha: 1))
+    let points = 400
+    let centerX = 128.0
+    let centerY = 128.0
+    for index in 0 ... points {
+        let angle = 2.0 * Double.pi * Double(index) / Double(points)
+        let radius = index % 2 == 0 ? 120.0 : 40.0
+        let pt = Point(x: centerX + radius * cosApprox(angle), y: centerY + radius * sinApprox(angle))
+        if index == 0 {
+            context.move(to: pt)
+        } else {
+            context.addLine(to: pt)
+        }
+    }
+    context.closeSubpath()
+    context.fillPath()
+    return context
+}
+
+/// Foundation-free trig via Geometry's affine rotation of a unit vector.
+func cosApprox(_ angle: Double) -> Double {
+    Point(x: 1, y: 0).applying(AffineTransform.rotation(angle: angle)).x
+}
+
+func sinApprox(_ angle: Double) -> Double {
+    Point(x: 1, y: 0).applying(AffineTransform.rotation(angle: angle)).y
+}
+
 func strokeScenario() -> GraphicsContext {
     var context = GraphicsContext()
     context.setStrokeColor(Color(red: 0.1, green: 0.6, blue: 0.3, alpha: 1))
@@ -147,6 +179,7 @@ func patternScenario() -> GraphicsContext {
 let scenarios: [Scenario] = [
     Scenario(name: "fill-aa", canvas: 256, build: { fillScenario(antialiased: true) }),
     Scenario(name: "fill-aliased", canvas: 256, build: { fillScenario(antialiased: false) }),
+    Scenario(name: "fill-complex", canvas: 256, build: complexFillScenario),
     Scenario(name: "stroke", canvas: 256, build: strokeScenario),
     Scenario(name: "gradient", canvas: 256, build: gradientScenario),
     Scenario(name: "pattern", canvas: 256, build: patternScenario),
