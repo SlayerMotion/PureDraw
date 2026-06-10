@@ -122,7 +122,32 @@ public struct PDFRenderer: Renderer {
         // We concatenate a transform to flip the Y axis.
         contentStream += "1 0 0 -1 0 \(height) cm\n"
 
-        for (opIndex, op) in context.flattenedCommands.enumerated() {
+        // Collect the fonts used by native text runs (named, identity-matrix
+        // showText). Other text runs are already lowered to outlines.
+        var fontUsages: [(font: Font, glyphs: Set<Int>, toUnicode: [Int: UInt32])] = []
+        func fontIndex(_ font: Font) -> Int {
+            if let index = fontUsages.firstIndex(where: { $0.font == font }) { return index }
+            fontUsages.append((font: font, glyphs: [], toUnicode: [:]))
+            return fontUsages.count - 1
+        }
+        for op in context.layerFlattenedCommands {
+            guard case let .showText(glyphs, text, font, _, mode, _, _) = op.kind, mode != .invisible else { continue }
+            let index = fontIndex(font)
+            fontUsages[index].glyphs.formUnion(glyphs)
+            if let text {
+                let scalars = Array(text.unicodeScalars)
+                for (position, glyph) in glyphs.enumerated() where position < scalars.count {
+                    fontUsages[index].toUnicode[glyph] = scalars[position].value
+                }
+            }
+        }
+        // Embed each font as a Type0/CIDFontType2 with the program in FontFile2.
+        var fontObjectIDs: [Int] = []
+        for usage in fontUsages {
+            fontObjectIDs.append(embedFont(usage.font, usedGlyphs: usage.glyphs, toUnicode: usage.toUnicode, writer: writer, encrypt: encryptedStream))
+        }
+
+        for (opIndex, op) in context.layerFlattenedCommands.enumerated() {
             contentStream += "q\n"
 
             // 1. Transform
@@ -376,10 +401,34 @@ public struct PDFRenderer: Renderer {
                 contentStream += "\(rect.width) 0 0 \(rect.height) \(rect.origin.x) \(rect.origin.y) cm\n"
                 contentStream += "/\(imgName) Do\n"
                 contentStream += "Q\n"
+            case let .showText(glyphs, _, font, fontSize, mode, _, position):
+                if !glyphs.isEmpty, mode != .invisible {
+                    let name = "F\(fontIndex(font))"
+                    let renderMode = switch mode {
+                    case .fill: 0
+                    case .stroke: 1
+                    case .fillStroke: 2
+                    case .invisible: 3
+                    }
+                    if mode != .stroke {
+                        contentStream += pdfFillColorString(for: op.state.fillColor)
+                    }
+                    if mode != .fill {
+                        contentStream += pdfStrokeColorString(for: op.state.strokeColor)
+                    }
+                    let hex = glyphs.map { String(format: "%04X", $0 & 0xFFFF) }.joined()
+                    contentStream += "BT\n"
+                    contentStream += "\(renderMode) Tr\n"
+                    contentStream += "/\(name) \(fontSize) Tf\n"
+                    // Counter the page Y-flip so glyphs render upright.
+                    contentStream += "1 0 0 -1 \(position.x) \(position.y) Tm\n"
+                    contentStream += "<\(hex)> Tj\n"
+                    contentStream += "ET\n"
+                }
             case .beginTransparencyLayer, .endTransparencyLayer:
                 break
-            case .drawLayer, .showText:
-                break // expanded by flattenedCommands
+            case .drawLayer:
+                break // expanded by layerFlattenedCommands
             }
 
             contentStream += "Q\n"
@@ -440,6 +489,13 @@ public struct PDFRenderer: Renderer {
             resourcesStr += "\n  /XObject <<"
             for (name, objId) in images {
                 resourcesStr += "\n    /\(name) \(objId) 0 R"
+            }
+            resourcesStr += "\n  >>"
+        }
+        if !fontObjectIDs.isEmpty {
+            resourcesStr += "\n  /Font <<"
+            for (index, objID) in fontObjectIDs.enumerated() {
+                resourcesStr += "\n    /F\(index) \(objID) 0 R"
             }
             resourcesStr += "\n  >>"
         }
@@ -549,6 +605,89 @@ public struct PDFRenderer: Renderer {
     /// A user-space rect (top-left origin) as a PDF rectangle (bottom-left).
     private func pdfBoxString(for box: Rect) -> String {
         "[ \(box.minX) \(height - box.maxY) \(box.maxX) \(height - box.minY) ]"
+    }
+
+    /// Embeds a TrueType font as a Type 0 composite font (Identity-H) whose
+    /// descendant CIDFontType2 carries the program in FontFile2 with an
+    /// identity CID-to-GID map, the used glyph widths, and a ToUnicode CMap
+    /// for copy/paste. Returns the Type 0 font object ID.
+    private func embedFont(_ font: Font, usedGlyphs: Set<Int>, toUnicode: [Int: UInt32], writer: PDFWriter, encrypt: (Data) -> Data) -> Int {
+        let upem = Double(font.unitsPerEm)
+        let scale = upem > 0 ? 1000.0 / upem : 1.0
+        func scaled(_ value: Double) -> Int {
+            Int((value * scale).rounded())
+        }
+        let psName = "PDF\(writer.nextObjectID)Font"
+
+        // FontFile2: the raw sfnt program, FlateDecode-compressed when possible.
+        let programData = Data(font.sfntData)
+        var compressed: Data?
+        if #available(macOS 10.15, iOS 13.0, *) {
+            compressed = try? (programData as NSData).compressed(using: .zlib) as Data
+        }
+        var fontFileHeader = "<<\n  /Length1 \(programData.count)"
+        let fontFileID: Int
+        if let comp = compressed {
+            fontFileHeader += "\n  /Filter /FlateDecode\n  /Length \(comp.count)\n>>"
+            fontFileID = writer.append(header: fontFileHeader, stream: encrypt(comp))
+        } else {
+            fontFileHeader += "\n  /Length \(programData.count)\n>>"
+            fontFileID = writer.append(header: fontFileHeader, stream: encrypt(programData))
+        }
+
+        // FontDescriptor. Flag 4 marks a symbolic font (Identity-H encoding).
+        let ascent = scaled(font.ascent)
+        let descent = scaled(font.descent)
+        let descriptor = "<< /Type /FontDescriptor /FontName /\(psName) /Flags 4"
+            + " /FontBBox [ 0 \(descent) 1000 \(ascent) ] /ItalicAngle 0"
+            + " /Ascent \(ascent) /Descent \(descent) /CapHeight \(ascent) /StemV 80"
+            + " /FontFile2 \(fontFileID) 0 R >>"
+        let descriptorID = writer.append(descriptor)
+
+        // Per-glyph widths in 1000-unit text space.
+        var widths = "[ "
+        for glyph in usedGlyphs.sorted() {
+            widths += "\(glyph) [\(scaled(font.advanceWidth(forGlyph: glyph)))] "
+        }
+        widths += "]"
+
+        let cidFont = "<< /Type /Font /Subtype /CIDFontType2 /BaseFont /\(psName)"
+            + " /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>"
+            + " /FontDescriptor \(descriptorID) 0 R /CIDToGIDMap /Identity /DW 1000 /W \(widths) >>"
+        let cidFontID = writer.append(cidFont)
+
+        // ToUnicode CMap: maps 2-byte glyph codes back to Unicode for search.
+        let cmapBody = Data(toUnicodeCMap(toUnicode).utf8)
+        let toUnicodeID = writer.append(header: "<< /Length \(cmapBody.count) >>", stream: encrypt(cmapBody))
+        let type0 = "<< /Type /Font /Subtype /Type0 /BaseFont /\(psName)"
+            + " /Encoding /Identity-H /DescendantFonts [ \(cidFontID) 0 R ]"
+            + " /ToUnicode \(toUnicodeID) 0 R >>"
+        return writer.append(type0)
+    }
+
+    /// Builds the ToUnicode CMap stream body mapping 2-byte glyph codes to
+    /// Unicode scalars, for selectable/searchable text.
+    private func toUnicodeCMap(_ mapping: [Int: UInt32]) -> String {
+        var body = """
+        /CIDInit /ProcSet findresource begin
+        12 dict begin
+        begincmap
+        /CMapName /Adobe-Identity-UCS def
+        /CMapType 2 def
+        1 begincodespacerange
+        <0000> <FFFF>
+        endcodespacerange
+        """
+        let entries = mapping.sorted { $0.key < $1.key }
+        if !entries.isEmpty {
+            body += "\n\(entries.count) beginbfchar\n"
+            for (glyph, scalar) in entries {
+                body += String(format: "<%04X> <%04X>\n", glyph & 0xFFFF, scalar & 0xFFFF)
+            }
+            body += "endbfchar\n"
+        }
+        body += "endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend"
+        return body
     }
 
     private func pdfFillColorString(for color: Color) -> String {

@@ -20,6 +20,8 @@ struct SVGTextTests {
     /// A minimal TrueType font (two glyphs: .notdef and a 500-unit square
     /// mapped to 'A'), built here so the Renderers test target needs nothing
     /// from CoreTests.
+    static let miniFontBytes: [UInt8] = miniFont()
+
     private static func miniFont() -> [UInt8] {
         func be16(_ v: Int) -> [UInt8] {
             [UInt8((v >> 8) & 0xFF), UInt8(v & 0xFF)]

@@ -19,6 +19,12 @@ public struct Font: Equatable, Sendable {
     public let descent: Double
     public let numberOfGlyphs: Int
 
+    /// The raw sfnt bytes the font was parsed from, for embedding in formats
+    /// such as PDF.
+    public var sfntData: [UInt8] {
+        data
+    }
+
     private let data: [UInt8]
     private let tables: [String: (offset: Int, length: Int)]
     private let indexToLocFormat: Int

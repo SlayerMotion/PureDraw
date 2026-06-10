@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SVGRenderer` emits `<text>` elements for `showText(_:)` runs, so exported
   SVG carries real selectable, searchable text. Glyph-index runs (no source
   string) and transformed text fall back to outlines.
+- `PDFRenderer` embeds the TrueType program as a Type 0 / CIDFontType2 font
+  (Identity-H, FontFile2, per-glyph widths, ToUnicode CMap) and emits `Tj`
+  text objects for `showText(_:)` runs, so exported PDFs carry real selectable,
+  searchable text. `Font.sfntData` exposes the raw font bytes for embedding.
 - `Pattern`, the `CGPattern` equivalent: a tiling cell recorded into its own
   context and used via `GraphicsContext.setFillPattern(_:)`. Colored patterns
   carry their own colors; uncolored (stencil) patterns paint with the current
