@@ -16,7 +16,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::done --> Epic38["Epic #38: Rasterizer Quality"]:::done --> Epic13["Epic #13: Masking, Caching & Streams"]:::done --> Epic40["Epic #40: PNG Export & Golden Tests"]:::done --> Epic18["Epic #18: Typography & Text Layout"]:::done --> Epic22["Epic #22: Advanced PDF Systems"]:::done
+    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::done --> Epic38["Epic #38: Rasterizer Quality"]:::done --> Epic13["Epic #13: Masking, Caching & Streams"]:::done --> Epic40["Epic #40: PNG Export & Golden Tests"]:::done --> Epic18["Epic #18: Typography & Text Layout"]:::done --> Epic22["Epic #22: Advanced PDF Systems"]:::done --> Epic53["Epic #53: Validation Completeness"]:::done --> Epic58["Epic #58: Performance"]:::next --> Epic59["Epic #59: API Documentation"]:::todo --> Epic60["Epic #60: CFF Outlines"]:::todo --> Epic61["Epic #61: Selectable Native Text"]:::todo
 
     click E0 href "https://github.com/mihaelamj/PureDraw/issues/1" "E0"
     click E1 href "https://github.com/mihaelamj/PureDraw/issues/2" "E1"
@@ -31,6 +31,11 @@ flowchart TB
     click Epic40 href "https://github.com/mihaelamj/PureDraw/issues/40" "Epic #40"
     click Epic18 href "https://github.com/mihaelamj/PureDraw/issues/18" "Epic #18"
     click Epic22 href "https://github.com/mihaelamj/PureDraw/issues/22" "Epic #22"
+    click Epic53 href "https://github.com/mihaelamj/PureDraw/issues/53" "Epic #53"
+    click Epic58 href "https://github.com/mihaelamj/PureDraw/issues/58" "Epic #58"
+    click Epic59 href "https://github.com/mihaelamj/PureDraw/issues/59" "Epic #59"
+    click Epic60 href "https://github.com/mihaelamj/PureDraw/issues/60" "Epic #60"
+    click Epic61 href "https://github.com/mihaelamj/PureDraw/issues/61" "Epic #61"
 ```
 
 ### Status Legend
