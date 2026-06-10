@@ -342,8 +342,14 @@ public struct GraphicsContext: Sendable, Validatable {
     /// Records a fill command in the buffer using the current state and clears the current path.
     public mutating func fillPath(using rule: FillRule = .winding) {
         guard !currentPath.isEmpty else { return }
-        commands.append(DrawOperation(kind: .fill(currentPath, rule: rule), state: currentState))
+        recordFill(of: currentPath, rule: rule)
         currentPath = Path()
+    }
+
+    /// Sets the tiling pattern used by fill operations; pass nil to fill with
+    /// the fill color again.
+    public mutating func setFillPattern(_ pattern: Pattern?) {
+        currentState.fillPattern = pattern
     }
 
     /// Strokes the specified path using the current graphics state, leaving the current path of the context unchanged.
@@ -353,7 +359,18 @@ public struct GraphicsContext: Sendable, Validatable {
 
     /// Fills the specified path using the current graphics state, leaving the current path of the context unchanged.
     public mutating func fill(_ path: Path, using rule: FillRule = .winding) {
-        commands.append(DrawOperation(kind: .fill(path, rule: rule), state: currentState))
+        recordFill(of: path, rule: rule)
+    }
+
+    /// Records a fill, expanding into tiled cell operations when a fill
+    /// pattern is set so every backend renders patterns with no special
+    /// support.
+    private mutating func recordFill(of path: Path, rule: FillRule) {
+        if let pattern = currentState.fillPattern {
+            commands.append(contentsOf: patternFillCommands(of: path, pattern: pattern))
+        } else {
+            commands.append(DrawOperation(kind: .fill(path, rule: rule), state: currentState))
+        }
     }
 
     /// Strokes the boundary of the specified rectangle using the current graphics state.

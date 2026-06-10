@@ -86,6 +86,9 @@ public struct GraphicState: Equatable, Sendable, Validatable {
     /// How shown text is painted.
     public var textDrawingMode: TextDrawingMode
 
+    /// The tiling pattern used by fill operations; nil fills with `fillColor`.
+    public var fillPattern: Pattern?
+
     /// The current active image-based clipping mask.
     public var maskImage: Image?
 
@@ -122,6 +125,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         fontSize: Double = 12.0,
         characterSpacing: Double = 0.0,
         textDrawingMode: TextDrawingMode = .fill,
+        fillPattern: Pattern? = nil,
         maskImage: Image? = nil,
         maskRect: Rect? = nil,
         maskTransform: Geometry.AffineTransform? = nil
@@ -152,6 +156,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         self.fontSize = fontSize
         self.characterSpacing = characterSpacing
         self.textDrawingMode = textDrawingMode
+        self.fillPattern = fillPattern
         self.maskImage = maskImage
         self.maskRect = maskRect
         self.maskTransform = maskTransform

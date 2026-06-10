@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Pattern`, the `CGPattern` equivalent: a tiling cell recorded into its own
+  context and used via `GraphicsContext.setFillPattern(_:)`. Colored patterns
+  carry their own colors; uncolored (stencil) patterns paint with the current
+  fill color. Pattern fills expand into tiled, clipped cell operations at
+  record time, so every backend renders them with no special support.
 - `Gradient(samples:_:)` builds a gradient from a procedural color function,
   the `CGFunction` shading equivalent, sampled into ordinary stops so every
   backend renders it unchanged.
