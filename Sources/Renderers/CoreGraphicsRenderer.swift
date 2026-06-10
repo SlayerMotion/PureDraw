@@ -21,13 +21,16 @@
         }
 
         public func draw(_ context: GraphicsContext) throws {
+            // DeviceGray mask conversion is O(width * height); reuse converted
+            // masks across operations within this render pass.
+            var maskCache = [(source: Image, mask: CGImage)]()
             for operation in context.commands {
                 switch operation.kind {
                 case .beginTransparencyLayer:
                     targetContext.saveGState()
 
                     // Apply CTM & Mask
-                    applyCTMAndMask(state: operation.state)
+                    applyCTMAndMask(state: operation.state, maskCache: &maskCache)
                     targetContext.setAlpha(CGFloat(operation.state.alpha))
                     targetContext.setBlendMode(CGBlendMode(from: operation.state.blendMode))
 
@@ -67,7 +70,7 @@
                     targetContext.saveGState()
 
                     // 2. Apply CTM & Mask & Opacity
-                    applyCTMAndMask(state: operation.state)
+                    applyCTMAndMask(state: operation.state, maskCache: &maskCache)
                     targetContext.setAlpha(CGFloat(operation.state.alpha))
                     targetContext.setBlendMode(CGBlendMode(from: operation.state.blendMode))
 
@@ -185,12 +188,12 @@
             case cannotCreateGradient
         }
 
-        private func applyCTMAndMask(state: GraphicState) {
+        private func applyCTMAndMask(state: GraphicState, maskCache: inout [(source: Image, mask: CGImage)]) {
             let t = state.transform
             if let maskImage = state.maskImage,
                let maskRect = state.maskRect,
                let maskTransform = state.maskTransform,
-               let cgMask = createMaskCGImage(from: maskImage)
+               let cgMask = cachedMaskCGImage(for: maskImage, cache: &maskCache)
             {
                 // AffineTransform builders append (self first, then step), unlike
                 // their CoreGraphics namesakes which prepend: flip = scale, then
@@ -211,6 +214,18 @@
             } else {
                 targetContext.concatenate(CGAffineTransform(t))
             }
+        }
+
+        /// Returns the DeviceGray mask for the image, converting at most once
+        /// per render pass. Lookup is by `Image` equality, which short-circuits
+        /// when both values share the same pixel storage.
+        private func cachedMaskCGImage(for image: Image, cache: inout [(source: Image, mask: CGImage)]) -> CGImage? {
+            if let hit = cache.first(where: { $0.source == image }) {
+                return hit.mask
+            }
+            guard let converted = createMaskCGImage(from: image) else { return nil }
+            cache.append((source: image, mask: converted))
+            return converted
         }
 
         /// Builds the DeviceGray, no-alpha image that `CGContext.clip(to:mask:)` requires.

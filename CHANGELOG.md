@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `CoreGraphicsRenderer` converts each distinct mask image to DeviceGray at
+  most once per render pass instead of once per operation.
 - **Breaking:** `Image.init` throws `ValidationError` when the data buffer is
   smaller than `height * bytesPerRow`, instead of trapping via `precondition`.
   Construction sites must use `try`.
