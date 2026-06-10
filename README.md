@@ -137,7 +137,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::done --> Epic38["Epic #38: Rasterizer Quality"]:::done --> Epic13["Epic #13: Masking, Caching & Streams"]:::done --> Epic40["Epic #40: PNG Export & Golden Tests"]:::done --> Epic18["Epic #18: Typography & Text Layout"]:::done --> Epic22["Epic #22: Advanced PDF Systems"]:::next
+    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::done --> Epic38["Epic #38: Rasterizer Quality"]:::done --> Epic13["Epic #13: Masking, Caching & Streams"]:::done --> Epic40["Epic #40: PNG Export & Golden Tests"]:::done --> Epic18["Epic #18: Typography & Text Layout"]:::done --> Epic22["Epic #22: Advanced PDF Systems"]:::done
 
     click E0 href "https://github.com/mihaelamj/PureDraw/issues/1" "E0"
     click E1 href "https://github.com/mihaelamj/PureDraw/issues/2" "E1"
@@ -292,7 +292,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    Epic22["Epic #22: Advanced PDF Systems"]:::next --> I23["#23: PDF Outlines & Hyperlinks"]:::todo --> I24["#24: PDF Page Boxes & Transforms"]:::todo --> I25["#25: Low-Level PDF Scanning"]:::todo --> I26["#26: PDF Encryption & Permissions"]:::todo
+    Epic22["Epic #22: Advanced PDF Systems"]:::done --> I23["#23: PDF Outlines & Hyperlinks"]:::done --> I24["#24: PDF Page Boxes & Transforms"]:::done --> I25["#25: Low-Level PDF Scanning"]:::done --> I26["#26: PDF Encryption & Permissions"]:::done
 
     click Epic22 href "https://github.com/mihaelamj/PureDraw/issues/22" "Epic #22"
     click I23 href "https://github.com/mihaelamj/PureDraw/issues/23" "Issue #23"
