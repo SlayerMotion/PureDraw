@@ -6,6 +6,7 @@
 import Core
 import Foundation
 import Geometry
+import Validation
 
 /// A renderer that rasterizes a `GraphicsContext` drawing buffer into a raw pixel `Image`.
 public final class BitmapRenderer: Renderer, Sendable {
@@ -33,6 +34,13 @@ public final class BitmapRenderer: Renderer, Sendable {
     }
 
     public func draw(_ context: GraphicsContext) throws -> Image {
+        guard width > 0, height > 0 else {
+            throw ValidationError(
+                reason: "BitmapRenderer width and height must be positive",
+                at: [ValidationCodingKey("renderer")]
+            )
+        }
+
         var currentBuffer = [UInt8](repeating: 0, count: width * height * 4)
         var bufferStack: [[UInt8]] = []
         var beginOpStack: [DrawOperation] = []
