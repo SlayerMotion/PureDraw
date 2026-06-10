@@ -184,7 +184,6 @@ public struct Path: Equatable, Sendable, Validatable {
         closeSubpath()
     }
 
-    /// Adds a rounded rectangle with the specified corner dimensions.
     /// Adds a rectangle with Apple-style *continuous* (squircle) corners: the
     /// curvature ramps smoothly from the straight edge into the corner instead
     /// of jumping at a circular arc, so there is no visible junction. This is
@@ -263,6 +262,9 @@ public struct Path: Equatable, Sendable, Validatable {
         closeSubpath()
     }
 
+    /// Adds a rounded rectangle with circular corners of the specified
+    /// dimensions. For Apple-style continuous corners, use
+    /// `addContinuousRoundedRect(in:cornerRadius:smoothing:)`.
     public mutating func addRoundedRect(in rect: Rect, cornerWidth: Double, cornerHeight: Double) {
         let rx = min(abs(cornerWidth), rect.width / 2.0)
         let ry = min(abs(cornerHeight), rect.height / 2.0)
