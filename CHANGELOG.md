@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PNGEncoder.encode(_:)` turns any `Image` into a standards-correct PNG
   (8-bit RGBA, stored deflate blocks) with no external dependencies, on every
   supported platform.
+- Golden-image tests pin `BitmapRenderer` output byte-for-byte (fills,
+  strokes, gradients, images, masks, transparency layers), so the macOS,
+  Linux, and Windows CI gates now enforce pixel-identical rasterization.
 - `BitmapRenderer` fills with a scanline pass and coverage-based anti-aliasing,
   honoring `GraphicState.shouldAntialias` (previously unread). Aliased
   rendering keeps the old pixel-center behavior, and the scanline pass replaces
