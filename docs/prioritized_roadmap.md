@@ -16,7 +16,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::done --> Epic38["Epic #38: Rasterizer Quality"]:::done --> Epic13["Epic #13: Masking, Caching & Streams"]:::done --> Epic40["Epic #40: PNG Export & Golden Tests"]:::done --> Epic18["Epic #18: Typography & Text Layout"]:::done --> Epic22["Epic #22: Advanced PDF Systems"]:::done --> Epic53["Epic #53: Validation Completeness"]:::done --> Epic58["Epic #58: Performance"]:::done --> Epic59["Epic #59: API Documentation"]:::todo --> Epic60["Epic #60: CFF Outlines"]:::done --> Epic61["Epic #61: Selectable Native Text"]:::next
+    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::done --> Epic38["Epic #38: Rasterizer Quality"]:::done --> Epic13["Epic #13: Masking, Caching & Streams"]:::done --> Epic40["Epic #40: PNG Export & Golden Tests"]:::done --> Epic18["Epic #18: Typography & Text Layout"]:::done --> Epic22["Epic #22: Advanced PDF Systems"]:::done --> Epic53["Epic #53: Validation Completeness"]:::done --> Epic58["Epic #58: Performance"]:::done --> Epic59["Epic #59: API Documentation"]:::todo --> Epic60["Epic #60: CFF Outlines"]:::done --> Epic61["Epic #61: Selectable Native Text"]:::next --> Epic74["Epic #74: Extended Font Formats"]:::todo
 
     click E0 href "https://github.com/mihaelamj/PureDraw/issues/1" "E0"
     click E1 href "https://github.com/mihaelamj/PureDraw/issues/2" "E1"
@@ -36,6 +36,7 @@ flowchart TB
     click Epic59 href "https://github.com/mihaelamj/PureDraw/issues/59" "Epic #59"
     click Epic60 href "https://github.com/mihaelamj/PureDraw/issues/60" "Epic #60"
     click Epic61 href "https://github.com/mihaelamj/PureDraw/issues/61" "Epic #61"
+    click Epic74 href "https://github.com/mihaelamj/PureDraw/issues/74" "Epic #74"
 ```
 
 ### Status Legend
