@@ -14,9 +14,60 @@ public struct PDFRenderer: Renderer {
     public let width: Double
     public let height: Double
 
-    public init(width: Double = 500, height: Double = 500) {
+    /// Optional page boundary boxes, in user space (top-left origin); they
+    /// convert to PDF coordinates on write. The media box is always the full
+    /// page.
+    public let cropBox: Rect?
+    public let bleedBox: Rect?
+    public let trimBox: Rect?
+    public let artBox: Rect?
+
+    public init(
+        width: Double = 500,
+        height: Double = 500,
+        cropBox: Rect? = nil,
+        bleedBox: Rect? = nil,
+        trimBox: Rect? = nil,
+        artBox: Rect? = nil
+    ) {
         self.width = width
         self.height = height
+        self.cropBox = cropBox
+        self.bleedBox = bleedBox
+        self.trimBox = trimBox
+        self.artBox = artBox
+    }
+
+    /// The `CGPDFPageGetDrawingTransform` equivalent: a transform that fits
+    /// `box` into `rect`, rotated by the nearest multiple of 90 degrees,
+    /// centered, and scaled down only (never up) when `preserveAspectRatio`
+    /// is true.
+    public static func drawingTransform(
+        fitting box: Rect,
+        into rect: Rect,
+        rotationDegrees: Int = 0,
+        preserveAspectRatio: Bool = true
+    ) -> Geometry.AffineTransform {
+        let normalized = ((rotationDegrees % 360) + 360) % 360
+        let quarterTurns = ((normalized + 45) / 90) % 4
+        let rotated = quarterTurns % 2 == 1
+        let boxWidth = rotated ? box.height : box.width
+        let boxHeight = rotated ? box.width : box.height
+        guard boxWidth > 0, boxHeight > 0 else { return .identity }
+
+        var scaleX = rect.width / boxWidth
+        var scaleY = rect.height / boxHeight
+        if preserveAspectRatio {
+            let scale = min(min(scaleX, scaleY), 1.0)
+            scaleX = scale
+            scaleY = scale
+        }
+
+        return Geometry.AffineTransform.identity
+            .translatedBy(x: -(box.minX + box.width / 2), y: -(box.minY + box.height / 2))
+            .rotated(by: Double(quarterTurns) * Double.pi / 2)
+            .scaledBy(x: scaleX, y: scaleY)
+            .translatedBy(x: rect.minX + rect.width / 2, y: rect.minY + rect.height / 2)
     }
 
     public func draw(_ context: GraphicsContext) throws -> Data {
@@ -349,10 +400,22 @@ public struct PDFRenderer: Renderer {
         }
         resourcesStr += "\n>>"
 
-        _ = writer.append("<< /Type /Page /Parent \(pagesID) 0 R /MediaBox [ 0 0 \(width) \(height) ] /Contents \(contentsID) 0 R /Resources \(resourcesStr) >>")
+        var pageDict = "<< /Type /Page /Parent \(pagesID) 0 R /MediaBox [ 0 0 \(width) \(height) ]"
+        for (name, box) in [("CropBox", cropBox), ("BleedBox", bleedBox), ("TrimBox", trimBox), ("ArtBox", artBox)] {
+            if let box {
+                pageDict += " /\(name) \(pdfBoxString(for: box))"
+            }
+        }
+        pageDict += " /Contents \(contentsID) 0 R /Resources \(resourcesStr) >>"
+        _ = writer.append(pageDict)
         _ = writer.append("<< /Length \(contentStream.data(using: .utf8)?.count ?? 0) >>\nstream\n\(contentStream)\nendstream")
 
         return writer.buildData()
+    }
+
+    /// A user-space rect (top-left origin) as a PDF rectangle (bottom-left).
+    private func pdfBoxString(for box: Rect) -> String {
+        "[ \(box.minX) \(height - box.maxY) \(box.maxX) \(height - box.minY) ]"
     }
 
     private func pdfFillColorString(for color: Color) -> String {
