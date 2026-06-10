@@ -343,17 +343,13 @@ public struct PDFRenderer: Renderer {
                     alphaData.append(UInt8(min(255, max(0, Int(round(outA * 255.0))))))
                 }
 
-                var rgbCompressed: Data? = nil
-                if #available(macOS 10.15, iOS 13.0, *) {
-                    rgbCompressed = try? (rgbData as NSData).compressed(using: .zlib) as Data
-                }
+                // Valid zlib (FlateDecode) framing; Apple's NSData zlib emits
+                // raw DEFLATE that viewers reject.
+                let rgbCompressed = Data(PNGEncoder.zlibStored(Array(rgbData)))
 
                 var smaskObjId: Int? = nil
                 if hasAlpha {
-                    var alphaCompressed: Data? = nil
-                    if #available(macOS 10.15, iOS 13.0, *) {
-                        alphaCompressed = try? (alphaData as NSData).compressed(using: .zlib) as Data
-                    }
+                    let alphaCompressed = Data(PNGEncoder.zlibStored(Array(alphaData)))
                     var maskHeader = """
                     <<
                       /Type /XObject
@@ -363,13 +359,8 @@ public struct PDFRenderer: Renderer {
                       /ColorSpace /DeviceGray
                       /BitsPerComponent 8
                     """
-                    if let comp = alphaCompressed {
-                        maskHeader += "\n  /Filter /FlateDecode\n  /Length \(comp.count)\n>>"
-                        smaskObjId = writer.append(header: maskHeader, stream: encryptedStream(comp))
-                    } else {
-                        maskHeader += "\n  /Length \(alphaData.count)\n>>"
-                        smaskObjId = writer.append(header: maskHeader, stream: encryptedStream(alphaData))
-                    }
+                    maskHeader += "\n  /Filter /FlateDecode\n  /Length \(alphaCompressed.count)\n>>"
+                    smaskObjId = writer.append(header: maskHeader, stream: encryptedStream(alphaCompressed))
                 }
 
                 var imgHeader = """
@@ -386,12 +377,9 @@ public struct PDFRenderer: Renderer {
                 }
 
                 let imgObjId: Int
-                if let comp = rgbCompressed {
-                    imgHeader += "\n  /Filter /FlateDecode\n  /Length \(comp.count)\n>>"
-                    imgObjId = writer.append(header: imgHeader, stream: encryptedStream(comp))
-                } else {
-                    imgHeader += "\n  /Length \(rgbData.count)\n>>"
-                    imgObjId = writer.append(header: imgHeader, stream: encryptedStream(rgbData))
+                do {
+                    imgHeader += "\n  /Filter /FlateDecode\n  /Length \(rgbCompressed.count)\n>>"
+                    imgObjId = writer.append(header: imgHeader, stream: encryptedStream(rgbCompressed))
                 }
 
                 let imgName = "Img\(opIndex)"
@@ -617,23 +605,18 @@ public struct PDFRenderer: Renderer {
         func scaled(_ value: Double) -> Int {
             Int((value * scale).rounded())
         }
-        let psName = "PDF\(writer.nextObjectID)Font"
+        // A content-derived 6-letter subset tag keeps each distinct font
+        // program uniquely named, so a viewer's font cache (keyed by PostScript
+        // name) never serves one document's program for another's.
+        let psName = "\(Self.subsetTag(for: font.sfntData))+PureDrawFont"
 
-        // FontFile2: the raw sfnt program, FlateDecode-compressed when possible.
-        let programData = Data(font.sfntData)
-        var compressed: Data?
-        if #available(macOS 10.15, iOS 13.0, *) {
-            compressed = try? (programData as NSData).compressed(using: .zlib) as Data
-        }
-        var fontFileHeader = "<<\n  /Length1 \(programData.count)"
-        let fontFileID: Int
-        if let comp = compressed {
-            fontFileHeader += "\n  /Filter /FlateDecode\n  /Length \(comp.count)\n>>"
-            fontFileID = writer.append(header: fontFileHeader, stream: encrypt(comp))
-        } else {
-            fontFileHeader += "\n  /Length \(programData.count)\n>>"
-            fontFileID = writer.append(header: fontFileHeader, stream: encrypt(programData))
-        }
+        // FontFile2: the raw sfnt program in a valid zlib (FlateDecode) stream.
+        // Apple's NSData zlib compression emits raw DEFLATE, which CoreGraphics
+        // cannot decode as FlateDecode, so use PureDraw's zlib writer.
+        let program = font.sfntData
+        let programStream = Data(PNGEncoder.zlibStored(program))
+        let fontFileHeader = "<<\n  /Length1 \(program.count)\n  /Filter /FlateDecode\n  /Length \(programStream.count)\n>>"
+        let fontFileID = writer.append(header: fontFileHeader, stream: encrypt(programStream))
 
         // FontDescriptor. Flag 4 marks a symbolic font (Identity-H encoding).
         let ascent = scaled(font.ascent)
@@ -663,6 +646,23 @@ public struct PDFRenderer: Renderer {
             + " /Encoding /Identity-H /DescendantFonts [ \(cidFontID) 0 R ]"
             + " /ToUnicode \(toUnicodeID) 0 R >>"
         return writer.append(type0)
+    }
+
+    /// A deterministic six-uppercase-letter subset tag (PDF font-naming
+    /// convention) derived from the font program via FNV-1a, so distinct
+    /// programs get distinct PostScript names.
+    private static func subsetTag(for bytes: [UInt8]) -> String {
+        var hash: UInt64 = 0xCBF2_9CE4_8422_2325
+        for byte in bytes {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x0000_0100_0000_01B3
+        }
+        var tag = ""
+        for _ in 0 ..< 6 {
+            tag.append(Character(UnicodeScalar(UInt8(65 + Int(hash % 26)))))
+            hash /= 26
+        }
+        return tag
     }
 
     /// Builds the ToUnicode CMap stream body mapping 2-byte glyph codes to

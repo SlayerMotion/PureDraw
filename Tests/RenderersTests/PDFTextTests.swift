@@ -72,3 +72,41 @@ struct PDFTextTests {
         #endif
     }
 }
+
+extension PDFTextTests {
+    @Test func embeddedFontStreamIsValidZlib() throws {
+        // The FontFile2 program must be wrapped in a real zlib stream (header
+        // 0x78), not Apple's raw DEFLATE, which CoreGraphics cannot decode as
+        // FlateDecode (the glyphs then render as .notdef).
+        var ctx = GraphicsContext()
+        try ctx.setFont(Font(data: SVGTextTests.miniFontBytes))
+        ctx.setFontSize(24)
+        ctx.setFillColor(.black)
+        ctx.showText("A", at: Point(x: 10, y: 40))
+        let data = try PDFRenderer(width: 100, height: 60).render(ctx)
+        let bytes = [UInt8](data)
+
+        // Locate the FontFile2 object's stream and check the zlib header.
+        let needle = Array("/Length1".utf8)
+        guard let lengthOne = firstRange(of: needle, in: bytes) else {
+            Issue.record("no FontFile2 object")
+            return
+        }
+        guard let streamKeyword = firstRange(of: Array("stream\n".utf8), in: bytes, from: lengthOne) else {
+            Issue.record("no stream after FontFile2")
+            return
+        }
+        let streamStart = streamKeyword + Array("stream\n".utf8).count
+        #expect(bytes[streamStart] == 0x78, "FontFile2 must start with a zlib header, got 0x\(String(bytes[streamStart], radix: 16))")
+    }
+
+    private func firstRange(of needle: [UInt8], in haystack: [UInt8], from: Int = 0) -> Int? {
+        guard needle.count <= haystack.count else { return nil }
+        var i = from
+        while i <= haystack.count - needle.count {
+            if Array(haystack[i ..< i + needle.count]) == needle { return i }
+            i += 1
+        }
+        return nil
+    }
+}

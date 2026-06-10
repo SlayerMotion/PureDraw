@@ -19,11 +19,9 @@ struct ShowcaseGenerationTests {
         let height = 850.0
         var ctx = GraphicsContext()
 
-        // Labels are disabled: Font.glyphIndex mis-maps multi-segment cmaps in
-        // real system fonts (tracked separately), so the poster stays wordless
-        // rather than rendering .notdef boxes. Set a font here once that is
-        // fixed to bring the labels back.
-        let font: Font? = nil
+        // A real system font for the labels (developer machine only; CI has no
+        // such path, so font is nil there and the poster stays wordless).
+        let font = try? Font(data: Array(Data(contentsOf: URL(fileURLWithPath: "/System/Library/Fonts/Supplemental/Arial.ttf"))))
 
         drawBackground(&ctx, width: width, height: height)
         drawTitle(&ctx, font: font, width: width)

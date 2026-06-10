@@ -65,8 +65,9 @@ public enum PNGEncoder {
         appendBigEndian(crc32(typeBytes + data), to: &png)
     }
 
-    /// Wraps raw bytes in a zlib stream of stored (uncompressed) deflate blocks.
-    private static func zlibStored(_ raw: [UInt8]) -> [UInt8] {
+    /// Wraps raw bytes in a valid zlib stream of stored (uncompressed) deflate
+    /// blocks, usable both for PNG IDAT and as a PDF FlateDecode stream.
+    static func zlibStored(_ raw: [UInt8]) -> [UInt8] {
         var stream: [UInt8] = [0x78, 0x01] // deflate, 32K window, no preset dictionary
         var offset = 0
         repeat {
