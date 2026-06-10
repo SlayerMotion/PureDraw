@@ -82,27 +82,24 @@ public final class BitmapRenderer: Renderer, Sendable {
 
     private func rasterizeFill(path: Path, state: GraphicState, color: Color, rule: FillRule, buffer: inout [UInt8]) {
         let transformedPath = path.applying(state.transform)
-        let bbox = transformedPath.boundingBox
-        guard !bbox.isNull, !bbox.isEmpty else { return }
+        let rasterizer = CoverageRasterizer(canvasWidth: width, canvasHeight: height)
+        guard let pathCoverage = rasterizer.coverage(of: transformedPath, rule: rule, antialiased: state.shouldAntialias) else { return }
 
-        let clipPath = state.clipPath?.applying(state.transform)
+        var clipCoverage: CoverageRasterizer.CoverageMap?
+        if let clip = state.clipPath?.applying(state.transform) {
+            guard let coverage = rasterizer.coverage(of: clip, rule: .winding, antialiased: state.shouldAntialias) else { return }
+            clipCoverage = coverage
+        }
 
-        let minX = max(0, Int(floor(bbox.minX)))
-        let maxX = min(width - 1, Int(ceil(bbox.maxX)))
-        let minY = max(0, Int(floor(bbox.minY)))
-        let maxY = min(height - 1, Int(ceil(bbox.maxY)))
-
-        guard minX <= maxX, minY <= maxY else { return }
-
-        for y in minY ... maxY {
-            for x in minX ... maxX {
-                let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
-                if transformedPath.contains(pt, using: rule) {
-                    if let clip = clipPath {
-                        guard clip.contains(pt, using: .winding) else { continue }
-                    }
-                    blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
+        for y in pathCoverage.minY ..< pathCoverage.minY + pathCoverage.height {
+            for x in pathCoverage.minX ..< pathCoverage.minX + pathCoverage.width {
+                var coverage = pathCoverage.value(atX: x, y: y)
+                guard coverage > 0 else { continue }
+                if let clipCoverage {
+                    coverage *= clipCoverage.value(atX: x, y: y)
+                    guard coverage > 0 else { continue }
                 }
+                blendPixel(x: x, y: y, color: color, state: state, coverage: coverage, buffer: &buffer)
             }
         }
     }
@@ -404,7 +401,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         }
     }
 
-    private func blendPixel(x: Int, y: Int, color: Color, state: GraphicState, buffer: inout [UInt8]) {
+    private func blendPixel(x: Int, y: Int, color: Color, state: GraphicState, coverage: Double = 1.0, buffer: inout [UInt8]) {
         let index = (y * width + x) * 4
 
         var maskAlpha = 1.0
@@ -423,7 +420,7 @@ public final class BitmapRenderer: Renderer, Sendable {
             }
         }
 
-        let srcA = color.alpha * state.alpha * maskAlpha
+        let srcA = color.alpha * state.alpha * maskAlpha * coverage
         let srcR = color.red * srcA
         let srcG = color.green * srcA
         let srcB = color.blue * srcA

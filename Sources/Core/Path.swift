@@ -609,7 +609,20 @@ public struct Path: Equatable, Sendable, Validatable {
     }
 
     public func toPolygons() -> [[Point]] {
-        var polygons: [[Point]] = []
+        toPolylines().map { polyline in
+            var points = polyline.points
+            if let first = points.first, points.last != first {
+                points.append(first)
+            }
+            return points
+        }
+    }
+
+    /// Flattens the path into one polyline per subpath, preserving whether the
+    /// subpath was explicitly closed. Open subpaths are not closed implicitly,
+    /// which is the contract stroking requires; use `toPolygons()` for filling.
+    public func toPolylines() -> [(points: [Point], isClosed: Bool)] {
+        var polylines: [(points: [Point], isClosed: Bool)] = []
         var currentPolygon: [Point] = []
         var currentPoint = Point.zero
         var subpathStart = Point.zero
@@ -618,10 +631,7 @@ public struct Path: Equatable, Sendable, Validatable {
             switch element {
             case let .move(to):
                 if !currentPolygon.isEmpty {
-                    if currentPolygon.last != subpathStart {
-                        currentPolygon.append(subpathStart)
-                    }
-                    polygons.append(currentPolygon)
+                    polylines.append((points: currentPolygon, isClosed: false))
                 }
                 currentPolygon = [to]
                 currentPoint = to
@@ -676,10 +686,7 @@ public struct Path: Equatable, Sendable, Validatable {
 
             case .close:
                 if !currentPolygon.isEmpty {
-                    if currentPolygon.last != subpathStart {
-                        currentPolygon.append(subpathStart)
-                    }
-                    polygons.append(currentPolygon)
+                    polylines.append((points: currentPolygon, isClosed: true))
                     currentPolygon = []
                 }
                 currentPoint = subpathStart
@@ -687,12 +694,9 @@ public struct Path: Equatable, Sendable, Validatable {
         }
 
         if !currentPolygon.isEmpty {
-            if currentPolygon.last != subpathStart {
-                currentPolygon.append(subpathStart)
-            }
-            polygons.append(currentPolygon)
+            polylines.append((points: currentPolygon, isClosed: false))
         }
 
-        return polygons
+        return polylines
     }
 }

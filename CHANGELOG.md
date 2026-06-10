@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `BitmapRenderer` fills with a scanline pass and coverage-based anti-aliasing,
+  honoring `GraphicState.shouldAntialias` (previously unread). Aliased
+  rendering keeps the old pixel-center behavior, and the scanline pass replaces
+  the O(pixels x segments) per-pixel containment loop.
+- `Path.toPolylines()` flattens a path into per-subpath polylines that
+  preserve whether each subpath was explicitly closed.
 - Image-based clipping masks: `GraphicsContext.clip(to:mask:)`, honored by
   `BitmapRenderer` and `CoreGraphicsRenderer`.
 - Color masking on `Image` via `maskingColors`, applied consistently by both

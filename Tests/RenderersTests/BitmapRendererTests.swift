@@ -88,6 +88,50 @@ struct BitmapRendererTests {
         }
     }
 
+    @Test func antialiasedFillProducesPartialEdgeCoverage() throws {
+        var context = GraphicsContext()
+        context.setFillColor(Color(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0))
+        context.move(to: Point(x: 0, y: 0))
+        context.addLine(to: Point(x: 10, y: 0))
+        context.addLine(to: Point(x: 0, y: 10))
+        context.closeSubpath()
+        context.fillPath()
+
+        let image = try BitmapRenderer(width: 10, height: 10).render(context)
+        let data = image.data
+
+        // Interior pixel: full coverage.
+        #expect(data[(2 * 10 + 2) * 4 + 3] == 255)
+        // The hypotenuse (x + y = 10) bisects pixel (4, 5): about half coverage.
+        let edgeAlpha = Int(data[(5 * 10 + 4) * 4 + 3])
+        #expect(edgeAlpha > 100 && edgeAlpha < 155, "expected ~50% edge coverage, got \(edgeAlpha)")
+        // Outside: untouched.
+        #expect(data[(8 * 10 + 8) * 4 + 3] == 0)
+    }
+
+    @Test func aliasedFillKeepsHardEdges() throws {
+        var context = GraphicsContext()
+        context.setShouldAntialias(false)
+        context.setFillColor(Color(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0))
+        context.move(to: Point(x: 0, y: 0))
+        context.addLine(to: Point(x: 10, y: 0))
+        context.addLine(to: Point(x: 0, y: 10))
+        context.closeSubpath()
+        context.fillPath()
+
+        let image = try BitmapRenderer(width: 10, height: 10).render(context)
+        let data = image.data
+
+        for y in 0 ..< 10 {
+            for x in 0 ..< 10 {
+                let alpha = data[(y * 10 + x) * 4 + 3]
+                #expect(alpha == 0 || alpha == 255, "expected hard edge at (\(x), \(y)), got \(alpha)")
+            }
+        }
+        #expect(data[(2 * 10 + 2) * 4 + 3] == 255)
+        #expect(data[(8 * 10 + 8) * 4 + 3] == 0)
+    }
+
     @Test func strokeRespectsClipUnderTransform() throws {
         var context = GraphicsContext()
 
