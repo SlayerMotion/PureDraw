@@ -28,6 +28,9 @@ public struct PDFRenderer: Renderer {
     /// The document outline (bookmarks); empty means no outline.
     public let outline: [PDFOutlineItem]
 
+    /// Standard-security-handler encryption; nil writes an open document.
+    public let encryption: PDFEncryption?
+
     public init(
         width: Double = 500,
         height: Double = 500,
@@ -36,7 +39,8 @@ public struct PDFRenderer: Renderer {
         trimBox: Rect? = nil,
         artBox: Rect? = nil,
         links: [PDFLink] = [],
-        outline: [PDFOutlineItem] = []
+        outline: [PDFOutlineItem] = [],
+        encryption: PDFEncryption? = nil
     ) {
         self.width = width
         self.height = height
@@ -46,6 +50,7 @@ public struct PDFRenderer: Renderer {
         self.artBox = artBox
         self.links = links
         self.outline = outline
+        self.encryption = encryption
     }
 
     /// The `CGPDFPageGetDrawingTransform` equivalent: a transform that fits
@@ -82,6 +87,29 @@ public struct PDFRenderer: Renderer {
 
     public func draw(_ context: GraphicsContext) throws -> Data {
         let writer = PDFWriter()
+
+        // The file ID seeds the encryption key; derive it deterministically so
+        // identical input yields identical bytes.
+        var prepared: PDFEncryption.Prepared?
+        if let encryption {
+            let seed = Array("PureDraw \(width)x\(height)".utf8)
+                + PDFEncryption.padded(encryption.userPassword)
+                + PDFEncryption.padded(encryption.ownerPassword)
+            prepared = encryption.prepare(fileID: PDFEncryption.md5(seed))
+        }
+
+        /// RC4 preserves length, so headers written before encryption stay valid.
+        func encryptedStream(_ data: Data) -> Data {
+            guard let prepared else { return data }
+            return Data(prepared.encrypt(Array(data), objectID: writer.nextObjectID))
+        }
+
+        /// A PDF text string: literal when open, encrypted hex when locked.
+        func pdfTextString(_ text: String, objectID: Int) -> String {
+            guard let prepared else { return "(\(escapedPDFString(text)))" }
+            let encrypted = prepared.encrypt(Array(text.utf8), objectID: objectID)
+            return "<" + encrypted.map { String(format: "%02X", $0) }.joined() + ">"
+        }
 
         var extGStates: [ExtGStateKey: String] = [:]
         var shadings: [String: String] = [:] // shading dictionary content -> name
@@ -312,10 +340,10 @@ public struct PDFRenderer: Renderer {
                     """
                     if let comp = alphaCompressed {
                         maskHeader += "\n  /Filter /FlateDecode\n  /Length \(comp.count)\n>>"
-                        smaskObjId = writer.append(header: maskHeader, stream: comp)
+                        smaskObjId = writer.append(header: maskHeader, stream: encryptedStream(comp))
                     } else {
                         maskHeader += "\n  /Length \(alphaData.count)\n>>"
-                        smaskObjId = writer.append(header: maskHeader, stream: alphaData)
+                        smaskObjId = writer.append(header: maskHeader, stream: encryptedStream(alphaData))
                     }
                 }
 
@@ -335,10 +363,10 @@ public struct PDFRenderer: Renderer {
                 let imgObjId: Int
                 if let comp = rgbCompressed {
                     imgHeader += "\n  /Filter /FlateDecode\n  /Length \(comp.count)\n>>"
-                    imgObjId = writer.append(header: imgHeader, stream: comp)
+                    imgObjId = writer.append(header: imgHeader, stream: encryptedStream(comp))
                 } else {
                     imgHeader += "\n  /Length \(rgbData.count)\n>>"
-                    imgObjId = writer.append(header: imgHeader, stream: rgbData)
+                    imgObjId = writer.append(header: imgHeader, stream: encryptedStream(rgbData))
                 }
 
                 let imgName = "Img\(opIndex)"
@@ -428,14 +456,15 @@ public struct PDFRenderer: Renderer {
         }
         pageDict += " /Contents \(contentsID) 0 R /Resources \(resourcesStr) >>"
         _ = writer.append(pageDict)
-        _ = writer.append("<< /Length \(contentStream.data(using: .utf8)?.count ?? 0) >>\nstream\n\(contentStream)\nendstream")
+        let contentData = encryptedStream(Data(contentStream.utf8))
+        _ = writer.append(header: "<< /Length \(contentData.count) >>", stream: contentData)
 
         for link in links {
             let rect = link.rect
             let pdfRect = "[ \(rect.minX) \(height - rect.maxY) \(rect.maxX) \(height - rect.minY) ]"
             let action = switch link.target {
             case let .url(url):
-                "/A << /S /URI /URI (\(escapedPDFString(url))) >>"
+                "/A << /S /URI /URI \(pdfTextString(url, objectID: writer.nextObjectID)) >>"
             case let .destination(point):
                 "/Dest [ \(pageID) 0 R /XYZ \(point.x) \(height - point.y) null ]"
             }
@@ -443,7 +472,17 @@ public struct PDFRenderer: Renderer {
         }
 
         if !outline.isEmpty {
-            appendOutline(to: writer, rootID: outlineRootID, pageID: pageID)
+            appendOutline(to: writer, rootID: outlineRootID, pageID: pageID, textString: pdfTextString)
+        }
+
+        if let prepared {
+            func hex(_ bytes: [UInt8]) -> String {
+                bytes.map { String(format: "%02X", $0) }.joined()
+            }
+            writer.encryptObjectID = writer.append(
+                "<< /Filter /Standard /V 1 /R 2 /O <\(hex(prepared.oValue))> /U <\(hex(prepared.uValue))> /P \(prepared.permissionsValue) >>"
+            )
+            writer.fileIDHex = hex(prepared.fileID)
         }
 
         return writer.buildData()
@@ -455,12 +494,12 @@ public struct PDFRenderer: Renderer {
         1 + item.children.reduce(0) { $0 + subtreeSize($1) }
     }
 
-    private func appendOutline(to writer: PDFWriter, rootID: Int, pageID: Int) {
+    private func appendOutline(to writer: PDFWriter, rootID: Int, pageID: Int, textString: (String, Int) -> String) {
         let totalCount = outline.reduce(0) { $0 + subtreeSize($1) }
         let firstID = rootID + 1
         let lastID = siblingIDs(for: outline, startingAt: firstID).last ?? firstID
         _ = writer.append("<< /Type /Outlines /First \(firstID) 0 R /Last \(lastID) 0 R /Count \(totalCount) >>")
-        appendOutlineItems(outline, parentID: rootID, startingAt: firstID, to: writer, pageID: pageID)
+        appendOutlineItems(outline, parentID: rootID, startingAt: firstID, to: writer, pageID: pageID, textString: textString)
     }
 
     /// Object IDs of a sibling run laid out in pre-order starting at `startID`.
@@ -474,11 +513,11 @@ public struct PDFRenderer: Renderer {
         return ids
     }
 
-    private func appendOutlineItems(_ items: [PDFOutlineItem], parentID: Int, startingAt startID: Int, to writer: PDFWriter, pageID: Int) {
+    private func appendOutlineItems(_ items: [PDFOutlineItem], parentID: Int, startingAt startID: Int, to writer: PDFWriter, pageID: Int, textString: (String, Int) -> String) {
         let ids = siblingIDs(for: items, startingAt: startID)
         for (index, item) in items.enumerated() {
             let id = ids[index]
-            var dict = "<< /Title (\(escapedPDFString(item.title))) /Parent \(parentID) 0 R"
+            var dict = "<< /Title \(textString(item.title, id)) /Parent \(parentID) 0 R"
             if index > 0 {
                 dict += " /Prev \(ids[index - 1]) 0 R"
             }
@@ -494,7 +533,7 @@ public struct PDFRenderer: Renderer {
             dict += " >>"
             _ = writer.append(dict)
             if !item.children.isEmpty {
-                appendOutlineItems(item.children, parentID: id, startingAt: id + 1, to: writer, pageID: pageID)
+                appendOutlineItems(item.children, parentID: id, startingAt: id + 1, to: writer, pageID: pageID, textString: textString)
             }
         }
     }
@@ -615,6 +654,8 @@ public struct PDFRenderer: Renderer {
     private class PDFWriter {
         var objects: [Data] = []
         var rootObjectID = 1
+        var encryptObjectID: Int?
+        var fileIDHex: String?
 
         var nextObjectID: Int {
             objects.count + 1
@@ -660,11 +701,17 @@ public struct PDFRenderer: Renderer {
             }
             data.append(Data(xref.utf8))
 
+            var trailerDict = "/Size \(objects.count + 1)\n  /Root \(rootObjectID) 0 R"
+            if let encryptObjectID {
+                trailerDict += "\n  /Encrypt \(encryptObjectID) 0 R"
+            }
+            if let fileIDHex {
+                trailerDict += "\n  /ID [ <\(fileIDHex)> <\(fileIDHex)> ]"
+            }
             let trailer = """
             trailer
             <<
-              /Size \(objects.count + 1)
-              /Root \(rootObjectID) 0 R
+              \(trailerDict)
             >>
             startxref
             \(xrefOffset)

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- PDF document features on `PDFRenderer`: page boundary boxes (CropBox,
+  BleedBox, TrimBox, ArtBox) with a `drawingTransform` fit calculator, link
+  annotations (`PDFLink`: URI or internal destination), hierarchical outlines
+  (`PDFOutlineItem`), and standard-security-handler encryption
+  (`PDFEncryption`: user/owner passwords and permission flags, RC4-40 with
+  pure Swift MD5/RC4).
+- `PDFScanner`, the `CGPDFScanner` equivalent: tokenizes content streams and
+  dispatches operator callbacks with parsed operand stacks.
 - `Font`, a pure Swift TrueType parser: `cmap` formats 0/4/6/12, short and
   long `loca`, simple and composite `glyf` outlines decoded to `Path` values
   in font units, `hmtx` advance widths, and `.ttc` collections. CFF-outlined
