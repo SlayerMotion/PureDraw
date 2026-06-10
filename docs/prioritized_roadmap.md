@@ -27,12 +27,16 @@ flowchart TD
     end
 
     subgraph Phase 2: Images, Masking & Streams
-        P2_1["Epic #9: CGImage & Bitmap Context"]:::phase2
-        subgraph Epic #13: Masking, Caching & Streams
+        subgraph Epic9["Epic #9: Bitmap Images & Rasterization"]
+            P2_1_a["#10: Raw Pixel Buffer Structure"]:::phase2
+            P2_1_b["#11: Bitmap Context Renderer"]:::phase2
+            P2_1_c["#12: Image Drawing on Context"]:::phase2
+        end
+        subgraph Epic13["Epic #13: Masking, Caching & Streams"]
             P2_2["#14: Stencil & Chroma Masking"]:::phase2
             P2_3["#15: CGLayer Caching"]:::phase2
-            P2_4["#17: Image I/O Metadata"]:::phase2
             P2_5["#16: Data Streams"]:::phase2
+            P2_4["#17: Image I/O Metadata"]:::phase2
         end
     end
 
@@ -42,14 +46,20 @@ flowchart TD
     end
 
     subgraph Phase 4: Typography
-        P4_1["Epic #18: Font Engine & Layout"]:::phase4
+        subgraph Epic18["Epic #18: Typography & Text Layout"]
+            P4_1_a["#19: Font File Parser & Glyphs"]:::phase4
+            P4_1_b["#20: Text State Stack & Matrix"]:::phase4
+            P4_1_c["#21: Text Showing Context Operations"]:::phase4
+        end
     end
 
-    subgraph Phase 5: Advanced PDF Systems (Epic #22)
-        P5_1["#23: PDF Outlines & Links"]:::phase5
-        P5_2["#24: PDF Page Boxes"]:::phase5
-        P5_3["#25: PDF Content Scanning"]:::phase5
-        P5_4["#26: PDF Document Encryption"]:::phase5
+    subgraph Phase 5: Advanced PDF Systems
+        subgraph Epic22["Epic #22: Advanced PDF Systems"]
+            P5_1["#23: PDF Outlines & Links"]:::phase5
+            P5_2["#24: PDF Page Boxes"]:::phase5
+            P5_3["#25: PDF Content Scanning"]:::phase5
+            P5_4["#26: PDF Document Encryption"]:::phase5
+        end
     end
 
     E3 --> TL
@@ -60,16 +70,23 @@ flowchart TD
     
     P1_1 --> P1_2
     
-    P1_1 --> P2_1
-    P2_1 --> P2_2
-    P2_1 --> P2_3
-    P2_1 --> P2_4
-    P2_1 --> P2_5
+    P1_1 --> P2_1_a
+    P2_1_a --> P2_1_b
+    P2_1_a --> P2_1_c
+    P2_1_b --> P2_1_c
     
-    P2_1 --> P3_1
+    P2_1_c --> P2_2
+    P2_1_c --> P2_3
+    P2_1_c --> P2_5
+    P2_5 --> P2_4
+    
+    P2_1_c --> P3_1
     P1_1 --> P3_2
     
-    P2_1 --> P4_1
+    P2_1_c --> P4_1_a
+    P2_1_c --> P4_1_b
+    P4_1_a --> P4_1_c
+    P4_1_b --> P4_1_c
     
     P2_5 --> P5_1
     P5_1 --> P5_2
@@ -78,14 +95,18 @@ flowchart TD
 
     click P1_1 href "https://github.com/mihaelamj/PureDraw/issues/27" "Issue #27"
     click P1_2 href "https://github.com/mihaelamj/PureDraw/issues/28" "Issue #28"
-    click P2_1 href "https://github.com/mihaelamj/PureDraw/issues/9" "Epic #9"
+    click P2_1_a href "https://github.com/mihaelamj/PureDraw/issues/10" "Issue #10"
+    click P2_1_b href "https://github.com/mihaelamj/PureDraw/issues/11" "Issue #11"
+    click P2_1_c href "https://github.com/mihaelamj/PureDraw/issues/12" "Issue #12"
     click P2_2 href "https://github.com/mihaelamj/PureDraw/issues/14" "Issue #14"
     click P2_3 href "https://github.com/mihaelamj/PureDraw/issues/15" "Issue #15"
     click P2_4 href "https://github.com/mihaelamj/PureDraw/issues/17" "Issue #17"
     click P2_5 href "https://github.com/mihaelamj/PureDraw/issues/16" "Issue #16"
     click P3_1 href "https://github.com/mihaelamj/PureDraw/issues/29" "Issue #29"
     click P3_2 href "https://github.com/mihaelamj/PureDraw/issues/30" "Issue #30"
-    click P4_1 href "https://github.com/mihaelamj/PureDraw/issues/18" "Epic #18"
+    click P4_1_a href "https://github.com/mihaelamj/PureDraw/issues/19" "Issue #19"
+    click P4_1_b href "https://github.com/mihaelamj/PureDraw/issues/20" "Issue #20"
+    click P4_1_c href "https://github.com/mihaelamj/PureDraw/issues/21" "Issue #21"
     click P5_1 href "https://github.com/mihaelamj/PureDraw/issues/23" "Issue #23"
     click P5_2 href "https://github.com/mihaelamj/PureDraw/issues/24" "Issue #24"
     click P5_3 href "https://github.com/mihaelamj/PureDraw/issues/25" "Issue #25"
