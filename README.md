@@ -127,121 +127,112 @@ bash scripts/check-all.sh
 
 ## Roadmap
 
+### High-Level Roadmap Flow
 ```mermaid
 flowchart TD
     classDef done fill:#34c759,stroke:#000,color:#fff
-    classDef phase1 fill:#007aff,stroke:#000,color:#fff
-    classDef phase2 fill:#5856d6,stroke:#000,color:#fff
-    classDef phase3 fill:#ff9500,stroke:#000,color:#fff
-    classDef phase4 fill:#ff3b30,stroke:#000,color:#fff
-    classDef phase5 fill:#8e8e93,stroke:#000,color:#fff
+    classDef active fill:#007aff,stroke:#000,color:#fff
 
-    subgraph Shipped
-        E0["E0 (#1): Math Primitives"]:::done
-        E1["E1 (#2): Path Construction"]:::done
-        E2["E2 (#3): Graphic State"]:::done
-        E3["E3 (#4): Rendering Bridge"]:::done
-        TL["Transparency Layers"]:::done
-        CS["CMYK & Gray Color Spaces"]:::done
-    end
-
-    subgraph Phase 1: Core & Geometry Extensions
-        P1_1["#27: GState Settings"]:::phase1
-        P1_2["#28: Path Hit-Testing"]:::phase1
-    end
-
-    subgraph Phase 2: Images, Masking & Streams
-        subgraph Epic9["Epic #9: Bitmap Images & Rasterization"]
-            P2_1_a["#10: Raw Pixel Buffer Structure"]:::phase2
-            P2_1_b["#11: Bitmap Context Renderer"]:::phase2
-            P2_1_c["#12: Image Drawing on Context"]:::phase2
-        end
-        subgraph Epic13["Epic #13: Masking, Caching & Streams"]
-            P2_2["#14: Stencil & Chroma Masking"]:::phase2
-            P2_3["#15: CGLayer Caching"]:::phase2
-            P2_5["#16: Data Streams"]:::phase2
-            P2_4["#17: Image I/O Metadata"]:::phase2
-        end
-    end
-
-    subgraph Phase 3: Fills & Patterns
-        P3_1["#29: Colored & Template Patterns"]:::phase3
-        P3_2["#30: Custom Math Shading"]:::phase3
-    end
-
-    subgraph Phase 4: Typography
-        subgraph Epic18["Epic #18: Typography & Text Layout"]
-            P4_1_a["#19: Font File Parser & Glyphs"]:::phase4
-            P4_1_b["#20: Text State Stack & Matrix"]:::phase4
-            P4_1_c["#21: Text Showing Context Operations"]:::phase4
-        end
-    end
-
-    subgraph Phase 5: Advanced PDF Systems
-        subgraph Epic22["Epic #22: Advanced PDF Systems"]
-            P5_1["#23: PDF Outlines & Links"]:::phase5
-            P5_2["#24: PDF Page Boxes"]:::phase5
-            P5_3["#25: PDF Content Scanning"]:::phase5
-            P5_4["#26: PDF Document Encryption"]:::phase5
-        end
-    end
-
-    E0 --> E1
-    E1 --> E2
-    E2 --> E3
-    E3 --> TL
-    E3 --> CS
-
-    TL --> P1_1
-    CS --> P1_1
+    E0["E0 (#1): Math Primitives"]:::done
+    E1["E1 (#2): Path Construction"]:::done
+    E2["E2 (#3): Graphic State"]:::done
+    E3["E3 (#4): Rendering Bridge"]:::done
     
-    P1_1 --> P1_2
-    
-    P1_1 --> P2_1_a
-    P2_1_a --> P2_1_b
-    P2_1_a --> P2_1_c
-    P2_1_b --> P2_1_c
-    
-    P2_1_c --> P2_2
-    P2_1_c --> P2_3
-    P2_1_c --> P2_5
-    P2_5 --> P2_4
-    
-    P2_1_c --> P3_1
-    P1_1 --> P3_2
-    
-    P2_1_c --> P4_1_a
-    P2_1_c --> P4_1_b
-    P4_1_a --> P4_1_c
-    P4_1_b --> P4_1_c
-    
-    P2_5 --> P5_1
-    P5_1 --> P5_2
-    P5_2 --> P5_3
-    P5_3 --> P5_4
+    Epic9["Epic #9: Bitmap Images"]:::active
+    Epic13["Epic #13: Masking & Streams"]:::active
+    Epic18["Epic #18: Typography"]:::active
+    Epic22["Epic #22: Advanced PDF"]:::active
+
+    E0 --> E1 --> E2 --> E3
+    E3 --> Epic9 --> Epic13
+    Epic9 --> Epic18
+    Epic13 --> Epic22
 
     click E0 href "https://github.com/mihaelamj/PureDraw/issues/1" "E0"
     click E1 href "https://github.com/mihaelamj/PureDraw/issues/2" "E1"
     click E2 href "https://github.com/mihaelamj/PureDraw/issues/3" "E2"
     click E3 href "https://github.com/mihaelamj/PureDraw/issues/4" "E3"
-    click P1_1 href "https://github.com/mihaelamj/PureDraw/issues/27" "Issue #27"
-    click P1_2 href "https://github.com/mihaelamj/PureDraw/issues/28" "Issue #28"
-    click P2_1_a href "https://github.com/mihaelamj/PureDraw/issues/10" "Issue #10"
-    click P2_1_b href "https://github.com/mihaelamj/PureDraw/issues/11" "Issue #11"
-    click P2_1_c href "https://github.com/mihaelamj/PureDraw/issues/12" "Issue #12"
-    click P2_2 href "https://github.com/mihaelamj/PureDraw/issues/14" "Issue #14"
-    click P2_3 href "https://github.com/mihaelamj/PureDraw/issues/15" "Issue #15"
-    click P2_4 href "https://github.com/mihaelamj/PureDraw/issues/17" "Issue #17"
-    click P2_5 href "https://github.com/mihaelamj/PureDraw/issues/16" "Issue #16"
-    click P3_1 href "https://github.com/mihaelamj/PureDraw/issues/29" "Issue #29"
-    click P3_2 href "https://github.com/mihaelamj/PureDraw/issues/30" "Issue #30"
-    click P4_1_a href "https://github.com/mihaelamj/PureDraw/issues/19" "Issue #19"
-    click P4_1_b href "https://github.com/mihaelamj/PureDraw/issues/20" "Issue #20"
-    click P4_1_c href "https://github.com/mihaelamj/PureDraw/issues/21" "Issue #21"
-    click P5_1 href "https://github.com/mihaelamj/PureDraw/issues/23" "Issue #23"
-    click P5_2 href "https://github.com/mihaelamj/PureDraw/issues/24" "Issue #24"
-    click P5_3 href "https://github.com/mihaelamj/PureDraw/issues/25" "Issue #25"
-    click P5_4 href "https://github.com/mihaelamj/PureDraw/issues/26" "Issue #26"
+    click Epic9 href "https://github.com/mihaelamj/PureDraw/issues/9" "Epic #9"
+    click Epic13 href "https://github.com/mihaelamj/PureDraw/issues/13" "Epic #13"
+    click Epic18 href "https://github.com/mihaelamj/PureDraw/issues/18" "Epic #18"
+    click Epic22 href "https://github.com/mihaelamj/PureDraw/issues/22" "Epic #22"
+```
+
+### Epic #9: Bitmap Images & Rasterization Support
+```mermaid
+flowchart TD
+    Epic9["Epic #9: Bitmap Images & Rasterization"]:::epic --> I10["#10: Raw Pixel Buffer Structure"]:::issue
+    Epic9 --> I11["#11: Bitmap Context Renderer"]:::issue
+    Epic9 --> I12["#12: Image Drawing on Context"]:::issue
+    
+    I10 --> I11
+    I10 --> I12
+    I11 --> I12
+
+    classDef epic fill:#5856d6,stroke:#000,color:#fff,stroke-width:2px;
+    classDef issue fill:#007aff,stroke:#000,color:#fff;
+    click Epic9 href "https://github.com/mihaelamj/PureDraw/issues/9" "Epic #9"
+    click I10 href "https://github.com/mihaelamj/PureDraw/issues/10" "Issue #10"
+    click I11 href "https://github.com/mihaelamj/PureDraw/issues/11" "Issue #11"
+    click I12 href "https://github.com/mihaelamj/PureDraw/issues/12" "Issue #12"
+```
+
+### Epic #13: Image Masking, Caching & Data Streams
+```mermaid
+flowchart TD
+    Epic13["Epic #13: Masking, Caching & Streams"]:::epic --> I14["#14: Stencil & Chroma Masking"]:::issue
+    Epic13 --> I15["#15: CGLayer Caching"]:::issue
+    Epic13 --> I16["#16: Data Providers & Consumers"]:::issue
+    Epic13 --> I17["#17: Image I/O Metadata"]:::issue
+    
+    I16 --> I17
+
+    classDef epic fill:#5856d6,stroke:#000,color:#fff,stroke-width:2px;
+    classDef issue fill:#007aff,stroke:#000,color:#fff;
+    click Epic13 href "https://github.com/mihaelamj/PureDraw/issues/13" "Epic #13"
+    click I14 href "https://github.com/mihaelamj/PureDraw/issues/14" "Issue #14"
+    click I15 href "https://github.com/mihaelamj/PureDraw/issues/15" "Issue #15"
+    click I16 href "https://github.com/mihaelamj/PureDraw/issues/16" "Issue #16"
+    click I17 href "https://github.com/mihaelamj/PureDraw/issues/17" "Issue #17"
+```
+
+### Epic #18: Typography and Text Layout Engine
+```mermaid
+flowchart TD
+    Epic18["Epic #18: Typography & Text Layout"]:::epic --> I19["#19: Font File Parser & Glyphs"]:::issue
+    Epic18 --> I20["#20: Text State Stack & Matrix"]:::issue
+    Epic18 --> I21["#21: Text Showing Context Operations"]:::issue
+    
+    I19 --> I21
+    I20 --> I21
+
+    classDef epic fill:#5856d6,stroke:#000,color:#fff,stroke-width:2px;
+    classDef issue fill:#007aff,stroke:#000,color:#fff;
+    click Epic18 href "https://github.com/mihaelamj/PureDraw/issues/18" "Epic #18"
+    click I19 href "https://github.com/mihaelamj/PureDraw/issues/19" "Issue #19"
+    click I20 href "https://github.com/mihaelamj/PureDraw/issues/20" "Issue #20"
+    click I21 href "https://github.com/mihaelamj/PureDraw/issues/21" "Issue #21"
+```
+
+### Epic #22: Advanced PDF Systems
+```mermaid
+flowchart TD
+    Epic22["Epic #22: Advanced PDF Systems"]:::epic --> I23["#23: PDF Outlines & Hyperlinks"]:::issue
+    Epic22 --> I24["#24: PDF Page Boxes & Transforms"]:::issue
+    Epic22 --> I25["#25: Low-Level PDF Scanning"]:::issue
+    Epic22 --> I26["#26: PDF Encryption & Permissions"]:::issue
+    
+    I23 --> I24
+    I24 --> I25
+    I25 --> I26
+
+    classDef epic fill:#5856d6,stroke:#000,color:#fff,stroke-width:2px;
+    classDef issue fill:#007aff,stroke:#000,color:#fff;
+    click Epic22 href "https://github.com/mihaelamj/PureDraw/issues/22" "Epic #22"
+    click I23 href "https://github.com/mihaelamj/PureDraw/issues/23" "Issue #23"
+    click I24 href "https://github.com/mihaelamj/PureDraw/issues/24" "Issue #24"
+    click I25 href "https://github.com/mihaelamj/PureDraw/issues/25" "Issue #25"
+    click I26 href "https://github.com/mihaelamj/PureDraw/issues/26" "Issue #26"
 ```
 
 ---
