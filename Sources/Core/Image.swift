@@ -14,6 +14,7 @@ public struct Image: Sendable, Equatable {
     public let bytesPerRow: Int
     public let colorSpace: ColorSpace
     public let alphaInfo: AlphaInfo
+    public let maskingColors: [Double]?
     public let data: [UInt8]
 
     public init(
@@ -24,6 +25,7 @@ public struct Image: Sendable, Equatable {
         bytesPerRow: Int? = nil,
         colorSpace: ColorSpace = .deviceRGB,
         alphaInfo: AlphaInfo = .premultipliedLast,
+        maskingColors: [Double]? = nil,
         data: [UInt8]
     ) {
         let computedBytesPerRow = bytesPerRow ?? (width * bitsPerPixel / 8)
@@ -37,6 +39,7 @@ public struct Image: Sendable, Equatable {
         self.bytesPerRow = computedBytesPerRow
         self.colorSpace = colorSpace
         self.alphaInfo = alphaInfo
+        self.maskingColors = maskingColors
         self.data = data
     }
 }

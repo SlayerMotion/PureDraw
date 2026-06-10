@@ -102,6 +102,21 @@ public extension Validation {
                     ))
                 }
 
+                if s.maskImage != nil {
+                    if s.maskRect == nil {
+                        errors.append(ValidationError(
+                            reason: "maskRect must be set when maskImage is present",
+                            at: context.codingPath + [ValidationCodingKey("maskRect")]
+                        ))
+                    }
+                    if s.maskTransform == nil {
+                        errors.append(ValidationError(
+                            reason: "maskTransform must be set when maskImage is present",
+                            at: context.codingPath + [ValidationCodingKey("maskTransform")]
+                        ))
+                    }
+                }
+
                 return errors
             }
         )
@@ -257,6 +272,28 @@ public extension Validation {
                         reason: "data buffer size is smaller than height * bytesPerRow",
                         at: context.codingPath + [ValidationCodingKey("data")]
                     ))
+                }
+
+                if let maskingColors = img.maskingColors {
+                    let expectedCount = switch img.colorSpace {
+                    case .deviceRGB: 6
+                    case .deviceGray: 2
+                    case .deviceCMYK: 8
+                    }
+                    if maskingColors.count != expectedCount {
+                        errors.append(ValidationError(
+                            reason: "maskingColors count must be \(expectedCount) for colorSpace \(img.colorSpace.rawValue)",
+                            at: context.codingPath + [ValidationCodingKey("maskingColors")]
+                        ))
+                    }
+                    for (index, val) in maskingColors.enumerated() {
+                        if !(0.0 ... 1.0).contains(val) {
+                            errors.append(ValidationError(
+                                reason: "maskingColors element at index \(index) must be between 0.0 and 1.0",
+                                at: context.codingPath + [ValidationCodingKey("maskingColors"), ValidationCodingKey(index)]
+                            ))
+                        }
+                    }
                 }
 
                 return errors

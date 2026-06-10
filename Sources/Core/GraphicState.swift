@@ -74,6 +74,15 @@ public struct GraphicState: Equatable, Sendable, Validatable {
     /// Whether to quantize fonts at subpixel positions.
     public var shouldSubpixelQuantizeFonts: Bool
 
+    /// The current active image-based clipping mask.
+    public var maskImage: Image?
+
+    /// The target rectangle where the mask image is mapped.
+    public var maskRect: Rect?
+
+    /// The transform matrix at the time the mask was set.
+    public var maskTransform: Geometry.AffineTransform?
+
     public init(
         transform: Geometry.AffineTransform = .identity,
         strokeColor: Color = .black,
@@ -96,7 +105,10 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         shouldSmoothFonts: Bool = true,
         allowsFontSmoothing: Bool = true,
         shouldSubpixelPositionFonts: Bool = true,
-        shouldSubpixelQuantizeFonts: Bool = true
+        shouldSubpixelQuantizeFonts: Bool = true,
+        maskImage: Image? = nil,
+        maskRect: Rect? = nil,
+        maskTransform: Geometry.AffineTransform? = nil
     ) {
         self.transform = transform
         self.strokeColor = strokeColor
@@ -120,6 +132,9 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         self.allowsFontSmoothing = allowsFontSmoothing
         self.shouldSubpixelPositionFonts = shouldSubpixelPositionFonts
         self.shouldSubpixelQuantizeFonts = shouldSubpixelQuantizeFonts
+        self.maskImage = maskImage
+        self.maskRect = maskRect
+        self.maskTransform = maskTransform
     }
 
     public static var defaultValidator: Validator<GraphicState> {

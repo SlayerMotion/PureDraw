@@ -101,7 +101,7 @@ public final class BitmapRenderer: Renderer, Sendable {
                     if let clip = clipPath {
                         guard clip.contains(pt, using: .winding) else { continue }
                     }
-                    blendPixel(x: x, y: y, color: color, stateAlpha: state.alpha, blendMode: state.blendMode, buffer: &buffer)
+                    blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
                 }
             }
         }
@@ -175,7 +175,7 @@ public final class BitmapRenderer: Renderer, Sendable {
                     if let clip = clipPath {
                         guard clip.contains(pt, using: .winding) else { continue }
                     }
-                    blendPixel(x: x, y: y, color: color, stateAlpha: state.alpha, blendMode: state.blendMode, buffer: &buffer)
+                    blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
                 }
             }
         }
@@ -274,7 +274,7 @@ public final class BitmapRenderer: Renderer, Sendable {
                 paramT = min(1.0, max(0.0, paramT))
 
                 let color = interpolateGradient(grad, at: paramT)
-                blendPixel(x: x, y: y, color: color, stateAlpha: state.alpha, blendMode: state.blendMode, buffer: &buffer)
+                blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
             }
         }
     }
@@ -341,7 +341,7 @@ public final class BitmapRenderer: Renderer, Sendable {
                 if let valT = paramT {
                     let clampedT = min(1.0, max(0.0, valT))
                     let color = interpolateGradient(grad, at: clampedT)
-                    blendPixel(x: x, y: y, color: color, stateAlpha: state.alpha, blendMode: state.blendMode, buffer: &buffer)
+                    blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
                 }
             }
         }
@@ -394,16 +394,43 @@ public final class BitmapRenderer: Renderer, Sendable {
                     let srcB = srcA > 0 ? (Double(layer[index + 2]) / 255.0) / srcA : 0.0
 
                     let color = Color(red: srcR, green: srcG, blue: srcB, alpha: srcA)
-                    blendPixel(x: x, y: y, color: color, stateAlpha: state.alpha, blendMode: state.blendMode, buffer: &parent)
+                    blendPixel(x: x, y: y, color: color, state: state, buffer: &parent)
                 }
             }
         }
     }
 
-    private func blendPixel(x: Int, y: Int, color: Color, stateAlpha: Double, blendMode: BlendMode, buffer: inout [UInt8]) {
+    private func blendPixel(x: Int, y: Int, color: Color, state: GraphicState, buffer: inout [UInt8]) {
         let index = (y * width + x) * 4
 
-        let srcA = color.alpha * stateAlpha
+        var maskAlpha = 1.0
+        if let maskImage = state.maskImage, let maskRect = state.maskRect, let maskTransform = state.maskTransform {
+            let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
+            let invTransform = maskTransform.inverted()
+            let userPt = pt.applying(invTransform)
+            if maskRect.contains(userPt) {
+                let u = maskRect.width > 0 ? (userPt.x - maskRect.minX) / maskRect.width : 0.0
+                let v = maskRect.height > 0 ? (userPt.y - maskRect.minY) / maskRect.height : 0.0
+                let srcX = min(maskImage.width - 1, max(0, Int(u * Double(maskImage.width))))
+                let srcY = min(maskImage.height - 1, max(0, Int(v * Double(maskImage.height))))
+                let maskColor = extractPixelColor(from: maskImage, x: srcX, y: srcY)
+
+                let hasAlpha = switch maskImage.alphaInfo {
+                case .none, .noneSkipLast, .noneSkipFirst: false
+                default: true
+                }
+
+                if hasAlpha {
+                    maskAlpha = maskColor.alpha
+                } else {
+                    maskAlpha = 0.2126 * maskColor.red + 0.7152 * maskColor.green + 0.0722 * maskColor.blue
+                }
+            } else {
+                maskAlpha = 0.0
+            }
+        }
+
+        let srcA = color.alpha * state.alpha * maskAlpha
         let srcR = color.red * srcA
         let srcG = color.green * srcA
         let srcB = color.blue * srcA
@@ -418,7 +445,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         var outB = 0.0
         var outA = 0.0
 
-        switch blendMode {
+        switch state.blendMode {
         case .normal:
             outA = srcA + dstA * (1.0 - srcA)
             outR = srcR + dstR * (1.0 - srcA)
@@ -495,30 +522,144 @@ public final class BitmapRenderer: Renderer, Sendable {
                     let srcY = min(image.height - 1, max(0, Int(v * Double(image.height))))
 
                     let color = extractPixelColor(from: image, x: srcX, y: srcY)
-                    blendPixel(x: x, y: y, color: color, stateAlpha: state.alpha, blendMode: state.blendMode, buffer: &buffer)
+                    blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
                 }
             }
         }
     }
 
     private func extractPixelColor(from image: Image, x: Int, y: Int) -> Color {
-        let index = (y * image.width + x) * 4
-        guard index + 3 < image.data.count else { return .clear }
+        let bytesPerPixel = image.bitsPerPixel / 8
+        let index = y * image.bytesPerRow + x * bytesPerPixel
+        guard index + bytesPerPixel <= image.data.count else { return .clear }
 
-        let r = Double(image.data[index]) / 255.0
-        let g = Double(image.data[index + 1]) / 255.0
-        let b = Double(image.data[index + 2]) / 255.0
-        let a = Double(image.data[index + 3]) / 255.0
+        let alphaFirst = image.alphaInfo == .first || image.alphaInfo == .premultipliedFirst || image.alphaInfo == .noneSkipFirst
+        let hasAlpha = !(image.alphaInfo == .none || image.alphaInfo == .noneSkipFirst || image.alphaInfo == .noneSkipLast)
 
-        switch image.alphaInfo {
-        case .premultipliedLast:
-            return Color(red: a > 0 ? r / a : 0.0, green: a > 0 ? g / a : 0.0, blue: a > 0 ? b / a : 0.0, alpha: a)
-        case .premultipliedFirst:
-            return Color(red: a > 0 ? r / a : 0.0, green: a > 0 ? g / a : 0.0, blue: a > 0 ? b / a : 0.0, alpha: a)
-        case .last, .first:
-            return Color(red: r, green: g, blue: b, alpha: a)
-        case .none, .noneSkipLast, .noneSkipFirst:
-            return Color(red: r, green: g, blue: b, alpha: 1.0)
+        var rawComponents: [Double] = []
+        var rawAlpha = 1.0
+
+        switch image.colorSpace {
+        case .deviceGray:
+            if bytesPerPixel >= 2 {
+                if alphaFirst {
+                    rawAlpha = Double(image.data[index]) / 255.0
+                    rawComponents = [Double(image.data[index + 1]) / 255.0]
+                } else {
+                    rawComponents = [Double(image.data[index]) / 255.0]
+                    rawAlpha = Double(image.data[index + 1]) / 255.0
+                }
+            } else if bytesPerPixel == 1 {
+                rawComponents = [Double(image.data[index]) / 255.0]
+                rawAlpha = 1.0
+            } else {
+                return .clear
+            }
+
+        case .deviceRGB:
+            if bytesPerPixel >= 4 {
+                if alphaFirst {
+                    rawAlpha = Double(image.data[index]) / 255.0
+                    rawComponents = [
+                        Double(image.data[index + 1]) / 255.0,
+                        Double(image.data[index + 2]) / 255.0,
+                        Double(image.data[index + 3]) / 255.0,
+                    ]
+                } else {
+                    rawComponents = [
+                        Double(image.data[index]) / 255.0,
+                        Double(image.data[index + 1]) / 255.0,
+                        Double(image.data[index + 2]) / 255.0,
+                    ]
+                    rawAlpha = Double(image.data[index + 3]) / 255.0
+                }
+            } else if bytesPerPixel == 3 {
+                rawComponents = [
+                    Double(image.data[index]) / 255.0,
+                    Double(image.data[index + 1]) / 255.0,
+                    Double(image.data[index + 2]) / 255.0,
+                ]
+                rawAlpha = 1.0
+            } else {
+                return .clear
+            }
+
+        case .deviceCMYK:
+            if bytesPerPixel >= 5 {
+                if alphaFirst {
+                    rawAlpha = Double(image.data[index]) / 255.0
+                    rawComponents = [
+                        Double(image.data[index + 1]) / 255.0,
+                        Double(image.data[index + 2]) / 255.0,
+                        Double(image.data[index + 3]) / 255.0,
+                        Double(image.data[index + 4]) / 255.0,
+                    ]
+                } else {
+                    rawComponents = [
+                        Double(image.data[index]) / 255.0,
+                        Double(image.data[index + 1]) / 255.0,
+                        Double(image.data[index + 2]) / 255.0,
+                        Double(image.data[index + 3]) / 255.0,
+                    ]
+                    rawAlpha = Double(image.data[index + 4]) / 255.0
+                }
+            } else if bytesPerPixel >= 4 {
+                rawComponents = [
+                    Double(image.data[index]) / 255.0,
+                    Double(image.data[index + 1]) / 255.0,
+                    Double(image.data[index + 2]) / 255.0,
+                    Double(image.data[index + 3]) / 255.0,
+                ]
+                rawAlpha = 1.0
+            } else {
+                return .clear
+            }
+        }
+
+        if let masking = image.maskingColors, masking.count == rawComponents.count * 2 {
+            var allMatch = true
+            for i in 0 ..< rawComponents.count {
+                let val = rawComponents[i]
+                let minVal = masking[2 * i]
+                let maxVal = masking[2 * i + 1]
+                if val < minVal || val > maxVal {
+                    allMatch = false
+                    break
+                }
+            }
+            if allMatch {
+                return .clear
+            }
+        }
+
+        let finalAlpha = hasAlpha ? rawAlpha : 1.0
+        let isPremultiplied = image.alphaInfo == .premultipliedLast || image.alphaInfo == .premultipliedFirst
+
+        switch image.colorSpace {
+        case .deviceGray:
+            let g = rawComponents[0]
+            let finalGray = (isPremultiplied && finalAlpha > 0) ? (g / finalAlpha) : g
+            return Color(gray: finalGray, alpha: finalAlpha)
+
+        case .deviceRGB:
+            let r = rawComponents[0]
+            let g = rawComponents[1]
+            let b = rawComponents[2]
+            let finalR = (isPremultiplied && finalAlpha > 0) ? (r / finalAlpha) : r
+            let finalG = (isPremultiplied && finalAlpha > 0) ? (g / finalAlpha) : g
+            let finalB = (isPremultiplied && finalAlpha > 0) ? (b / finalAlpha) : b
+            return Color(red: finalR, green: finalG, blue: finalB, alpha: finalAlpha)
+
+        case .deviceCMYK:
+            let c = rawComponents[0]
+            let m = rawComponents[1]
+            let y = rawComponents[2]
+            let k = rawComponents[3]
+            let finalC = (isPremultiplied && finalAlpha > 0) ? (c / finalAlpha) : c
+            let finalM = (isPremultiplied && finalAlpha > 0) ? (m / finalAlpha) : m
+            let finalY = (isPremultiplied && finalAlpha > 0) ? (y / finalAlpha) : y
+            let finalK = (isPremultiplied && finalAlpha > 0) ? (k / finalAlpha) : k
+            return Color(cyan: finalC, magenta: finalM, yellow: finalY, black: finalK, alpha: finalAlpha)
         }
     }
 }

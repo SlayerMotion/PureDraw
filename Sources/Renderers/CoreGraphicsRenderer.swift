@@ -26,16 +26,8 @@
                 case .beginTransparencyLayer:
                     targetContext.saveGState()
 
-                    // Apply CTM & Opacity & Blend Mode
-                    let t = operation.state.transform
-                    targetContext.concatenate(CGAffineTransform(
-                        a: CGFloat(t.a),
-                        b: CGFloat(t.b),
-                        c: CGFloat(t.c),
-                        d: CGFloat(t.d),
-                        tx: CGFloat(t.tx),
-                        ty: CGFloat(t.ty)
-                    ))
+                    // Apply CTM & Mask
+                    applyCTMAndMask(state: operation.state)
                     targetContext.setAlpha(CGFloat(operation.state.alpha))
                     targetContext.setBlendMode(CGBlendMode(from: operation.state.blendMode))
 
@@ -74,16 +66,8 @@
                     // 1. Push Graphics State
                     targetContext.saveGState()
 
-                    // 2. Apply CTM & Opacity
-                    let t = operation.state.transform
-                    targetContext.concatenate(CGAffineTransform(
-                        a: CGFloat(t.a),
-                        b: CGFloat(t.b),
-                        c: CGFloat(t.c),
-                        d: CGFloat(t.d),
-                        tx: CGFloat(t.tx),
-                        ty: CGFloat(t.ty)
-                    ))
+                    // 2. Apply CTM & Mask & Opacity
+                    applyCTMAndMask(state: operation.state)
                     targetContext.setAlpha(CGFloat(operation.state.alpha))
                     targetContext.setBlendMode(CGBlendMode(from: operation.state.blendMode))
 
@@ -178,40 +162,7 @@
                         )
 
                     case let .drawImage(image, rect):
-                        guard let provider = CGDataProvider(data: Data(image.data) as CFData) else {
-                            break
-                        }
-                        let cgColorSpace: CGColorSpace = switch image.colorSpace {
-                        case .deviceRGB:
-                            CGColorSpaceCreateDeviceRGB()
-                        case .deviceCMYK:
-                            CGColorSpaceCreateDeviceCMYK()
-                        case .deviceGray:
-                            CGColorSpaceCreateDeviceGray()
-                        }
-                        let cgAlphaInfo: CGImageAlphaInfo = switch image.alphaInfo {
-                        case .none: .none
-                        case .premultipliedLast: .premultipliedLast
-                        case .premultipliedFirst: .premultipliedFirst
-                        case .last: .last
-                        case .first: .first
-                        case .noneSkipLast: .noneSkipLast
-                        case .noneSkipFirst: .noneSkipFirst
-                        }
-                        let bitmapInfo = CGBitmapInfo(rawValue: cgAlphaInfo.rawValue)
-                        if let cgImage = CGImage(
-                            width: image.width,
-                            height: image.height,
-                            bitsPerComponent: image.bitsPerComponent,
-                            bitsPerPixel: image.bitsPerPixel,
-                            bytesPerRow: image.bytesPerRow,
-                            space: cgColorSpace,
-                            bitmapInfo: bitmapInfo,
-                            provider: provider,
-                            decode: nil,
-                            shouldInterpolate: true,
-                            intent: .defaultIntent
-                        ) {
+                        if let cgImage = createCGImage(from: image) {
                             targetContext.saveGState()
                             targetContext.translateBy(x: CGFloat(rect.origin.x), y: CGFloat(rect.origin.y + rect.height))
                             targetContext.scaleBy(x: 1.0, y: -1.0)
@@ -232,6 +183,75 @@
         private enum RenderingError: Error {
             case cannotCreateColorSpace
             case cannotCreateGradient
+        }
+
+        private func applyCTMAndMask(state: GraphicState) {
+            let t = state.transform
+            if let maskImage = state.maskImage,
+               let maskRect = state.maskRect,
+               let maskTransform = state.maskTransform,
+               let cgMask = createCGImage(from: maskImage)
+            {
+                let flip = Geometry.AffineTransform.identity
+                    .translatedBy(x: maskRect.origin.x, y: maskRect.origin.y + maskRect.height)
+                    .scaledBy(x: 1.0, y: -1.0)
+
+                let clipCTM = maskTransform.concatenating(flip)
+                targetContext.concatenate(CGAffineTransform(clipCTM))
+                targetContext.clip(to: CGRect(x: 0, y: 0, width: CGFloat(maskRect.width), height: CGFloat(maskRect.height)), mask: cgMask)
+
+                let remaining = clipCTM.inverted().concatenating(t)
+                targetContext.concatenate(CGAffineTransform(remaining))
+            } else {
+                targetContext.concatenate(CGAffineTransform(t))
+            }
+        }
+
+        private func createCGImage(from image: Image) -> CGImage? {
+            guard let provider = CGDataProvider(data: Data(image.data) as CFData) else {
+                return nil
+            }
+            let cgColorSpace: CGColorSpace = switch image.colorSpace {
+            case .deviceRGB:
+                CGColorSpaceCreateDeviceRGB()
+            case .deviceCMYK:
+                CGColorSpaceCreateDeviceCMYK()
+            case .deviceGray:
+                CGColorSpaceCreateDeviceGray()
+            }
+            let cgAlphaInfo: CGImageAlphaInfo = switch image.alphaInfo {
+            case .none: .none
+            case .premultipliedLast: .premultipliedLast
+            case .premultipliedFirst: .premultipliedFirst
+            case .last: .last
+            case .first: .first
+            case .noneSkipLast: .noneSkipLast
+            case .noneSkipFirst: .noneSkipFirst
+            }
+            let bitmapInfo = CGBitmapInfo(rawValue: cgAlphaInfo.rawValue)
+            guard let cgImage = CGImage(
+                width: image.width,
+                height: image.height,
+                bitsPerComponent: image.bitsPerComponent,
+                bitsPerPixel: image.bitsPerPixel,
+                bytesPerRow: image.bytesPerRow,
+                space: cgColorSpace,
+                bitmapInfo: bitmapInfo,
+                provider: provider,
+                decode: nil,
+                shouldInterpolate: true,
+                intent: .defaultIntent
+            ) else {
+                return nil
+            }
+
+            if let maskingColors = image.maskingColors {
+                let maxVal = CGFloat((1 << image.bitsPerComponent) - 1)
+                let cgMaskingColors = maskingColors.map { CGFloat($0) * maxVal }
+                return cgImage.copy(maskingColorComponents: cgMaskingColors)
+            }
+
+            return cgImage
         }
 
         private func applyFillColor(_ color: Color) {
@@ -378,6 +398,19 @@
             case .plusDarker: self = .plusDarker
             case .plusLighter: self = .plusLighter
             }
+        }
+    }
+
+    private extension CGAffineTransform {
+        init(_ t: Geometry.AffineTransform) {
+            self.init(
+                a: CGFloat(t.a),
+                b: CGFloat(t.b),
+                c: CGFloat(t.c),
+                d: CGFloat(t.d),
+                tx: CGFloat(t.tx),
+                ty: CGFloat(t.ty)
+            )
         }
     }
 #endif

@@ -403,6 +403,13 @@ public struct GraphicsContext: Sendable, Validatable {
         currentPath = Path()
     }
 
+    /// Intersects the current clipping path with the clipping mask defined by the specified image.
+    public mutating func clip(to rect: Rect, mask: Image) {
+        currentState.maskImage = mask
+        currentState.maskRect = rect
+        currentState.maskTransform = currentState.transform
+    }
+
     /// Returns a boolean value indicating whether the context's current path contains the specified point.
     ///
     /// - Parameters:
