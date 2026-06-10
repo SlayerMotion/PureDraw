@@ -52,3 +52,32 @@ struct ValidationReachTests {
         #expect((try? result.get()) == nil, "negative pattern bounds should fail validation")
     }
 }
+
+extension ValidationReachTests {
+    @Test func negativeShowTextFontSizeIsCaught() throws {
+        let font = try Font(data: MiniFont.build())
+        let op = DrawOperation(
+            kind: .showText(glyphs: [1], text: "A", font: font, fontSize: -5, drawingMode: .fill, textMatrix: .identity, position: .zero),
+            state: GraphicState()
+        )
+        #expect(throws: ValidationErrorCollection.self) { try op.validate() }
+    }
+
+    @Test func negativeGlyphIndexIsCaught() throws {
+        let font = try Font(data: MiniFont.build())
+        let op = DrawOperation(
+            kind: .showText(glyphs: [-1], text: nil, font: font, fontSize: 10, drawingMode: .fill, textMatrix: .identity, position: .zero),
+            state: GraphicState()
+        )
+        #expect(throws: ValidationErrorCollection.self) { try op.validate() }
+    }
+
+    @Test func validShowTextOperationPasses() throws {
+        let font = try Font(data: MiniFont.build())
+        let op = DrawOperation(
+            kind: .showText(glyphs: [1], text: "A", font: font, fontSize: 10, drawingMode: .fill, textMatrix: .identity, position: .zero),
+            state: GraphicState()
+        )
+        try op.validate()
+    }
+}

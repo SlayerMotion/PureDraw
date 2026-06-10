@@ -206,6 +206,32 @@ public extension Validation {
         )
     }
 
+    /// Validates a text-show operation's captured scalars: the font size must
+    /// be non-negative and glyph indices non-negative. The text matrix and
+    /// position are validated through reflection.
+    static var showTextIsValid: Validation<Document, DrawOperation> {
+        .init(
+            description: "Text-show operation parameters are valid",
+            check: { context in
+                guard case let .showText(glyphs, _, _, fontSize, _, _, _) = context.subject.kind else { return [] }
+                var errors: [ValidationError] = []
+                if fontSize < 0 {
+                    errors.append(ValidationError(
+                        reason: "showText fontSize cannot be negative",
+                        at: context.codingPath + [ValidationCodingKey("kind"), ValidationCodingKey("fontSize")]
+                    ))
+                }
+                if glyphs.contains(where: { $0 < 0 }) {
+                    errors.append(ValidationError(
+                        reason: "showText glyph indices cannot be negative",
+                        at: context.codingPath + [ValidationCodingKey("kind"), ValidationCodingKey("glyphs")]
+                    ))
+                }
+                return errors
+            }
+        )
+    }
+
     /// Validates that begin/end transparency-layer operations balance, so
     /// renderers never emit an unclosed group or drop an unmatched end.
     static var transparencyLayersAreBalanced: Validation<Document, GraphicsContext> {
