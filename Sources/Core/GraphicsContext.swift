@@ -404,6 +404,97 @@ public struct GraphicsContext: Sendable, Validatable {
     }
 
     /// Intersects the current clipping path with the clipping mask defined by the specified image.
+    // MARK: - Text State
+
+    /// The text matrix applied to shown glyphs, the `CGContext` text matrix
+    /// equivalent. Unlike the graphics state, it is not saved or restored by
+    /// `saveGState()` / `restoreGState()`.
+    public var textMatrix: Geometry.AffineTransform = .identity
+
+    /// The user-space point where the next glyph is shown.
+    public private(set) var textPosition: Point = .zero
+
+    public mutating func setFont(_ font: Font) {
+        currentState.font = font
+    }
+
+    public mutating func setFontSize(_ size: Double) {
+        currentState.fontSize = size
+    }
+
+    public mutating func setCharacterSpacing(_ spacing: Double) {
+        currentState.characterSpacing = spacing
+    }
+
+    public mutating func setTextDrawingMode(_ mode: TextDrawingMode) {
+        currentState.textDrawingMode = mode
+    }
+
+    public mutating func setTextPosition(_ position: Point) {
+        textPosition = position
+    }
+
+    // MARK: - Text Showing
+
+    /// Shows text starting at the given position, advancing the text position.
+    public mutating func showText(_ text: String, at position: Point) {
+        setTextPosition(position)
+        showText(text)
+    }
+
+    /// Shows text at the current text position, advancing it. Unmapped
+    /// characters render as the font's missing glyph.
+    public mutating func showText(_ text: String) {
+        guard let font = currentState.font else { return }
+        showGlyphs(text.unicodeScalars.map { font.glyphIndex(for: $0) ?? 0 })
+    }
+
+    /// Shows glyphs starting at the given position, advancing the text position.
+    public mutating func showGlyphs(_ glyphs: [Int], at position: Point) {
+        setTextPosition(position)
+        showGlyphs(glyphs)
+    }
+
+    /// Shows glyphs by index at the current text position. Each glyph outline
+    /// is converted to a path (so every backend renders text as vectors),
+    /// painted per the text drawing mode, and the text position advances by
+    /// the glyph's advance width plus character spacing, along the text
+    /// matrix's x axis.
+    public mutating func showGlyphs(_ glyphs: [Int]) {
+        guard let font = currentState.font, font.unitsPerEm > 0 else { return }
+        let scale = currentState.fontSize / Double(font.unitsPerEm)
+
+        for glyph in glyphs {
+            if currentState.textDrawingMode != .invisible, let outline = font.outline(forGlyph: glyph) {
+                // Font units are y-up; user space is y-down, so flip while
+                // scaling, then apply the text matrix and the pen position.
+                let placement = Geometry.AffineTransform.identity
+                    .scaledBy(x: scale, y: -scale)
+                    .concatenating(textMatrix)
+                    .translatedBy(x: textPosition.x, y: textPosition.y)
+                let placed = outline.applying(placement)
+
+                switch currentState.textDrawingMode {
+                case .fill:
+                    commands.append(DrawOperation(kind: .fill(placed, rule: .winding), state: currentState))
+                case .stroke:
+                    commands.append(DrawOperation(kind: .stroke(placed), state: currentState))
+                case .fillStroke:
+                    commands.append(DrawOperation(kind: .fill(placed, rule: .winding), state: currentState))
+                    commands.append(DrawOperation(kind: .stroke(placed), state: currentState))
+                case .invisible:
+                    break
+                }
+            }
+
+            let advance = font.advanceWidth(forGlyph: glyph) * scale + currentState.characterSpacing
+            textPosition = Point(
+                x: textPosition.x + advance * textMatrix.a,
+                y: textPosition.y + advance * textMatrix.b
+            )
+        }
+    }
+
     /// Stamps a recorded layer into the given rect, scaling its contents.
     public mutating func draw(_ layer: Layer, in rect: Rect) {
         commands.append(DrawOperation(kind: .drawLayer(layer, rect: rect), state: currentState))

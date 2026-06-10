@@ -74,6 +74,18 @@ public struct GraphicState: Equatable, Sendable, Validatable {
     /// Whether to quantize fonts at subpixel positions.
     public var shouldSubpixelQuantizeFonts: Bool
 
+    /// The font used by text-showing operations.
+    public var font: Font?
+
+    /// The text size in user-space units.
+    public var fontSize: Double
+
+    /// Extra spacing added after each shown glyph, in user-space units.
+    public var characterSpacing: Double
+
+    /// How shown text is painted.
+    public var textDrawingMode: TextDrawingMode
+
     /// The current active image-based clipping mask.
     public var maskImage: Image?
 
@@ -106,6 +118,10 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         allowsFontSmoothing: Bool = true,
         shouldSubpixelPositionFonts: Bool = true,
         shouldSubpixelQuantizeFonts: Bool = true,
+        font: Font? = nil,
+        fontSize: Double = 12.0,
+        characterSpacing: Double = 0.0,
+        textDrawingMode: TextDrawingMode = .fill,
         maskImage: Image? = nil,
         maskRect: Rect? = nil,
         maskTransform: Geometry.AffineTransform? = nil
@@ -132,6 +148,10 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         self.allowsFontSmoothing = allowsFontSmoothing
         self.shouldSubpixelPositionFonts = shouldSubpixelPositionFonts
         self.shouldSubpixelQuantizeFonts = shouldSubpixelQuantizeFonts
+        self.font = font
+        self.fontSize = fontSize
+        self.characterSpacing = characterSpacing
+        self.textDrawingMode = textDrawingMode
         self.maskImage = maskImage
         self.maskRect = maskRect
         self.maskTransform = maskTransform

@@ -102,6 +102,13 @@ public extension Validation {
                     ))
                 }
 
+                if s.fontSize < 0 {
+                    errors.append(ValidationError(
+                        reason: "fontSize cannot be negative",
+                        at: context.codingPath + [ValidationCodingKey("fontSize")]
+                    ))
+                }
+
                 if s.maskImage != nil {
                     if s.maskRect == nil {
                         errors.append(ValidationError(

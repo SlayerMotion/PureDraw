@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Font`, a pure Swift TrueType parser: `cmap` formats 0/4/6/12, short and
+  long `loca`, simple and composite `glyf` outlines decoded to `Path` values
+  in font units, `hmtx` advance widths, and `.ttc` collections. CFF-outlined
+  OpenType fonts are rejected with a clear error.
+- Text state and showing: `font`, `fontSize`, `characterSpacing`, and
+  `textDrawingMode` on the graphics state, `textMatrix`/`textPosition` on the
+  context, and `showText(_:at:)`/`showGlyphs(_:at:)` which record glyph
+  outlines as plain fill/stroke operations, so every backend renders text as
+  vectors with no per-renderer work.
 - `Layer`, the `CGLayer` equivalent: record into `layer.context`, stamp with
   `GraphicsContext.draw(_:in:)` or `draw(_:at:)`. `BitmapRenderer` rasterizes
   each layer once per pass and reuses the cached image; `CoreGraphicsRenderer`
