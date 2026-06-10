@@ -137,7 +137,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::partial --> Epic38["Epic #38: Rasterizer Quality"]:::next --> Epic13["Epic #13: Masking, Caching & Streams"]:::partial --> Epic40["Epic #40: PNG Export & Golden Tests"]:::todo --> Epic18["Epic #18: Typography & Text Layout"]:::todo --> Epic22["Epic #22: Advanced PDF Systems"]:::todo
+    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::done --> Epic38["Epic #38: Rasterizer Quality"]:::partial --> Epic13["Epic #13: Masking, Caching & Streams"]:::partial --> Epic40["Epic #40: PNG Export & Golden Tests"]:::todo --> Epic18["Epic #18: Typography & Text Layout"]:::todo --> Epic22["Epic #22: Advanced PDF Systems"]:::todo
 
     click E0 href "https://github.com/mihaelamj/PureDraw/issues/1" "E0"
     click E1 href "https://github.com/mihaelamj/PureDraw/issues/2" "E1"
@@ -200,7 +200,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    Epic39["Epic #39: Image Model Hardening"]:::partial --> I45["#45: Throwing Image.init"]:::done --> I46["#46: 8-Bit Component Rule"]:::done --> I47["#47: DeviceGray Mask Cache"]:::next
+    Epic39["Epic #39: Image Model Hardening"]:::done --> I45["#45: Throwing Image.init"]:::done --> I46["#46: 8-Bit Component Rule"]:::done --> I47["#47: DeviceGray Mask Cache"]:::done
 
     click Epic39 href "https://github.com/mihaelamj/PureDraw/issues/39" "Epic #39"
     click I45 href "https://github.com/mihaelamj/PureDraw/issues/45" "Issue #45"
@@ -218,7 +218,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    Epic38["Epic #38: Rasterizer Quality"]:::next --> I41["#41: Stroke Clip-Space Fix"]:::next --> I42["#42: Scanline AA Fill"]:::todo --> I43["#43: Miter & Bevel Joins"]:::todo --> I44["#44: Bilinear Sampling"]:::todo
+    Epic38["Epic #38: Rasterizer Quality"]:::partial --> I41["#41: Stroke Clip-Space Fix"]:::done --> I42["#42: Scanline AA Fill"]:::next --> I43["#43: Miter & Bevel Joins"]:::todo --> I44["#44: Bilinear Sampling"]:::todo
 
     click Epic38 href "https://github.com/mihaelamj/PureDraw/issues/38" "Epic #38"
     click I41 href "https://github.com/mihaelamj/PureDraw/issues/41" "Issue #41"
