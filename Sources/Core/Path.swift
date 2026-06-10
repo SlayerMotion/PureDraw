@@ -608,7 +608,7 @@ public struct Path: Equatable, Sendable, Validatable {
         (p1.x - p0.x) * (p2.y - p0.y) - (p2.x - p0.x) * (p1.y - p0.y)
     }
 
-    private func toPolygons() -> [[Point]] {
+    public func toPolygons() -> [[Point]] {
         var polygons: [[Point]] = []
         var currentPolygon: [Point] = []
         var currentPoint = Point.zero
