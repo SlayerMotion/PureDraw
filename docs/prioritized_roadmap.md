@@ -22,32 +22,34 @@ flowchart TD
     end
 
     subgraph Phase 1: Core & Geometry Extensions
-        P1_1[Issue 1: GState Settings]:::phase1
-        P1_2[Issue 2: Path Hit-Testing]:::phase1
+        P1_1["#27: GState Settings"]:::phase1
+        P1_2["#28: Path Hit-Testing"]:::phase1
     end
 
     subgraph Phase 2: Images, Masking & Streams
-        P2_1[Issue 3: CGImage & Bitmap Context]:::phase2
-        P2_2[Issue 4: Stencil & Chroma Masking]:::phase2
-        P2_3[Issue 5: CGLayer Caching]:::phase2
-        P2_4[Issue 6: Image I/O Metadata]:::phase2
-        P2_5[Issue 7: Data Streams]:::phase2
+        P2_1["Epic #9: CGImage & Bitmap Context"]:::phase2
+        subgraph Epic #13: Masking, Caching & Streams
+            P2_2["#14: Stencil & Chroma Masking"]:::phase2
+            P2_3["#15: CGLayer Caching"]:::phase2
+            P2_4["#17: Image I/O Metadata"]:::phase2
+            P2_5["#16: Data Streams"]:::phase2
+        end
     end
 
     subgraph Phase 3: Fills & Patterns
-        P3_1[Issue 8: Colored & Template Patterns]:::phase3
-        P3_2[Issue 9: Custom Math Shading]:::phase3
+        P3_1["#29: Colored & Template Patterns"]:::phase3
+        P3_2["#30: Custom Math Shading"]:::phase3
     end
 
     subgraph Phase 4: Typography
-        P4_1[Issue 10: Font Engine & Layout]:::phase4
+        P4_1["Epic #18: Font Engine & Layout"]:::phase4
     end
 
-    subgraph Phase 5: Advanced PDF Systems
-        P5_1[Issue 11: PDF Outlines & Links]:::phase5
-        P5_2[Issue 12: PDF Page Boxes]:::phase5
-        P5_3[Issue 13: PDF Content Scanning]:::phase5
-        P5_4[Issue 14: PDF Document Encryption]:::phase5
+    subgraph Phase 5: Advanced PDF Systems (Epic #22)
+        P5_1["#23: PDF Outlines & Links"]:::phase5
+        P5_2["#24: PDF Page Boxes"]:::phase5
+        P5_3["#25: PDF Content Scanning"]:::phase5
+        P5_4["#26: PDF Document Encryption"]:::phase5
     end
 
     E3 --> TL
@@ -73,6 +75,21 @@ flowchart TD
     P5_1 --> P5_2
     P5_2 --> P5_3
     P5_3 --> P5_4
+
+    click P1_1 href "https://github.com/mihaelamj/PureDraw/issues/27" "Issue #27"
+    click P1_2 href "https://github.com/mihaelamj/PureDraw/issues/28" "Issue #28"
+    click P2_1 href "https://github.com/mihaelamj/PureDraw/issues/9" "Epic #9"
+    click P2_2 href "https://github.com/mihaelamj/PureDraw/issues/14" "Issue #14"
+    click P2_3 href "https://github.com/mihaelamj/PureDraw/issues/15" "Issue #15"
+    click P2_4 href "https://github.com/mihaelamj/PureDraw/issues/17" "Issue #17"
+    click P2_5 href "https://github.com/mihaelamj/PureDraw/issues/16" "Issue #16"
+    click P3_1 href "https://github.com/mihaelamj/PureDraw/issues/29" "Issue #29"
+    click P3_2 href "https://github.com/mihaelamj/PureDraw/issues/30" "Issue #30"
+    click P4_1 href "https://github.com/mihaelamj/PureDraw/issues/18" "Epic #18"
+    click P5_1 href "https://github.com/mihaelamj/PureDraw/issues/23" "Issue #23"
+    click P5_2 href "https://github.com/mihaelamj/PureDraw/issues/24" "Issue #24"
+    click P5_3 href "https://github.com/mihaelamj/PureDraw/issues/25" "Issue #25"
+    click P5_4 href "https://github.com/mihaelamj/PureDraw/issues/26" "Issue #26"
 ```
 
 ---
