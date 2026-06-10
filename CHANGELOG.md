@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Gradient(samples:_:)` builds a gradient from a procedural color function,
+  the `CGFunction` shading equivalent, sampled into ordinary stops so every
+  backend renders it unchanged.
 - PDF document features on `PDFRenderer`: page boundary boxes (CropBox,
   BleedBox, TrimBox, ArtBox) with a `drawingTransform` fit calculator, link
   annotations (`PDFLink`: URI or internal destination), hierarchical outlines
