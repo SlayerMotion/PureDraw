@@ -11,6 +11,24 @@ This document defines ready-to-file GitHub issues to address all missing feature
 ### Description
 Introduce a native structure representing raw raster pixel data (RGBA) and a bitmap graphics context to render paths onto pixel memory buffers.
 
+```mermaid
+flowchart TD
+    Epic9["Epic #9: Bitmap Images & Rasterization"]:::epic --> I10["#10: Raw Pixel Buffer Structure"]:::issue
+    Epic9 --> I11["#11: Bitmap Context Renderer"]:::issue
+    Epic9 --> I12["#12: Image Drawing on Context"]:::issue
+    
+    I10 --> I11
+    I10 --> I12
+    I11 --> I12
+
+    classDef epic fill:#5856d6,stroke:#000,color:#fff,stroke-width:2px;
+    classDef issue fill:#007aff,stroke:#000,color:#fff;
+    click Epic9 href "https://github.com/mihaelamj/PureDraw/issues/9" "Epic #9"
+    click I10 href "https://github.com/mihaelamj/PureDraw/issues/10" "Issue #10"
+    click I11 href "https://github.com/mihaelamj/PureDraw/issues/11" "Issue #11"
+    click I12 href "https://github.com/mihaelamj/PureDraw/issues/12" "Issue #12"
+```
+
 ### Child Issues
 
 #### Issue 1a: `feat: implement raw pixel image buffer structure (CGImage equivalent)`
@@ -35,6 +53,24 @@ Introduce a native structure representing raw raster pixel data (RGBA) and a bit
 
 ### Description
 Support image-based clipping masks, hardware-optimized cached drawing layers, and generic data streams for file/memory access.
+
+```mermaid
+flowchart TD
+    Epic13["Epic #13: Masking, Caching & Streams"]:::epic --> I14["#14: Stencil & Chroma Masking"]:::issue
+    Epic13 --> I15["#15: CGLayer Caching"]:::issue
+    Epic13 --> I16["#16: Data Providers & Consumers"]:::issue
+    Epic13 --> I17["#17: Image I/O Metadata"]:::issue
+    
+    I16 --> I17
+
+    classDef epic fill:#5856d6,stroke:#000,color:#fff,stroke-width:2px;
+    classDef issue fill:#007aff,stroke:#000,color:#fff;
+    click Epic13 href "https://github.com/mihaelamj/PureDraw/issues/13" "Epic #13"
+    click I14 href "https://github.com/mihaelamj/PureDraw/issues/14" "Issue #14"
+    click I15 href "https://github.com/mihaelamj/PureDraw/issues/15" "Issue #15"
+    click I16 href "https://github.com/mihaelamj/PureDraw/issues/16" "Issue #16"
+    click I17 href "https://github.com/mihaelamj/PureDraw/issues/17" "Issue #17"
+```
 
 ### Child Issues
 
@@ -65,6 +101,23 @@ Support image-based clipping masks, hardware-optimized cached drawing layers, an
 ### Description
 Support loading font files (TTF/OTF), managing text transformations, measuring layout bounds, and showing text glyphs.
 
+```mermaid
+flowchart TD
+    Epic18["Epic #18: Typography & Text Layout"]:::epic --> I19["#19: Font File Parser & Glyphs"]:::issue
+    Epic18 --> I20["#20: Text State Stack & Matrix"]:::issue
+    Epic18 --> I21["#21: Text Showing Context Operations"]:::issue
+    
+    I19 --> I21
+    I20 --> I21
+
+    classDef epic fill:#5856d6,stroke:#000,color:#fff,stroke-width:2px;
+    classDef issue fill:#007aff,stroke:#000,color:#fff;
+    click Epic18 href "https://github.com/mihaelamj/PureDraw/issues/18" "Epic #18"
+    click I19 href "https://github.com/mihaelamj/PureDraw/issues/19" "Issue #19"
+    click I20 href "https://github.com/mihaelamj/PureDraw/issues/20" "Issue #20"
+    click I21 href "https://github.com/mihaelamj/PureDraw/issues/21" "Issue #21"
+```
+
 ### Child Issues
 
 #### Issue 3a: `feat: implement font file parser and glyph registration`
@@ -89,6 +142,26 @@ Support loading font files (TTF/OTF), managing text transformations, measuring l
 
 ### Description
 Extend the PDF engine with outlines, page bounds, content scanning/parsing, and security decryption.
+
+```mermaid
+flowchart TD
+    Epic22["Epic #22: Advanced PDF Systems"]:::epic --> I23["#23: PDF Outlines & Hyperlinks"]:::issue
+    Epic22 --> I24["#24: PDF Page Boxes & Transforms"]:::issue
+    Epic22 --> I25["#25: Low-Level PDF Scanning"]:::issue
+    Epic22 --> I26["#26: PDF Encryption & Permissions"]:::issue
+    
+    I23 --> I24
+    I24 --> I25
+    I25 --> I26
+
+    classDef epic fill:#5856d6,stroke:#000,color:#fff,stroke-width:2px;
+    classDef issue fill:#007aff,stroke:#000,color:#fff;
+    click Epic22 href "https://github.com/mihaelamj/PureDraw/issues/22" "Epic #22"
+    click I23 href "https://github.com/mihaelamj/PureDraw/issues/23" "Issue #23"
+    click I24 href "https://github.com/mihaelamj/PureDraw/issues/24" "Issue #24"
+    click I25 href "https://github.com/mihaelamj/PureDraw/issues/25" "Issue #25"
+    click I26 href "https://github.com/mihaelamj/PureDraw/issues/26" "Issue #26"
+```
 
 ### Child Issues
 
