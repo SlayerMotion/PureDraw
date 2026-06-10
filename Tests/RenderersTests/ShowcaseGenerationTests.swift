@@ -32,7 +32,7 @@ struct ShowcaseGenerationTests {
         drawShadowTransparency(&ctx, font: font, originY: 270)
         drawCrumple(&ctx, font: font, originY: 452)
         drawPerspective(&ctx, font: font, originY: 452)
-        drawPatternStrip(&ctx, font: font, originY: 636)
+        drawScarf(&ctx, font: font, originY: 648)
         drawFooter(&ctx, font: font, width: width, height: height)
 
         let data = try PDFRenderer(width: width, height: height).render(ctx)
@@ -288,26 +288,55 @@ struct ShowcaseGenerationTests {
         }
     }
 
-    /// A tiling pattern fill inside a continuous-corner panel.
-    private func drawPatternStrip(_ ctx: inout GraphicsContext, font: Font?, originY: Double) {
-        label(&ctx, font: font, "PATTERNS  (tiled cell fills)", x: 40, y: originY)
-        let pattern = Pattern(bounds: Rect(x: 0, y: 0, width: 22, height: 22), isColored: true)
-        pattern.context.setFillColor(Color(red: 0.25, green: 0.85, blue: 0.7))
-        pattern.context.addEllipse(in: Rect(x: 3, y: 3, width: 12, height: 12))
-        pattern.context.fillPath()
-        pattern.context.setFillColor(Color(red: 0.95, green: 0.5, blue: 0.3, alpha: 0.9))
-        pattern.context.addRect(Rect(x: 14, y: 14, width: 6, height: 6))
-        pattern.context.fillPath()
+    /// A flowing scarf: overlapping wavy translucent bands in Apple system
+    /// colors, each with a gradient sheen and a soft drop shadow, so the
+    /// overlaps blend like draped fabric.
+    private func drawScarf(_ ctx: inout GraphicsContext, font: Font?, originY: Double) {
+        label(&ctx, font: font, "SCARF  (curves + transparency + shadows)", x: 40, y: originY)
+        let left = 56.0
+        let right = 556.0
+        let bandHeight = 30.0
+        // Apple system colors.
+        let bands: [(y: Double, amp: Double, phase: Double, color: Color)] = [
+            (originY + 34, 14, 0.0, Color(red: 1.00, green: 0.18, blue: 0.33)), // systemPink
+            (originY + 48, 16, 1.1, Color(red: 1.00, green: 0.58, blue: 0.00)), // systemOrange
+            (originY + 62, 13, 2.3, Color(red: 0.35, green: 0.34, blue: 0.84)), // systemIndigo
+            (originY + 76, 15, 3.4, Color(red: 0.19, green: 0.69, blue: 0.78)), // systemTeal
+        ]
+        let freq = 2.0 * .pi / 210.0
+        for band in bands {
+            func wave(_ x: Double, _ offset: Double) -> Double {
+                band.y + offset + band.amp * sin(freq * x + band.phase)
+            }
+            var path = Path()
+            let steps = 80
+            path.move(to: Point(x: left, y: wave(left, 0)))
+            for i in 1 ... steps {
+                let x = left + (right - left) * Double(i) / Double(steps)
+                path.addLine(to: Point(x: x, y: wave(x, 0)))
+            }
+            for i in stride(from: steps, through: 0, by: -1) {
+                let x = left + (right - left) * Double(i) / Double(steps)
+                path.addLine(to: Point(x: x, y: wave(x, bandHeight)))
+            }
+            path.closeSubpath()
 
-        let panel = Rect(x: 40, y: originY + 14, width: 532, height: 150)
-        ctx.saveGState()
-        ctx.setShadow(offset: Point(x: 0, y: 8), blur: 14, color: Color(red: 0, green: 0, blue: 0, alpha: 0.5))
-        var clip = Path()
-        clip.addAppleRoundedRect(in: panel, cornerRadius: 30)
-        ctx.setFillPattern(pattern)
-        ctx.addPath(clip)
-        ctx.fillPath()
-        ctx.restoreGState()
+            // Soft drop shadow, then a translucent gradient-sheened fill.
+            ctx.saveGState()
+            ctx.setShadow(offset: Point(x: 0, y: 7), blur: 12, color: Color(red: 0, green: 0, blue: 0, alpha: 0.45))
+            ctx.addPath(path)
+            ctx.clip()
+            let sheen = Gradient(stops: [
+                GradientStop(color: shade(band.color, 1.15, alpha: 0.78), location: 0),
+                GradientStop(color: shade(band.color, 0.65, alpha: 0.78), location: 1),
+            ])
+            ctx.drawLinearGradient(sheen, start: Point(x: left, y: band.y), end: Point(x: left, y: band.y + bandHeight))
+            ctx.restoreGState()
+        }
+    }
+
+    private func shade(_ c: Color, _ k: Double, alpha: Double) -> Color {
+        Color(red: min(1, c.red * k), green: min(1, c.green * k), blue: min(1, c.blue * k), alpha: alpha)
     }
 
     private func drawFooter(_ ctx: inout GraphicsContext, font: Font?, width _: Double, height: Double) {
