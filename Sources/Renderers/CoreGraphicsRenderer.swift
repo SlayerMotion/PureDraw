@@ -245,10 +245,11 @@
                 return nil
             }
 
-            if let maskingColors = image.maskingColors {
+            if let maskingColors = image.maskingColors, !image.alphaInfo.hasAlpha {
                 let maxVal = CGFloat((1 << image.bitsPerComponent) - 1)
                 let cgMaskingColors = maskingColors.map { CGFloat($0) * maxVal }
-                return cgImage.copy(maskingColorComponents: cgMaskingColors)
+                // copy(maskingColorComponents:) returns nil for unsupported layouts; draw unmasked rather than dropping the image.
+                return cgImage.copy(maskingColorComponents: cgMaskingColors) ?? cgImage
             }
 
             return cgImage

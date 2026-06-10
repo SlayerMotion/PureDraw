@@ -415,12 +415,7 @@ public final class BitmapRenderer: Renderer, Sendable {
                 let srcY = min(maskImage.height - 1, max(0, Int(v * Double(maskImage.height))))
                 let maskColor = extractPixelColor(from: maskImage, x: srcX, y: srcY)
 
-                let hasAlpha = switch maskImage.alphaInfo {
-                case .none, .noneSkipLast, .noneSkipFirst: false
-                default: true
-                }
-
-                if hasAlpha {
+                if maskImage.alphaInfo.hasAlpha {
                     maskAlpha = maskColor.alpha
                 } else {
                     maskAlpha = 0.2126 * maskColor.red + 0.7152 * maskColor.green + 0.0722 * maskColor.blue
@@ -533,8 +528,8 @@ public final class BitmapRenderer: Renderer, Sendable {
         let index = y * image.bytesPerRow + x * bytesPerPixel
         guard index + bytesPerPixel <= image.data.count else { return .clear }
 
-        let alphaFirst = image.alphaInfo == .first || image.alphaInfo == .premultipliedFirst || image.alphaInfo == .noneSkipFirst
-        let hasAlpha = !(image.alphaInfo == .none || image.alphaInfo == .noneSkipFirst || image.alphaInfo == .noneSkipLast)
+        let alphaFirst = image.alphaInfo.isAlphaFirst
+        let hasAlpha = image.alphaInfo.hasAlpha
 
         var rawComponents: [Double] = []
         var rawAlpha = 1.0
@@ -616,7 +611,8 @@ public final class BitmapRenderer: Renderer, Sendable {
             }
         }
 
-        if let masking = image.maskingColors, masking.count == rawComponents.count * 2 {
+        // CoreGraphics applies masking colors only to images without alpha; match that here.
+        if let masking = image.maskingColors, !hasAlpha, masking.count == rawComponents.count * 2 {
             var allMatch = true
             for i in 0 ..< rawComponents.count {
                 let val = rawComponents[i]
@@ -633,7 +629,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         }
 
         let finalAlpha = hasAlpha ? rawAlpha : 1.0
-        let isPremultiplied = image.alphaInfo == .premultipliedLast || image.alphaInfo == .premultipliedFirst
+        let isPremultiplied = image.alphaInfo.isPremultiplied
 
         switch image.colorSpace {
         case .deviceGray:

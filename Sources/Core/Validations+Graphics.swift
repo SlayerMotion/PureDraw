@@ -275,6 +275,12 @@ public extension Validation {
                 }
 
                 if let maskingColors = img.maskingColors {
+                    if img.alphaInfo.hasAlpha {
+                        errors.append(ValidationError(
+                            reason: "maskingColors requires an image without an alpha channel (alphaInfo .none, .noneSkipLast, or .noneSkipFirst)",
+                            at: context.codingPath + [ValidationCodingKey("maskingColors")]
+                        ))
+                    }
                     let expectedCount = switch img.colorSpace {
                     case .deviceRGB: 6
                     case .deviceGray: 2
