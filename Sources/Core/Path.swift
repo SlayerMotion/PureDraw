@@ -192,8 +192,14 @@ public struct Path: Equatable, Sendable, Validatable {
     /// Each corner is three cubic Bézier segments (an ease-in, a shortened
     /// circular arc, and a symmetric ease-out), and consumes `(1 + smoothing)`
     /// times the radius along each edge. `smoothing` runs 0 (circular) to 1
-    /// (maximum); 0.6 matches the iOS app-icon corner. The construction
-    /// follows Figma's reverse-engineering of Apple's corners.
+    /// (maximum). This is the established tunable construction shared by
+    /// Figma's corner smoothing and SwiftUI's `RoundedCornerStyle.continuous`.
+    ///
+    /// `smoothing` 0.6 is the common default; Apple's measured app-icon corner
+    /// consumes about `1.53` times the radius, i.e. `smoothing` ≈ 0.53. Note
+    /// that Apple's exact corner is a fixed-ratio Bézier, not a superellipse:
+    /// a superellipse fits Apple's real corner *worse* than a plain circle, so
+    /// this Bézier construction is the right model.
     public mutating func addContinuousRoundedRect(in rect: Rect, cornerRadius: Double, smoothing: Double = 0.6) {
         let budget = min(rect.width, rect.height) / 2.0
         let radius = min(abs(cornerRadius), budget)
@@ -233,10 +239,18 @@ public struct Path: Equatable, Sendable, Validatable {
             // Shortened circular arc, as one cubic with matched tangents.
             let arcEnd = at(end1, arcSectionLength, arcSectionLength)
             let handle = (4.0 / 3.0) * tan(arcMeasure / 4.0 * .pi / 180.0) * radius
-            let tStartLen = (c * c + d * d).squareRoot()
-            let tEndLen = (d * d + c * c).squareRoot()
-            let startTangent = Point(x: (c * e.x + d * f.x) / tStartLen, y: (c * e.y + d * f.y) / tStartLen)
-            let endTangent = Point(x: (d * e.x + c * f.x) / tEndLen, y: (d * e.y + c * f.y) / tEndLen)
+            // When the ease segments vanish (smoothing 0, a pure arc), the
+            // arc tangents are simply the edge directions e and f.
+            let tangentLen = (c * c + d * d).squareRoot()
+            let startTangent: Point
+            let endTangent: Point
+            if tangentLen > 1e-9 {
+                startTangent = Point(x: (c * e.x + d * f.x) / tangentLen, y: (c * e.y + d * f.y) / tangentLen)
+                endTangent = Point(x: (d * e.x + c * f.x) / tangentLen, y: (d * e.y + c * f.y) / tangentLen)
+            } else {
+                startTangent = e
+                endTangent = f
+            }
             addCurve(
                 to: arcEnd,
                 control1: Point(x: end1.x + handle * startTangent.x, y: end1.y + handle * startTangent.y),

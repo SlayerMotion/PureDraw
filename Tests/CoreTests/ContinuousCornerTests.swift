@@ -96,3 +96,37 @@ struct ContinuousCornerTests {
         #expect(abs(box.minX - rect.minX) < 0.5 && abs(box.maxX - rect.maxX) < 0.5)
     }
 }
+
+extension ContinuousCornerTests {
+    @Test func largeRadiusDegradesToCircleWithoutBreaking() {
+        // At radius = half the short side, the corner must reduce to a clean
+        // circle (no self-intersection or NaN), not a degenerate shape.
+        var path = Path()
+        path.addContinuousRoundedRect(in: Rect(x: 0, y: 0, width: 100, height: 100), cornerRadius: 50, smoothing: 1.0)
+        let box = path.boundingBox
+        #expect(box.minX >= -0.01 && box.maxX <= 100.01)
+        #expect(box.minY >= -0.01 && box.maxY <= 100.01)
+        // Every control point is finite.
+        let allFinite = path.elements.allSatisfy { element in
+            switch element {
+            case let .move(p), let .line(p): p.x.isFinite && p.y.isFinite
+            case let .quadCurve(p, c): p.x.isFinite && c.x.isFinite
+            case let .cubicCurve(p, c1, c2): p.x.isFinite && c1.x.isFinite && c2.x.isFinite
+            case .close: true
+            }
+        }
+        #expect(allFinite)
+    }
+
+    @Test func appleEdgeConsumptionMatchesMeasuredRatio() {
+        // Apple's measured corner consumes ~1.5287r; smoothing 0.5287 hits it.
+        var path = Path()
+        path.addContinuousRoundedRect(in: Rect(x: 0, y: 0, width: 400, height: 400), cornerRadius: 80, smoothing: 0.528665)
+        guard case let .move(start) = path.elements.first else {
+            Issue.record("expected a leading move")
+            return
+        }
+        // p = (1 + 0.528665) * 80 = 122.2932
+        #expect(abs(start.x - 122.2932) < 0.01)
+    }
+}
