@@ -1,63 +1,52 @@
-# Public Swift coding rules (canonical)
+# Agent guide for PureDraw
 
-The canonical, scrubbed coding rules for public Swift repos. Each file is one rule
-area. This is the source of truth for the public rule set; the drop-in kit at
-`../../templates/public-swift-repo/` is assembled from here by
-`scripts/assemble-public-template.sh`.
+PureDraw is a dependency-free, Swift-native 2D vector graphics engine: a
+"Virtual PostScript Machine" API compatible with CoreGraphics (Quartz) and the
+HTML5 Canvas. Read this file first, then load rules from `docs/rules/` as the
+task requires.
 
-`CONVENTIONS.md` is the short overview; this folder is the full set. Examples use a
-sample tile-based static site generator; replace the example names with your
-project's when you adopt these.
+## Hard constraints
 
-## Always relevant (engine, today)
+- **Zero external dependencies.** `Package.swift` must keep an empty
+  dependency list. Do not add SPM packages.
+- **Pure Swift.** No bundled C/C++ sources.
+- **No Foundation in the core targets.** Foundation is allowed only where the
+  target already imports it (renderer outputs, tests).
+- **Cross-platform.** The library builds on macOS, Linux, Windows, and WASM;
+  platform-specific code (CoreGraphics) stays behind `#if canImport` gates.
 
-- [engineering.md](engineering.md) - the engineering bar: progressive
-  architecture, impossible states unrepresentable, testable by design.
-- [code-style.md](code-style.md) - namespacing discipline, file naming,
-  one-type-per-file.
-- [namespacing.md](namespacing.md) - caseless `enum` vs `struct` vs `class` for
-  namespace anchors.
-- [dependency-injection.md](dependency-injection.md) - no singletons, inject every
-  collaborator through `init`, protocol seams.
-- [concurrency.md](concurrency.md) - Swift 6 strict concurrency: `Sendable`,
-  actors, `@MainActor`.
-- [cross-platform.md](cross-platform.md) - the core builds on macOS and Linux;
-  guard platform-divergent code behind a protocol seam.
-- [linux-server.md](linux-server.md) - server-side operational rules for the
-  `serve` command and any networking.
-- [testing.md](testing.md) - Swift Testing, `@Test` / `#expect`, test isolation.
-- [testing-discipline.md](testing-discipline.md) - run the suite on every code
-  change; write tests where none exist.
-- [verification.md](verification.md) - no completion claim without fresh command
-  output.
-- [systematic-debugging.md](systematic-debugging.md) - reproduce, isolate,
-  explain, fix.
-- [documentation.md](documentation.md) - DocC catalogs and `///` requirements.
-- [documentation-search.md](documentation-search.md) - the cupertino doc index is
-  an FTS search engine, not an agent: query it with keywords and read the results
-  for Apple-API facts; never ask it to reason.
-- [file-naming.md](file-naming.md) - filename conventions.
-- [folder-grouping.md](folder-grouping.md) - when to flatten one-file folders.
-- [package-structure.md](package-structure.md) - workspace and package layout: one
-  `Package.swift` under `Packages/`, many targets, `Apps/` for app targets.
-- [package-architecture.md](package-architecture.md) - single-responsibility
-  targets with unidirectional dependencies.
-- [package-import-contract.md](package-import-contract.md) - per-target allowed
-  imports; applies now, the engine and CLI are already two targets.
-- [shared-protocols.md](shared-protocols.md) - the cross-target protocol seam.
+## Layout
 
-Open decisions live in [docs/decisions/](../decisions/).
+- `Sources/Validation` -> `Sources/Geometry` -> `Sources/Core` ->
+  `Sources/Renderers` -> `Sources/PureDraw` (umbrella). Dependencies point one
+  direction only.
+- Tests live in `Tests/<Target>Tests` and use Swift Testing
+  (`@Test`, `#expect`).
+- `docs/DESIGN.md` explains the architecture; the Quartz feature roadmap is in
+  `docs/prioritized_roadmap.md`.
 
-## Git and process
+## Commands
 
-- [commits.md](commits.md) - Conventional Commits format.
-- [git-discipline.md](git-discipline.md) - issues, labels, PRs, branches, commits,
-  remotes.
+- `swift build` - build all targets
+- `swift test` - run the full suite
+- `swiftformat . --config .swiftformat` - format before committing
+- `swiftlint --config .swiftlint.yml` - lint
+- `scripts/check-all.sh` - the aggregate gate CI runs; keep it green
+- Git hooks: `git config core.hooksPath .githooks` (run once per clone)
 
-## The planned native macOS and iOS editor
+## Rules
 
-- [views.md](views.md) - SwiftUI view architecture and identity.
-- [view-models.md](view-models.md) - ViewModel responsibilities and patterns.
-- [components.md](components.md) - the component system.
-- [colors.md](colors.md) - the color system.
-- [fonts.md](fonts.md) - font registration in SPM packages.
+The full rule set lives in [docs/rules/](docs/rules/); the index is
+[docs/rules/README.md](docs/rules/README.md) and the short overview is
+[docs/rules/CONVENTIONS.md](docs/rules/CONVENTIONS.md). Always relevant here:
+
+- [docs/rules/engineering.md](docs/rules/engineering.md)
+- [docs/rules/code-style.md](docs/rules/code-style.md)
+- [docs/rules/namespacing.md](docs/rules/namespacing.md)
+- [docs/rules/concurrency.md](docs/rules/concurrency.md)
+- [docs/rules/cross-platform.md](docs/rules/cross-platform.md)
+- [docs/rules/testing.md](docs/rules/testing.md)
+- [docs/rules/testing-discipline.md](docs/rules/testing-discipline.md)
+- [docs/rules/verification.md](docs/rules/verification.md)
+- [docs/rules/commits.md](docs/rules/commits.md)
+- [docs/rules/git-discipline.md](docs/rules/git-discipline.md)

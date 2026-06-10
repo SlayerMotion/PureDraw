@@ -1,11 +1,19 @@
-# Rules
+# PureDraw
 
-This folder holds shared rules consumed by other repos via `@`-import from `AGENTS.md`.
+Dependency-free, Swift-native 2D vector graphics engine. The agent entry point
+is [AGENTS.md](AGENTS.md); the full rule set is indexed in
+[docs/rules/README.md](docs/rules/README.md).
 
-- Entry point for AI agents: `AGENTS.md` (lists every rule file under `swift/` and `universal/`)
-- Swift-specific rules: `swift/<rule>.md` (and `swift/exp/<file>.md` for the ExtremePackaging folder)
-- Cross-cutting rules: `universal/<rule>.md`
-- Trigger guide for self-direction: `universal/rule-loading.md`
-- Global config that pulls these into `~/.claude/CLAUDE.md` on every Mac: `mihaela-agents/GLOBAL_CLAUDE.md`
+Non-negotiables for any change in this repo:
 
-Communication, attribution, voice-alert, and writing-style rules are global and live in `mihaela-agents/GLOBAL_CLAUDE.md`, not here.
+- No external SPM dependencies, no C/C++ sources, no Foundation in the core
+  targets.
+- Dependencies flow one direction: Validation -> Geometry -> Core -> Renderers
+  -> PureDraw.
+- Renderer backends must stay consistent with each other: a context rendered by
+  `BitmapRenderer` and `CoreGraphicsRenderer` should produce the same picture.
+- Format (`swiftformat . --config .swiftformat`), lint
+  (`swiftlint --config .swiftlint.yml`), and run `swift test` before every
+  commit; `scripts/check-all.sh` is the aggregate gate.
+- Commits follow `<type>(<scope>): summary` per
+  [docs/rules/commits.md](docs/rules/commits.md).
