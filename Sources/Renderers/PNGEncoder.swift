@@ -13,6 +13,11 @@ import Core
 /// `Image.pixelColor(x:y:)`, so any supported source layout round-trips to
 /// straight (non-premultiplied) RGBA.
 public enum PNGEncoder {
+    /// Encodes the image and writes the result to a data consumer.
+    public static func encode(_ image: Image, to consumer: DataConsumer) {
+        consumer.write(encode(image))
+    }
+
     public static func encode(_ image: Image) -> [UInt8] {
         var raw: [UInt8] = []
         raw.reserveCapacity(image.height * (1 + image.width * 4))
