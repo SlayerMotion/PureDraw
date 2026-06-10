@@ -137,7 +137,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic13["Epic #13: Masking, Caching & Streams"]:::partial --> Epic18["Epic #18: Typography & Text Layout"]:::todo --> Epic22["Epic #22: Advanced PDF Systems"]:::todo
+    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::partial --> Epic38["Epic #38: Rasterizer Quality"]:::next --> Epic13["Epic #13: Masking, Caching & Streams"]:::partial --> Epic40["Epic #40: PNG Export & Golden Tests"]:::todo --> Epic18["Epic #18: Typography & Text Layout"]:::todo --> Epic22["Epic #22: Advanced PDF Systems"]:::todo
 
     click E0 href "https://github.com/mihaelamj/PureDraw/issues/1" "E0"
     click E1 href "https://github.com/mihaelamj/PureDraw/issues/2" "E1"
@@ -146,7 +146,10 @@ flowchart TB
     click P1_1 href "https://github.com/mihaelamj/PureDraw/issues/27" "Issue #27"
     click P1_2 href "https://github.com/mihaelamj/PureDraw/issues/28" "Issue #28"
     click Epic9 href "https://github.com/mihaelamj/PureDraw/issues/9" "Epic #9"
+    click Epic39 href "https://github.com/mihaelamj/PureDraw/issues/39" "Epic #39"
+    click Epic38 href "https://github.com/mihaelamj/PureDraw/issues/38" "Epic #38"
     click Epic13 href "https://github.com/mihaelamj/PureDraw/issues/13" "Epic #13"
+    click Epic40 href "https://github.com/mihaelamj/PureDraw/issues/40" "Epic #40"
     click Epic18 href "https://github.com/mihaelamj/PureDraw/issues/18" "Epic #18"
     click Epic22 href "https://github.com/mihaelamj/PureDraw/issues/22" "Epic #22"
 ```
@@ -187,6 +190,43 @@ flowchart TB
     click I12 href "https://github.com/mihaelamj/PureDraw/issues/12" "Issue #12"
 ```
 
+### Epic #39: Image Model Hardening
+```mermaid
+flowchart TB
+    classDef done    fill:#34C759,color:#FFFFFF
+    classDef active  fill:#007AFF,color:#FFFFFF
+    classDef review  fill:#30B0C7,color:#FFFFFF
+    classDef next    fill:#5856D6,color:#FFFFFF
+    classDef partial fill:#FF9500,color:#FFFFFF
+    classDef todo    fill:#8E8E93,color:#FFFFFF
+
+    Epic39["Epic #39: Image Model Hardening"]:::partial --> I45["#45: Throwing Image.init"]:::done --> I46["#46: 8-Bit Component Rule"]:::done --> I47["#47: DeviceGray Mask Cache"]:::next
+
+    click Epic39 href "https://github.com/mihaelamj/PureDraw/issues/39" "Epic #39"
+    click I45 href "https://github.com/mihaelamj/PureDraw/issues/45" "Issue #45"
+    click I46 href "https://github.com/mihaelamj/PureDraw/issues/46" "Issue #46"
+    click I47 href "https://github.com/mihaelamj/PureDraw/issues/47" "Issue #47"
+```
+
+### Epic #38: Rasterizer Quality & Correctness
+```mermaid
+flowchart TB
+    classDef done    fill:#34C759,color:#FFFFFF
+    classDef active  fill:#007AFF,color:#FFFFFF
+    classDef review  fill:#30B0C7,color:#FFFFFF
+    classDef next    fill:#5856D6,color:#FFFFFF
+    classDef partial fill:#FF9500,color:#FFFFFF
+    classDef todo    fill:#8E8E93,color:#FFFFFF
+
+    Epic38["Epic #38: Rasterizer Quality"]:::next --> I41["#41: Stroke Clip-Space Fix"]:::next --> I42["#42: Scanline AA Fill"]:::todo --> I43["#43: Miter & Bevel Joins"]:::todo --> I44["#44: Bilinear Sampling"]:::todo
+
+    click Epic38 href "https://github.com/mihaelamj/PureDraw/issues/38" "Epic #38"
+    click I41 href "https://github.com/mihaelamj/PureDraw/issues/41" "Issue #41"
+    click I42 href "https://github.com/mihaelamj/PureDraw/issues/42" "Issue #42"
+    click I43 href "https://github.com/mihaelamj/PureDraw/issues/43" "Issue #43"
+    click I44 href "https://github.com/mihaelamj/PureDraw/issues/44" "Issue #44"
+```
+
 ### Epic #13: Image Masking, Caching & Data Streams
 ```mermaid
 flowchart TB
@@ -204,6 +244,23 @@ flowchart TB
     click I15 href "https://github.com/mihaelamj/PureDraw/issues/15" "Issue #15"
     click I16 href "https://github.com/mihaelamj/PureDraw/issues/16" "Issue #16"
     click I17 href "https://github.com/mihaelamj/PureDraw/issues/17" "Issue #17"
+```
+
+### Epic #40: PNG Export & Golden-Image Tests
+```mermaid
+flowchart TB
+    classDef done    fill:#34C759,color:#FFFFFF
+    classDef active  fill:#007AFF,color:#FFFFFF
+    classDef review  fill:#30B0C7,color:#FFFFFF
+    classDef next    fill:#5856D6,color:#FFFFFF
+    classDef partial fill:#FF9500,color:#FFFFFF
+    classDef todo    fill:#8E8E93,color:#FFFFFF
+
+    Epic40["Epic #40: PNG Export & Golden Tests"]:::todo --> I48["#48: PNG Encoder"]:::todo --> I49["#49: Golden-Image CI Suite"]:::todo
+
+    click Epic40 href "https://github.com/mihaelamj/PureDraw/issues/40" "Epic #40"
+    click I48 href "https://github.com/mihaelamj/PureDraw/issues/48" "Issue #48"
+    click I49 href "https://github.com/mihaelamj/PureDraw/issues/49" "Issue #49"
 ```
 
 ### Epic #18: Typography and Text Layout Engine
