@@ -137,7 +137,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::next --> Epic13["Epic #13: Masking, Caching & Streams"]:::todo --> Epic18["Epic #18: Typography & Text Layout"]:::todo --> Epic22["Epic #22: Advanced PDF Systems"]:::todo
+    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic13["Epic #13: Masking, Caching & Streams"]:::partial --> Epic18["Epic #18: Typography & Text Layout"]:::todo --> Epic22["Epic #22: Advanced PDF Systems"]:::todo
 
     click E0 href "https://github.com/mihaelamj/PureDraw/issues/1" "E0"
     click E1 href "https://github.com/mihaelamj/PureDraw/issues/2" "E1"
@@ -179,7 +179,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    Epic9["Epic #9: Bitmap Images & Rasterization"]:::next --> I10["#10: Raw Pixel Buffer Structure"]:::todo --> I11["#11: Bitmap Context Renderer"]:::todo --> I12["#12: Image Drawing on Context"]:::todo
+    Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> I10["#10: Raw Pixel Buffer Structure"]:::done --> I11["#11: Bitmap Context Renderer"]:::done --> I12["#12: Image Drawing on Context"]:::done
 
     click Epic9 href "https://github.com/mihaelamj/PureDraw/issues/9" "Epic #9"
     click I10 href "https://github.com/mihaelamj/PureDraw/issues/10" "Issue #10"
@@ -197,7 +197,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    Epic13["Epic #13: Masking, Caching & Streams"]:::todo --> I16["#16: Data Providers & Consumers"]:::todo --> I17["#17: Image I/O Metadata"]:::todo --> I14["#14: Stencil & Chroma Masking"]:::todo --> I15["#15: CGLayer Caching"]:::todo
+    Epic13["Epic #13: Masking, Caching & Streams"]:::partial --> I16["#16: Data Providers & Consumers"]:::next --> I17["#17: Image I/O Metadata"]:::todo --> I14["#14: Stencil & Chroma Masking"]:::done --> I15["#15: CGLayer Caching"]:::todo
 
     click Epic13 href "https://github.com/mihaelamj/PureDraw/issues/13" "Epic #13"
     click I14 href "https://github.com/mihaelamj/PureDraw/issues/14" "Issue #14"
