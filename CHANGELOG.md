@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GraphicsContext.textLoweredCommands` expands it to glyph outline
   fills/strokes (so pixel and PostScript/Canvas backends are unchanged), while
   SVG and PDF can read the raw operation to emit native selectable text.
+- `SVGRenderer` emits `<text>` elements for `showText(_:)` runs, so exported
+  SVG carries real selectable, searchable text. Glyph-index runs (no source
+  string) and transformed text fall back to outlines.
 - `Pattern`, the `CGPattern` equivalent: a tiling cell recorded into its own
   context and used via `GraphicsContext.setFillPattern(_:)`. Colored patterns
   carry their own colors; uncolored (stencil) patterns paint with the current

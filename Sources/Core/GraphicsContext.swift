@@ -460,10 +460,12 @@ public struct GraphicsContext: Sendable, Validatable {
     }
 
     /// Shows text at the current text position, advancing it. Unmapped
-    /// characters render as the font's missing glyph.
+    /// characters render as the font's missing glyph. The source string is
+    /// retained so SVG and PDF can emit native selectable text.
     public mutating func showText(_ text: String) {
         guard let font = currentState.font else { return }
-        showGlyphs(text.unicodeScalars.map { font.glyphIndex(for: $0) ?? 0 })
+        let glyphs = text.unicodeScalars.map { font.glyphIndex(for: $0) ?? 0 }
+        recordText(glyphs: glyphs, text: text)
     }
 
     /// Shows glyphs starting at the given position, advancing the text position.
@@ -472,20 +474,24 @@ public struct GraphicsContext: Sendable, Validatable {
         showGlyphs(glyphs)
     }
 
-    /// Shows glyphs by index at the current text position. Each glyph outline
-    /// is converted to a path (so every backend renders text as vectors),
-    /// painted per the text drawing mode, and the text position advances by
-    /// the glyph's advance width plus character spacing, along the text
-    /// matrix's x axis.
+    /// Shows glyphs by index at the current text position. The text position
+    /// advances by each glyph's advance width plus character spacing, along
+    /// the text matrix's x axis. Glyph-index runs carry no source string, so
+    /// they render as outlines on every backend.
     public mutating func showGlyphs(_ glyphs: [Int]) {
+        recordText(glyphs: glyphs, text: nil)
+    }
+
+    /// Records a text run as a single high-level operation and advances the
+    /// pen. Backends without native text expand it to glyph outlines via
+    /// `textLoweredCommands`; SVG and PDF can render it as real text.
+    private mutating func recordText(glyphs: [Int], text: String?) {
         guard let font = currentState.font, font.unitsPerEm > 0 else { return }
 
-        // Record the text as a single high-level operation. Backends without
-        // native text expand it to glyph outlines via `textLoweredCommands`;
-        // SVG and PDF can render it as real selectable text.
         commands.append(DrawOperation(
             kind: .showText(
                 glyphs: glyphs,
+                text: text,
                 font: font,
                 fontSize: currentState.fontSize,
                 drawingMode: currentState.textDrawingMode,

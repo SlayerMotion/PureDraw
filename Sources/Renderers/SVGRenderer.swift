@@ -123,7 +123,7 @@ public struct SVGRenderer: Renderer {
                 )
             defs.append("    </filter>")
         }
-        for (opIndex, op) in context.flattenedCommands.enumerated() {
+        for (opIndex, op) in context.layerFlattenedCommands.enumerated() {
             switch op.kind {
             case let .drawLinearGradient(grad, start, end, _):
                 defs
@@ -152,7 +152,7 @@ public struct SVGRenderer: Renderer {
 
         // 4. Render drawing operations
         var elements: [String] = []
-        for (opIndex, op) in context.flattenedCommands.enumerated() {
+        for (opIndex, op) in context.layerFlattenedCommands.enumerated() {
             switch op.kind {
             case let .fill(p, rule):
                 let pathStr = svgPathString(for: p)
@@ -192,8 +192,21 @@ public struct SVGRenderer: Renderer {
                 elements.append("  <g \(attrsStr)>")
             case .endTransparencyLayer:
                 elements.append("  </g>")
-            case .drawLayer, .showText:
-                break // expanded by flattenedCommands
+            case let .showText(_, text, _, fontSize, drawingMode, textMatrix, position):
+                if let element = svgTextElement(
+                    text: text,
+                    fontSize: fontSize,
+                    drawingMode: drawingMode,
+                    textMatrix: textMatrix,
+                    position: position,
+                    state: op.state,
+                    uniqueClipPaths: uniqueClipPaths,
+                    uniqueShadows: uniqueShadows
+                ) {
+                    elements.append(element)
+                }
+            case .drawLayer:
+                break // expanded by layerFlattenedCommands
             }
         }
 
@@ -220,6 +233,45 @@ public struct SVGRenderer: Renderer {
     }
 
     // MARK: - Helpers
+
+    /// Builds an SVG `<text>` element for a named text run. The element carries
+    /// the CTM via `styleAttributes`, so the baseline position is expressed in
+    /// user space. The run's text matrix is always identity here (other runs
+    /// lower to outlines), so font-size handles scaling and the baseline
+    /// handles the y axis. The glyph shapes depend on the viewer's font
+    /// substitution; the text is real and selectable.
+    private func svgTextElement(
+        text: String?,
+        fontSize: Double,
+        drawingMode: TextDrawingMode,
+        textMatrix _: Geometry.AffineTransform,
+        position: Point,
+        state: GraphicState,
+        uniqueClipPaths: [Path],
+        uniqueShadows: [Shadow]
+    ) -> String? {
+        guard let text, drawingMode != .invisible, !text.isEmpty else { return nil }
+        var attrs = styleAttributes(
+            for: state,
+            hasFill: drawingMode != .stroke,
+            fillRule: nil,
+            uniqueClipPaths: uniqueClipPaths,
+            uniqueShadows: uniqueShadows
+        )
+        attrs.append("x=\"\(position.x)\" y=\"\(position.y)\"")
+        attrs.append("font-size=\"\(fontSize)\"")
+        if state.characterSpacing != 0 {
+            attrs.append("letter-spacing=\"\(state.characterSpacing)\"")
+        }
+        return "  <text \(attrs.joined(separator: " "))>\(escapeXML(text))</text>"
+    }
+
+    private func escapeXML(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
 
     private func svgPathString(for path: Path) -> String {
         var d: [String] = []

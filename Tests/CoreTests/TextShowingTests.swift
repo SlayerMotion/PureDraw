@@ -21,11 +21,12 @@ struct TextShowingTests {
 
         // Text is recorded as a single high-level operation.
         #expect(context.commands.count == 1)
-        guard case let .showText(glyphs, _, fontSize, mode, _, position) = context.commands[0].kind else {
+        guard case let .showText(glyphs, text, _, fontSize, mode, _, position) = context.commands[0].kind else {
             Issue.record("expected a showText operation")
             return
         }
         #expect(glyphs == [1, 1])
+        #expect(text == "AA")
         #expect(fontSize == 10)
         #expect(mode == .fill)
         #expect(position == Point(x: 20, y: 20))

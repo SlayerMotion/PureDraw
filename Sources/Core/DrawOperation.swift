@@ -17,7 +17,7 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
         case endTransparencyLayer
         case drawImage(Image, rect: Rect)
         case drawLayer(Layer, rect: Rect)
-        case showText(glyphs: [Int], font: Font, fontSize: Double, drawingMode: TextDrawingMode, textMatrix: AffineTransform, position: Point)
+        case showText(glyphs: [Int], text: String?, font: Font, fontSize: Double, drawingMode: TextDrawingMode, textMatrix: AffineTransform, position: Point)
     }
 
     public let kind: Kind

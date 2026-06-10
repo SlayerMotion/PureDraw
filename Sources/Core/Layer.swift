@@ -43,18 +43,32 @@ public extension GraphicsContext {
         Self.flattenLayers(Self.lowerText(commands), depth: 8)
     }
 
+    /// The recorded commands with layers expanded, preserving `showText`
+    /// operations that carry a source string so backends that emit native
+    /// text (SVG, PDF) can render them. Glyph-index runs (no source string)
+    /// and text nested in a stamped layer are lowered to outlines.
+    var layerFlattenedCommands: [DrawOperation] {
+        Self.flattenLayers(Self.lowerText(commands, preservingNamedText: true), depth: 8)
+    }
+
     /// The recorded commands with `showText` operations lowered to glyph
     /// outline fills/strokes, leaving layers intact. Pixel backends render
-    /// this so text becomes vector paths; SVG and PDF can read the raw
-    /// `showText` operations instead to emit native selectable text.
+    /// this so text becomes vector paths.
     var textLoweredCommands: [DrawOperation] {
         Self.lowerText(commands)
     }
 
-    static func lowerText(_ operations: [DrawOperation]) -> [DrawOperation] {
+    static func lowerText(_ operations: [DrawOperation], preservingNamedText: Bool = false) -> [DrawOperation] {
         var result: [DrawOperation] = []
         for operation in operations {
-            guard case let .showText(glyphs, font, fontSize, drawingMode, textMatrix, position) = operation.kind else {
+            guard case let .showText(glyphs, text, font, fontSize, drawingMode, textMatrix, position) = operation.kind else {
+                result.append(operation)
+                continue
+            }
+            // A run with a source string and an identity text matrix can be
+            // rendered as native text by SVG/PDF; leave it intact for them.
+            // Anything else lowers to outlines so it stays correct.
+            if preservingNamedText, text != nil, textMatrix == .identity {
                 result.append(operation)
                 continue
             }
@@ -102,7 +116,9 @@ public extension GraphicsContext {
                 .scaledBy(x: rect.width / layer.width, y: rect.height / layer.height)
                 .translatedBy(x: rect.minX, y: rect.minY)
 
-            for subOperation in flattenLayers(layer.context.commands, depth: depth - 1) {
+            // Text nested in a stamped layer lowers to outlines so the layer
+            // placement transform applies correctly.
+            for subOperation in flattenLayers(lowerText(layer.context.commands), depth: depth - 1) {
                 var state = subOperation.state
                 state.transform = subOperation.state.transform
                     .concatenating(placement)
