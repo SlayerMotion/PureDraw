@@ -185,6 +185,84 @@ public struct Path: Equatable, Sendable, Validatable {
     }
 
     /// Adds a rounded rectangle with the specified corner dimensions.
+    /// Adds a rectangle with Apple-style *continuous* (squircle) corners: the
+    /// curvature ramps smoothly from the straight edge into the corner instead
+    /// of jumping at a circular arc, so there is no visible junction. This is
+    /// the SwiftUI `RoundedCornerStyle.continuous` / app-icon shape.
+    ///
+    /// Each corner is three cubic Bézier segments (an ease-in, a shortened
+    /// circular arc, and a symmetric ease-out), and consumes `(1 + smoothing)`
+    /// times the radius along each edge. `smoothing` runs 0 (circular) to 1
+    /// (maximum); 0.6 matches the iOS app-icon corner. The construction
+    /// follows Figma's reverse-engineering of Apple's corners.
+    public mutating func addContinuousRoundedRect(in rect: Rect, cornerRadius: Double, smoothing: Double = 0.6) {
+        let budget = min(rect.width, rect.height) / 2.0
+        let radius = min(abs(cornerRadius), budget)
+        guard radius > 0, budget > 0 else {
+            move(to: rect.origin)
+            addLine(to: Point(x: rect.maxX, y: rect.minY))
+            addLine(to: Point(x: rect.maxX, y: rect.maxY))
+            addLine(to: Point(x: rect.minX, y: rect.maxY))
+            closeSubpath()
+            return
+        }
+
+        // Clamp smoothing so the corner fits the available budget.
+        var s = min(max(smoothing, 0.0), 1.0)
+        s = min(s, max(0.0, budget / radius - 1.0))
+        let p = min((1.0 + s) * radius, budget)
+
+        let arcMeasure = 90.0 * (1.0 - s)
+        let arcSectionLength = sin(arcMeasure / 2.0 * .pi / 180.0) * radius * 2.0.squareRoot()
+        let angleAlpha = (90.0 - arcMeasure) / 2.0
+        let p3ToP4 = radius * tan(angleAlpha / 2.0 * .pi / 180.0)
+        let angleBeta = 45.0 * s
+        let c = p3ToP4 * cos(angleBeta * .pi / 180.0)
+        let d = c * tan(angleBeta * .pi / 180.0)
+        let b = (p - arcSectionLength - c - d) / 3.0
+        let a = 2.0 * b
+
+        /// Per-corner local frame: `e` is travel along the incoming edge, `f`
+        /// along the outgoing edge (a clockwise quarter turn from `e`).
+        func emitCorner(start: Point, e: Point, f: Point) {
+            func at(_ base: Point, _ ex: Double, _ fy: Double) -> Point {
+                Point(x: base.x + ex * e.x + fy * f.x, y: base.y + ex * e.y + fy * f.y)
+            }
+            // Ease-in cubic.
+            let end1 = at(start, a + b + c, d)
+            addCurve(to: end1, control1: at(start, a, 0), control2: at(start, a + b, 0))
+            // Shortened circular arc, as one cubic with matched tangents.
+            let arcEnd = at(end1, arcSectionLength, arcSectionLength)
+            let handle = (4.0 / 3.0) * tan(arcMeasure / 4.0 * .pi / 180.0) * radius
+            let tStartLen = (c * c + d * d).squareRoot()
+            let tEndLen = (d * d + c * c).squareRoot()
+            let startTangent = Point(x: (c * e.x + d * f.x) / tStartLen, y: (c * e.y + d * f.y) / tStartLen)
+            let endTangent = Point(x: (d * e.x + c * f.x) / tEndLen, y: (d * e.y + c * f.y) / tEndLen)
+            addCurve(
+                to: arcEnd,
+                control1: Point(x: end1.x + handle * startTangent.x, y: end1.y + handle * startTangent.y),
+                control2: Point(x: arcEnd.x - handle * endTangent.x, y: arcEnd.y - handle * endTangent.y)
+            )
+            // Ease-out cubic (symmetric to the ease-in).
+            addCurve(
+                to: at(arcEnd, d, a + b + c),
+                control1: at(arcEnd, d, c),
+                control2: at(arcEnd, d, b + c)
+            )
+        }
+
+        move(to: Point(x: rect.minX + p, y: rect.minY))
+        addLine(to: Point(x: rect.maxX - p, y: rect.minY))
+        emitCorner(start: Point(x: rect.maxX - p, y: rect.minY), e: Point(x: 1, y: 0), f: Point(x: 0, y: 1))
+        addLine(to: Point(x: rect.maxX, y: rect.maxY - p))
+        emitCorner(start: Point(x: rect.maxX, y: rect.maxY - p), e: Point(x: 0, y: 1), f: Point(x: -1, y: 0))
+        addLine(to: Point(x: rect.minX + p, y: rect.maxY))
+        emitCorner(start: Point(x: rect.minX + p, y: rect.maxY), e: Point(x: -1, y: 0), f: Point(x: 0, y: -1))
+        addLine(to: Point(x: rect.minX, y: rect.minY + p))
+        emitCorner(start: Point(x: rect.minX, y: rect.minY + p), e: Point(x: 0, y: -1), f: Point(x: 1, y: 0))
+        closeSubpath()
+    }
+
     public mutating func addRoundedRect(in rect: Rect, cornerWidth: Double, cornerHeight: Double) {
         let rx = min(abs(cornerWidth), rect.width / 2.0)
         let ry = min(abs(cornerHeight), rect.height / 2.0)
