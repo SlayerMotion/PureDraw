@@ -22,13 +22,21 @@ public struct PDFRenderer: Renderer {
     public let trimBox: Rect?
     public let artBox: Rect?
 
+    /// Hot-spot link annotations placed on the page.
+    public let links: [PDFLink]
+
+    /// The document outline (bookmarks); empty means no outline.
+    public let outline: [PDFOutlineItem]
+
     public init(
         width: Double = 500,
         height: Double = 500,
         cropBox: Rect? = nil,
         bleedBox: Rect? = nil,
         trimBox: Rect? = nil,
-        artBox: Rect? = nil
+        artBox: Rect? = nil,
+        links: [PDFLink] = [],
+        outline: [PDFOutlineItem] = []
     ) {
         self.width = width
         self.height = height
@@ -36,6 +44,8 @@ public struct PDFRenderer: Renderer {
         self.bleedBox = bleedBox
         self.trimBox = trimBox
         self.artBox = artBox
+        self.links = links
+        self.outline = outline
     }
 
     /// The `CGPDFPageGetDrawingTransform` equivalent: a transform that fits
@@ -353,8 +363,15 @@ public struct PDFRenderer: Renderer {
         let pagesID = catalogID + 1
         let pageID = catalogID + 2
         let contentsID = catalogID + 3
+        let annotIDs = links.indices.map { contentsID + 1 + $0 }
+        let outlineRootID = contentsID + 1 + links.count
         writer.rootObjectID = catalogID
-        _ = writer.append("<< /Type /Catalog /Pages \(pagesID) 0 R >>")
+        var catalogDict = "<< /Type /Catalog /Pages \(pagesID) 0 R"
+        if !outline.isEmpty {
+            catalogDict += " /Outlines \(outlineRootID) 0 R"
+        }
+        catalogDict += " >>"
+        _ = writer.append(catalogDict)
         _ = writer.append("<< /Type /Pages /Kids [ \(pageID) 0 R ] /Count 1 >>")
 
         var resourcesStr = "<<"
@@ -406,11 +423,88 @@ public struct PDFRenderer: Renderer {
                 pageDict += " /\(name) \(pdfBoxString(for: box))"
             }
         }
+        if !annotIDs.isEmpty {
+            pageDict += " /Annots [ " + annotIDs.map { "\($0) 0 R" }.joined(separator: " ") + " ]"
+        }
         pageDict += " /Contents \(contentsID) 0 R /Resources \(resourcesStr) >>"
         _ = writer.append(pageDict)
         _ = writer.append("<< /Length \(contentStream.data(using: .utf8)?.count ?? 0) >>\nstream\n\(contentStream)\nendstream")
 
+        for link in links {
+            let rect = link.rect
+            let pdfRect = "[ \(rect.minX) \(height - rect.maxY) \(rect.maxX) \(height - rect.minY) ]"
+            let action = switch link.target {
+            case let .url(url):
+                "/A << /S /URI /URI (\(escapedPDFString(url))) >>"
+            case let .destination(point):
+                "/Dest [ \(pageID) 0 R /XYZ \(point.x) \(height - point.y) null ]"
+            }
+            _ = writer.append("<< /Type /Annot /Subtype /Link /Rect \(pdfRect) /Border [ 0 0 0 ] \(action) >>")
+        }
+
+        if !outline.isEmpty {
+            appendOutline(to: writer, rootID: outlineRootID, pageID: pageID)
+        }
+
         return writer.buildData()
+    }
+
+    // MARK: - Outline Assembly
+
+    private func subtreeSize(_ item: PDFOutlineItem) -> Int {
+        1 + item.children.reduce(0) { $0 + subtreeSize($1) }
+    }
+
+    private func appendOutline(to writer: PDFWriter, rootID: Int, pageID: Int) {
+        let totalCount = outline.reduce(0) { $0 + subtreeSize($1) }
+        let firstID = rootID + 1
+        let lastID = siblingIDs(for: outline, startingAt: firstID).last ?? firstID
+        _ = writer.append("<< /Type /Outlines /First \(firstID) 0 R /Last \(lastID) 0 R /Count \(totalCount) >>")
+        appendOutlineItems(outline, parentID: rootID, startingAt: firstID, to: writer, pageID: pageID)
+    }
+
+    /// Object IDs of a sibling run laid out in pre-order starting at `startID`.
+    private func siblingIDs(for items: [PDFOutlineItem], startingAt startID: Int) -> [Int] {
+        var ids: [Int] = []
+        var nextID = startID
+        for item in items {
+            ids.append(nextID)
+            nextID += subtreeSize(item)
+        }
+        return ids
+    }
+
+    private func appendOutlineItems(_ items: [PDFOutlineItem], parentID: Int, startingAt startID: Int, to writer: PDFWriter, pageID: Int) {
+        let ids = siblingIDs(for: items, startingAt: startID)
+        for (index, item) in items.enumerated() {
+            let id = ids[index]
+            var dict = "<< /Title (\(escapedPDFString(item.title))) /Parent \(parentID) 0 R"
+            if index > 0 {
+                dict += " /Prev \(ids[index - 1]) 0 R"
+            }
+            if index < items.count - 1 {
+                dict += " /Next \(ids[index + 1]) 0 R"
+            }
+            if !item.children.isEmpty {
+                let childIDs = siblingIDs(for: item.children, startingAt: id + 1)
+                dict += " /First \(childIDs[0]) 0 R /Last \(childIDs[childIDs.count - 1]) 0 R"
+                dict += " /Count \(item.children.reduce(0) { $0 + subtreeSize($1) })"
+            }
+            dict += " /Dest [ \(pageID) 0 R /XYZ \(item.destination.x) \(height - item.destination.y) null ]"
+            dict += " >>"
+            _ = writer.append(dict)
+            if !item.children.isEmpty {
+                appendOutlineItems(item.children, parentID: id, startingAt: id + 1, to: writer, pageID: pageID)
+            }
+        }
+    }
+
+    /// Escapes backslashes and parentheses for a PDF literal string.
+    private func escapedPDFString(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "(", with: "\\(")
+            .replacingOccurrences(of: ")", with: "\\)")
     }
 
     /// A user-space rect (top-left origin) as a PDF rectangle (bottom-left).

@@ -18,3 +18,6 @@
 --wrapparameters before-first
 --wrapcollections before-first
 --self remove
+
+# Never scan build products; Xcode mutates these mid-run.
+--exclude DerivedData,.build

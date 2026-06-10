@@ -9,6 +9,10 @@ import Geometry
 @testable import Renderers
 import Testing
 
+#if canImport(PDFKit)
+    import PDFKit
+#endif
+
 struct PDFDocumentTests {
     @Test func rootReferencesTheCatalogEvenWithImages() throws {
         let sprite = try Image(width: 2, height: 2, data: [UInt8](repeating: 255, count: 16))
@@ -90,5 +94,51 @@ struct PDFDocumentTests {
         #expect(abs(corner.x - 100) < 1e-9 && abs(corner.y) < 1e-9, "got \(corner)")
         let opposite = Point(x: 200, y: 100).applying(transform)
         #expect(abs(opposite.x) < 1e-9 && abs(opposite.y - 200) < 1e-9, "got \(opposite)")
+    }
+
+    @Test func writesLinkAnnotationsAndOutline() throws {
+        var context = GraphicsContext()
+        context.setFillColor(.black)
+        context.addRect(Rect(x: 0, y: 0, width: 10, height: 10))
+        context.fillPath()
+
+        let renderer = PDFRenderer(
+            width: 100,
+            height: 100,
+            links: [
+                PDFLink(rect: Rect(x: 10, y: 10, width: 30, height: 10), target: .url("https://example.com")),
+                PDFLink(rect: Rect(x: 10, y: 30, width: 30, height: 10), target: .destination(Point(x: 0, y: 90))),
+            ],
+            outline: [
+                PDFOutlineItem(title: "Chapter (1)", destination: Point(x: 0, y: 0), children: [
+                    PDFOutlineItem(title: "Section 1.1", destination: Point(x: 0, y: 50)),
+                ]),
+                PDFOutlineItem(title: "Chapter 2", destination: Point(x: 0, y: 80)),
+            ]
+        )
+        let data = try renderer.render(context)
+        let pdf = String(decoding: data, as: UTF8.self)
+
+        // Annotations: rects convert to bottom-up PDF coordinates.
+        #expect(pdf.contains("/Annots [ "))
+        #expect(pdf.contains("/Subtype /Link /Rect [ 10.0 80.0 40.0 90.0 ] /Border [ 0 0 0 ] /A << /S /URI /URI (https://example.com) >>"))
+        #expect(pdf.contains("/Dest [ "))
+
+        // Outline: catalog points at the root, titles escape parentheses.
+        #expect(pdf.contains("/Outlines"))
+        #expect(pdf.contains("/Type /Outlines"))
+        #expect(pdf.contains("/Count 3"))
+        #expect(pdf.contains("/Title (Chapter \\(1\\))"))
+        #expect(pdf.contains("/Title (Section 1.1)"))
+
+        #if canImport(PDFKit)
+            let document = try #require(PDFDocument(data: data), "PDFKit must accept the document")
+            let root = try #require(document.outlineRoot, "outline root missing")
+            #expect(root.numberOfChildren == 2)
+            #expect(root.child(at: 0)?.label == "Chapter (1)")
+            #expect(root.child(at: 0)?.numberOfChildren == 1)
+            #expect(root.child(at: 0)?.child(at: 0)?.label == "Section 1.1")
+            #expect(document.page(at: 0)?.annotations.count == 2)
+        #endif
     }
 }
