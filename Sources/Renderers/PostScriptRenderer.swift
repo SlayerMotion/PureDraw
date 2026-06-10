@@ -22,7 +22,7 @@ public struct PostScriptRenderer: Renderer {
         self.height = height
     }
 
-    public func render(_ context: GraphicsContext) throws -> String {
+    public func draw(_ context: GraphicsContext) throws -> String {
         // 1. Calculate Bounding Box
         let minX: Double
         let minY: Double

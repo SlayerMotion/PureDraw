@@ -21,7 +21,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         self.colorSpace = colorSpace
     }
 
-    public func render(_ context: GraphicsContext) throws -> Image {
+    public func draw(_ context: GraphicsContext) throws -> Image {
         var currentBuffer = [UInt8](repeating: 0, count: width * height * 4)
         var bufferStack: [[UInt8]] = []
         var beginOpStack: [DrawOperation] = []

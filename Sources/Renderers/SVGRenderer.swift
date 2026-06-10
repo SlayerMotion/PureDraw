@@ -22,7 +22,7 @@ public struct SVGRenderer: Renderer {
         self.height = height
     }
 
-    public func render(_ context: GraphicsContext) throws -> String {
+    public func draw(_ context: GraphicsContext) throws -> String {
         // 1. Gather all unique clip paths and shadows
         var uniqueClipPaths: [Path] = []
         var uniqueShadows: [Shadow] = []

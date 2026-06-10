@@ -19,7 +19,7 @@ public struct PDFRenderer: Renderer {
         self.height = height
     }
 
-    public func render(_ context: GraphicsContext) throws -> Data {
+    public func draw(_ context: GraphicsContext) throws -> Data {
         let writer = PDFWriter()
 
         var extGStates: [ExtGStateKey: String] = [:]

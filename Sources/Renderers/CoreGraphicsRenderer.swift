@@ -20,7 +20,7 @@
             targetContext = context
         }
 
-        public func render(_ context: GraphicsContext) throws {
+        public func draw(_ context: GraphicsContext) throws {
             for operation in context.commands {
                 switch operation.kind {
                 case .beginTransparencyLayer:

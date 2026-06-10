@@ -18,7 +18,7 @@ public struct CanvasRenderer: Renderer {
         self.contextName = contextName
     }
 
-    public func render(_ context: GraphicsContext) throws -> String {
+    public func draw(_ context: GraphicsContext) throws -> String {
         var js: [String] = []
 
         // Wrap in save/restore to keep global context clean
