@@ -706,17 +706,23 @@ struct RendererTests {
 
         // Render to PDF
         let pdfData = try PDFRenderer(width: 500, height: 500).render(context)
+        #expect(!pdfData.isEmpty)
 
-        // Write PDF data to the workspace directory
-        let outputPath = "3d_transform_scene.pdf"
-        try pdfData.write(to: URL(fileURLWithPath: outputPath))
-        print("Generated 3D perspective scene at: \(outputPath)")
+        // Write the artifacts to a scratch directory so test runs never dirty the repo.
+        // The checked-in 3d_transform_scene.* snapshots are refreshed manually from there.
+        let outputDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("PureDrawTestArtifacts", isDirectory: true)
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+
+        let pdfURL = outputDirectory.appendingPathComponent("3d_transform_scene.pdf")
+        try pdfData.write(to: pdfURL)
+        print("Generated 3D perspective scene at: \(pdfURL.path)")
 
         // Render to HTML Canvas page
         let htmlData = try CanvasRenderer().renderToHTMLPage(context, width: 500, height: 500)
-        let htmlPath = "3d_transform_scene.html"
-        try htmlData.write(to: URL(fileURLWithPath: htmlPath), atomically: true, encoding: .utf8)
-        print("Generated 3D HTML Canvas preview at: \(htmlPath)")
+        #expect(!htmlData.isEmpty)
+        let htmlURL = outputDirectory.appendingPathComponent("3d_transform_scene.html")
+        try htmlData.write(to: htmlURL, atomically: true, encoding: .utf8)
+        print("Generated 3D HTML Canvas preview at: \(htmlURL.path)")
     }
 
     @Test func allBlendModesExecutionAndValidation() throws {
