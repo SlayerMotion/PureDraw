@@ -71,6 +71,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `BitmapRenderer` throws `ValidationError` on non-positive dimensions instead
+  of trapping at buffer allocation.
+- Validation now rejects unbalanced transparency layers (which produced
+  unclosed SVG groups), image layouts whose `bitsPerPixel` is too small for
+  the color space or whose `bytesPerRow` cannot hold a row, `drawLayer` stamps
+  with non-positive dimensions, and fonts with `unitsPerEm == 0`.
 - The validation walker now visits each reference-type instance once, so
   cyclic object graphs (such as a layer drawn into itself) validate instead
   of overflowing the stack.

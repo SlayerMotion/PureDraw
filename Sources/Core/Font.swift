@@ -77,6 +77,9 @@ public struct Font: Equatable, Sendable {
         else {
             throw Self.error("missing or truncated head table")
         }
+        guard unitsPerEm > 0 else {
+            throw Self.error("invalid head table: unitsPerEm must be positive")
+        }
         guard let maxp = tableDirectory["maxp"],
               let glyphCount = Self.u16(bytes, at: maxp.offset + 4)
         else {

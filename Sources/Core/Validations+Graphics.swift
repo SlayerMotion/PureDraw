@@ -180,6 +180,57 @@ public extension Validation {
         )
     }
 
+    /// Validates that a layer-stamp operation has positive layer dimensions.
+    static var drawLayerHasValidDimensions: Validation<Document, DrawOperation> {
+        .init(
+            description: "Layer stamp has positive dimensions",
+            check: { context in
+                guard case let .drawLayer(layer, _) = context.subject.kind else { return [] }
+                guard layer.width > 0, layer.height > 0 else {
+                    return [ValidationError(
+                        reason: "Layer width and height must be positive",
+                        at: context.codingPath + [ValidationCodingKey("kind")]
+                    )]
+                }
+                return []
+            }
+        )
+    }
+
+    /// Validates that begin/end transparency-layer operations balance, so
+    /// renderers never emit an unclosed group or drop an unmatched end.
+    static var transparencyLayersAreBalanced: Validation<Document, GraphicsContext> {
+        .init(
+            description: "Transparency layers are balanced",
+            check: { context in
+                var depth = 0
+                for op in context.subject.commands {
+                    switch op.kind {
+                    case .beginTransparencyLayer:
+                        depth += 1
+                    case .endTransparencyLayer:
+                        depth -= 1
+                        if depth < 0 {
+                            return [ValidationError(
+                                reason: "endTransparencyLayer without a matching beginTransparencyLayer",
+                                at: context.codingPath + [ValidationCodingKey("commands")]
+                            )]
+                        }
+                    default:
+                        break
+                    }
+                }
+                guard depth == 0 else {
+                    return [ValidationError(
+                        reason: "\(depth) transparency layer(s) opened but never closed",
+                        at: context.codingPath + [ValidationCodingKey("commands")]
+                    )]
+                }
+                return []
+            }
+        )
+    }
+
     /// Validates that a linear gradient has distinct start and end points.
     static var linearGradientPointsAreDistinct: Validation<Document, DrawOperation> {
         .init(
@@ -269,6 +320,32 @@ public extension Validation {
                 if img.bytesPerRow <= 0 {
                     errors.append(ValidationError(
                         reason: "bytesPerRow must be positive",
+                        at: context.codingPath + [ValidationCodingKey("bytesPerRow")]
+                    ))
+                }
+
+                // bitsPerPixel must hold every component plus any alpha byte,
+                // or pixelColor decodes the wrong layout (often as clear).
+                let componentCount = switch img.colorSpace {
+                case .deviceGray: 1
+                case .deviceRGB: 3
+                case .deviceCMYK: 4
+                }
+                let channelCount = componentCount + (img.alphaInfo.hasAlpha ? 1 : 0)
+                let minBitsPerPixel = channelCount * img.bitsPerComponent
+                if img.bitsPerPixel < minBitsPerPixel {
+                    errors.append(ValidationError(
+                        reason: "bitsPerPixel must be at least \(minBitsPerPixel) for colorSpace \(img.colorSpace.rawValue) with this alpha layout",
+                        at: context.codingPath + [ValidationCodingKey("bitsPerPixel")]
+                    ))
+                }
+
+                // A declared row narrower than the pixels it must hold decodes
+                // bytes from the following row.
+                let minBytesPerRow = (img.width * img.bitsPerPixel + 7) / 8
+                if img.bytesPerRow < minBytesPerRow {
+                    errors.append(ValidationError(
+                        reason: "bytesPerRow must be at least \(minBytesPerRow) for width \(img.width) at \(img.bitsPerPixel) bits per pixel",
                         at: context.codingPath + [ValidationCodingKey("bytesPerRow")]
                     ))
                 }

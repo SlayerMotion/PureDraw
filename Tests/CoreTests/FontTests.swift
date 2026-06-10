@@ -136,6 +136,20 @@ enum MiniFont {
         return font
     }
 
+    /// Locates a table's byte offset by walking the font directory; used by
+    /// tests that corrupt specific tables.
+    static func tableOffset(in font: [UInt8], tag: String) -> Int? {
+        let tagBytes = Array(tag.utf8)
+        let tableCount = Int(font[4]) << 8 | Int(font[5])
+        for index in 0 ..< tableCount {
+            let record = 12 + index * 16
+            if Array(font[record ..< record + 4]) == tagBytes {
+                return Int(font[record + 8]) << 24 | Int(font[record + 9]) << 16 | Int(font[record + 10]) << 8 | Int(font[record + 11])
+            }
+        }
+        return nil
+    }
+
     static func ascii(_ string: String) -> [UInt8] {
         Array(string.utf8)
     }

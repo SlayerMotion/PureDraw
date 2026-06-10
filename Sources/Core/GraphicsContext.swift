@@ -548,4 +548,8 @@ public struct GraphicsContext: Sendable, Validatable {
     public mutating func draw(_ image: Image, in rect: Rect) {
         commands.append(DrawOperation(kind: .drawImage(image, rect: rect), state: currentState))
     }
+
+    public static var defaultValidator: Validator<GraphicsContext> {
+        Validator().validating(.transparencyLayersAreBalanced)
+    }
 }

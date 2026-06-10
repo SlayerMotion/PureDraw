@@ -32,5 +32,6 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
             .validating(.drawOperationPathIsNotEmpty)
             .validating(.linearGradientPointsAreDistinct)
             .validating(.radialGradientIsValid)
+            .validating(.drawLayerHasValidDimensions)
     }
 }
