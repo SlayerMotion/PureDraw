@@ -276,6 +276,71 @@ public struct Path: Equatable, Sendable, Validatable {
         closeSubpath()
     }
 
+    /// Adds a rounded rectangle whose corners are Apple's exact continuous
+    /// corner: the same shape `UIBezierPath(roundedRect:cornerRadius:)` and
+    /// SwiftUI's `RoundedCornerStyle.continuous` produce, reproduced
+    /// pixel-for-pixel.
+    ///
+    /// Each corner is three cubic Bézier segments using the dimensionless
+    /// control-point ratios extracted from `UIBezierPath` (each corner consumes
+    /// `1.528665` times the radius along its edges). Unlike
+    /// `addContinuousRoundedRect(in:cornerRadius:smoothing:)`, this is not
+    /// tunable; it is the fixed Apple shape. The radius is clamped so the
+    /// corners never overlap. Constants are from Liam Rosenfeld's extraction of
+    /// the iOS corner (`liamrosenfeld.com/apple_icon_quest`).
+    public mutating func addAppleRoundedRect(in rect: Rect, cornerRadius: Double) {
+        // The corner spans 1.528665r along each edge, so the largest radius
+        // before opposite corners overlap is (shortest side / 2) / 1.528665.
+        let limit = 1.528665
+        let r = min(abs(cornerRadius), min(rect.width, rect.height) / 2.0 / limit)
+        guard r > 0 else {
+            move(to: rect.origin)
+            addLine(to: Point(x: rect.maxX, y: rect.minY))
+            addLine(to: Point(x: rect.maxX, y: rect.maxY))
+            addLine(to: Point(x: rect.minX, y: rect.maxY))
+            closeSubpath()
+            return
+        }
+
+        /// Corner-relative point helpers: `(x, y)` are multiples of the radius
+        /// measured inward from each corner.
+        func tl(_ x: Double, _ y: Double) -> Point {
+            Point(x: rect.minX + x * r, y: rect.minY + y * r)
+        }
+        func tr(_ x: Double, _ y: Double) -> Point {
+            Point(x: rect.maxX - x * r, y: rect.minY + y * r)
+        }
+        func br(_ x: Double, _ y: Double) -> Point {
+            Point(x: rect.maxX - x * r, y: rect.maxY - y * r)
+        }
+        func bl(_ x: Double, _ y: Double) -> Point {
+            Point(x: rect.minX + x * r, y: rect.maxY - y * r)
+        }
+
+        move(to: tl(1.528665, 0.0))
+        addLine(to: tr(1.528665, 0.0))
+        addCurve(to: tr(0.63149379, 0.07491139), control1: tr(1.08849296, 0.0), control2: tr(0.86840694, 0.0))
+        addCurve(to: tr(0.07491139, 0.63149379), control1: tr(0.37282383, 0.16905956), control2: tr(0.16905956, 0.37282383))
+        addCurve(to: tr(0.0, 1.52866498), control1: tr(0.0, 0.86840694), control2: tr(0.0, 1.08849296))
+
+        addLine(to: br(0.0, 1.528665))
+        addCurve(to: br(0.07491139, 0.63149379), control1: br(0.0, 1.08849296), control2: br(0.0, 0.86840694))
+        addCurve(to: br(0.63149379, 0.07491139), control1: br(0.16905956, 0.37282383), control2: br(0.37282383, 0.16905956))
+        addCurve(to: br(1.52866498, 0.0), control1: br(0.86840694, 0.0), control2: br(1.08849296, 0.0))
+
+        addLine(to: bl(1.528665, 0.0))
+        addCurve(to: bl(0.63149379, 0.07491139), control1: bl(1.08849296, 0.0), control2: bl(0.86840694, 0.0))
+        addCurve(to: bl(0.07491139, 0.63149379), control1: bl(0.37282383, 0.16905956), control2: bl(0.16905956, 0.37282383))
+        addCurve(to: bl(0.0, 1.52866498), control1: bl(0.0, 0.86840694), control2: bl(0.0, 1.08849296))
+
+        addLine(to: tl(0.0, 1.528665))
+        addCurve(to: tl(0.07491139, 0.63149379), control1: tl(0.0, 1.08849296), control2: tl(0.0, 0.86840694))
+        addCurve(to: tl(0.63149379, 0.07491139), control1: tl(0.16905956, 0.37282383), control2: tl(0.37282383, 0.16905956))
+        addCurve(to: tl(1.52866498, 0.0), control1: tl(0.86840694, 0.0), control2: tl(1.08849296, 0.0))
+
+        closeSubpath()
+    }
+
     /// Adds a rounded rectangle with circular corners of the specified
     /// dimensions. For Apple-style continuous corners, use
     /// `addContinuousRoundedRect(in:cornerRadius:smoothing:)`.

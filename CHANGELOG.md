@@ -9,13 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `Path.addContinuousRoundedRect(in:cornerRadius:smoothing:)` produces
-  Apple-style continuous (squircle) corners: curvature ramps smoothly from the
-  straight edge into the corner instead of jumping at a circular arc, the
-  SwiftUI `RoundedCornerStyle.continuous` / app-icon shape. Each corner is
-  three cubic Béziers (ease-in, shortened arc, ease-out) following Figma's
-  reverse-engineering of Apple's corners; `smoothing` runs 0 (circular) to 1,
-  default 0.6.
+- `Path.addAppleRoundedRect(in:cornerRadius:)` reproduces Apple's exact
+  continuous corner pixel-for-pixel: the same shape
+  `UIBezierPath(roundedRect:cornerRadius:)` and SwiftUI's
+  `RoundedCornerStyle.continuous` produce, using the control-point ratios
+  extracted from `UIBezierPath` (each corner is three cubic Béziers consuming
+  `1.528665` times the radius).
+- `Path.addContinuousRoundedRect(in:cornerRadius:smoothing:)` produces a
+  *tunable* continuous (squircle) corner: curvature ramps smoothly from the
+  straight edge into the corner. Each corner is three cubic Béziers (ease-in,
+  shortened arc, ease-out) following Figma's reverse-engineering of Apple's
+  corners; `smoothing` runs 0 (circular) to 1, default 0.6. (Apple's exact
+  corner is not a superellipse: a superellipse fits Apple worse than a circle.)
 - Text is recorded as a single high-level `showText` draw operation.
   `GraphicsContext.textLoweredCommands` expands it to glyph outline
   fills/strokes (so pixel and PostScript/Canvas backends are unchanged), while

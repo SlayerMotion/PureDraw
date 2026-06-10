@@ -130,3 +130,60 @@ extension ContinuousCornerTests {
         #expect(abs(start.x - 122.2932) < 0.01)
     }
 }
+
+extension ContinuousCornerTests {
+    @Test func appleExactCornerConsumesLimitRatio() {
+        var path = Path()
+        path.addAppleRoundedRect(in: Rect(x: 0, y: 0, width: 400, height: 400), cornerRadius: 80)
+        // The corner consumes exactly 1.528665r = 122.2932 of each edge.
+        guard case let .move(start) = path.elements.first else {
+            Issue.record("expected a leading move")
+            return
+        }
+        #expect(abs(start.x - 122.2932) < 0.001)
+    }
+
+    @Test func appleExactCornerStructureAndEdgeTangency() {
+        var path = Path()
+        path.addAppleRoundedRect(in: Rect(x: 0, y: 0, width: 200, height: 200), cornerRadius: 44)
+
+        // 4 corners x 3 cubics + 4 lines + move + close.
+        let curves = path.elements.filter { if case .cubicCurve = $0 { return true }
+            return false
+        }.count
+        #expect(curves == 12)
+        if case .close = path.elements.last {} else { Issue.record("path must be closed") }
+
+        // The corner leaves the straight edge tangentially: the first cubic's
+        // first control point sits on the top edge (y == minY), a horizontal
+        // departure with near-zero curvature, the seamless property. (Apple's
+        // exact corner has small kinks between its three sub-curves, so it is
+        // faithful to iOS rather than perfectly G2.)
+        let firstCubic = path.elements.first { if case .cubicCurve = $0 { return true }
+            return false
+        }
+        guard case let .cubicCurve(_, c1, _) = firstCubic else {
+            Issue.record("expected a cubic")
+            return
+        }
+        #expect(abs(c1.y) < 0.001, "first control point should sit on the top edge")
+    }
+
+    @Test func appleExactCornerClampsLargeRadius() {
+        // Asking for a radius larger than the corners can hold must not
+        // overlap or produce NaN.
+        var path = Path()
+        path.addAppleRoundedRect(in: Rect(x: 0, y: 0, width: 100, height: 100), cornerRadius: 1000)
+        let box = path.boundingBox
+        #expect(box.minX >= -0.01 && box.maxX <= 100.01 && box.minY >= -0.01 && box.maxY <= 100.01)
+        let finite = path.elements.allSatisfy {
+            switch $0 {
+            case let .move(p), let .line(p): p.x.isFinite && p.y.isFinite
+            case let .quadCurve(p, _): p.x.isFinite
+            case let .cubicCurve(p, _, _): p.x.isFinite
+            case .close: true
+            }
+        }
+        #expect(finite)
+    }
+}
