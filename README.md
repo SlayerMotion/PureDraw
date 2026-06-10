@@ -21,7 +21,11 @@ It provides a "Virtual PostScript Machine" API compatible with CoreGraphics (Qua
 
 ## Preview
 
-Here is a 3D perspective scene generated entirely by PureDraw (available in the test suite), showcasing linear gradients, 3D grids, perspective-distorted 2D badges, crumpled paper deformation, multiply blend modes, and drop shadows rendered to a vector PDF:
+A capability showcase rendered entirely by PureDraw to a vector PDF: circular, continuous, and pixel-exact Apple corners; linear, radial, and function-sampled gradients; multiply blending in transparency layers; translucent drop shadows; the non-linear crumple deformer; a depth-sorted, per-face-lit 3D cube; tiling patterns; and embedded selectable text.
+
+![PureDraw capability showcase](puredraw_showcase_preview.png)
+
+Here is an earlier 3D perspective scene, also generated entirely by PureDraw, showing linear gradients, 3D grids, perspective-distorted badges, crumpled paper deformation, multiply blend modes, and drop shadows:
 
 ![PureDraw 3D perspective scene preview](3d_transform_scene_preview.png)
 
