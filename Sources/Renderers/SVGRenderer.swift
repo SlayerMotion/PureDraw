@@ -26,7 +26,7 @@ public struct SVGRenderer: Renderer {
         // 1. Gather all unique clip paths and shadows
         var uniqueClipPaths: [Path] = []
         var uniqueShadows: [Shadow] = []
-        for op in context.commands {
+        for op in context.flattenedCommands {
             if let clip = op.state.clipPath {
                 if !uniqueClipPaths.contains(clip) {
                     uniqueClipPaths.append(clip)
@@ -56,7 +56,7 @@ public struct SVGRenderer: Renderer {
             var overallMaxX = -Double.infinity
             var overallMaxY = -Double.infinity
 
-            for op in context.commands {
+            for op in context.flattenedCommands {
                 let path: Path
                 switch op.kind {
                 case let .fill(p, _):
@@ -83,7 +83,7 @@ public struct SVGRenderer: Renderer {
                     p.addLine(to: Point(x: rect.minX, y: rect.maxY))
                     p.closeSubpath()
                     path = p
-                case .beginTransparencyLayer, .endTransparencyLayer:
+                case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer:
                     continue
                 }
 
@@ -123,7 +123,7 @@ public struct SVGRenderer: Renderer {
                 )
             defs.append("    </filter>")
         }
-        for (opIndex, op) in context.commands.enumerated() {
+        for (opIndex, op) in context.flattenedCommands.enumerated() {
             switch op.kind {
             case let .drawLinearGradient(grad, start, end, _):
                 defs
@@ -152,7 +152,7 @@ public struct SVGRenderer: Renderer {
 
         // 4. Render drawing operations
         var elements: [String] = []
-        for (opIndex, op) in context.commands.enumerated() {
+        for (opIndex, op) in context.flattenedCommands.enumerated() {
             switch op.kind {
             case let .fill(p, rule):
                 let pathStr = svgPathString(for: p)
@@ -192,6 +192,8 @@ public struct SVGRenderer: Renderer {
                 elements.append("  <g \(attrsStr)>")
             case .endTransparencyLayer:
                 elements.append("  </g>")
+            case .drawLayer:
+                break // expanded by flattenedCommands
             }
         }
 

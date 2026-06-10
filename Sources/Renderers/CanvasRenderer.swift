@@ -24,7 +24,7 @@ public struct CanvasRenderer: Renderer {
         // Wrap in save/restore to keep global context clean
         js.append("\(contextName).save();")
 
-        for (opIndex, op) in context.commands.enumerated() {
+        for (opIndex, op) in context.flattenedCommands.enumerated() {
             js.append("")
             js.append("// Operation \(opIndex)")
 
@@ -136,6 +136,9 @@ public struct CanvasRenderer: Renderer {
 
                 case .beginTransparencyLayer, .endTransparencyLayer:
                     break
+
+                case .drawLayer:
+                    break // expanded by flattenedCommands
 
                 case let .drawImage(image, rect):
                     let canvasVar = "imgCanvas_\(opIndex)"

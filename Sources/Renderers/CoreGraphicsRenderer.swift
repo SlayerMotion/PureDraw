@@ -16,14 +16,25 @@
         /// The target native CoreGraphics context.
         public let targetContext: CGContext
 
+        /// Guards against unbounded recursion through self-referential layers.
+        private let layerDepth: Int
+
         public init(context: CGContext) {
             targetContext = context
+            layerDepth = 0
+        }
+
+        private init(context: CGContext, layerDepth: Int) {
+            targetContext = context
+            self.layerDepth = layerDepth
         }
 
         public func draw(_ context: GraphicsContext) throws {
             // DeviceGray mask conversion is O(width * height); reuse converted
             // masks across operations within this render pass.
             var maskCache = [(source: Image, mask: CGImage)]()
+            // Each layer renders once per pass into a native CGLayer.
+            var layerCache: [ObjectIdentifier: CGLayer] = [:]
             for operation in context.commands {
                 switch operation.kind {
                 case .beginTransparencyLayer:
@@ -172,6 +183,20 @@
                             targetContext.scaleBy(x: 1.0, y: -1.0)
                             targetContext.draw(cgImage, in: CGRect(x: 0, y: 0, width: CGFloat(rect.width), height: CGFloat(rect.height)))
                             targetContext.restoreGState()
+                        }
+
+                    case let .drawLayer(layer, rect):
+                        guard layerDepth < 8, layer.width > 0, layer.height > 0 else { break }
+                        let key = ObjectIdentifier(layer)
+                        if layerCache[key] == nil,
+                           let cgLayer = CGLayer(targetContext, size: CGSize(width: layer.width, height: layer.height), auxiliaryInfo: nil),
+                           let layerContext = cgLayer.context
+                        {
+                            try CoreGraphicsRenderer(context: layerContext, layerDepth: layerDepth + 1).draw(layer.context)
+                            layerCache[key] = cgLayer
+                        }
+                        if let cgLayer = layerCache[key] {
+                            targetContext.draw(cgLayer, in: CGRect(x: rect.origin.x, y: rect.origin.y, width: rect.width, height: rect.height))
                         }
 
                     case .beginTransparencyLayer, .endTransparencyLayer:

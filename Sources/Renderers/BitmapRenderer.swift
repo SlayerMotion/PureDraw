@@ -15,16 +15,29 @@ public final class BitmapRenderer: Renderer, Sendable {
     public let height: Int
     public let colorSpace: ColorSpace
 
+    /// Guards against unbounded recursion through self-referential layers.
+    private let layerDepth: Int
+
     public init(width: Int, height: Int, colorSpace: ColorSpace = .deviceRGB) {
         self.width = width
         self.height = height
         self.colorSpace = colorSpace
+        layerDepth = 0
+    }
+
+    private init(width: Int, height: Int, colorSpace: ColorSpace, layerDepth: Int) {
+        self.width = width
+        self.height = height
+        self.colorSpace = colorSpace
+        self.layerDepth = layerDepth
     }
 
     public func draw(_ context: GraphicsContext) throws -> Image {
         var currentBuffer = [UInt8](repeating: 0, count: width * height * 4)
         var bufferStack: [[UInt8]] = []
         var beginOpStack: [DrawOperation] = []
+        // Each layer rasterizes once per pass; stamps reuse the cached image.
+        var layerCache: [ObjectIdentifier: Image] = [:]
 
         for op in context.commands {
             switch op.kind {
@@ -63,6 +76,24 @@ public final class BitmapRenderer: Renderer, Sendable {
 
             case let .drawImage(image, rect):
                 rasterizeImage(image, in: rect, state: op.state, buffer: &currentBuffer)
+
+            case let .drawLayer(layer, rect):
+                guard layerDepth < 8, layer.width > 0, layer.height > 0 else { continue }
+                let key = ObjectIdentifier(layer)
+                let stamp: Image
+                if let cached = layerCache[key] {
+                    stamp = cached
+                } else {
+                    let layerRenderer = BitmapRenderer(
+                        width: max(1, Int(layer.width.rounded(.up))),
+                        height: max(1, Int(layer.height.rounded(.up))),
+                        colorSpace: colorSpace,
+                        layerDepth: layerDepth + 1
+                    )
+                    stamp = try layerRenderer.draw(layer.context)
+                    layerCache[key] = stamp
+                }
+                rasterizeImage(stamp, in: rect, state: op.state, buffer: &currentBuffer)
             }
         }
 

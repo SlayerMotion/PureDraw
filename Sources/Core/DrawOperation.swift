@@ -16,6 +16,7 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
         case beginTransparencyLayer
         case endTransparencyLayer
         case drawImage(Image, rect: Rect)
+        case drawLayer(Layer, rect: Rect)
     }
 
     public let kind: Kind

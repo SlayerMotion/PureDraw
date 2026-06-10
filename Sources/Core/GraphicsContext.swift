@@ -404,6 +404,16 @@ public struct GraphicsContext: Sendable, Validatable {
     }
 
     /// Intersects the current clipping path with the clipping mask defined by the specified image.
+    /// Stamps a recorded layer into the given rect, scaling its contents.
+    public mutating func draw(_ layer: Layer, in rect: Rect) {
+        commands.append(DrawOperation(kind: .drawLayer(layer, rect: rect), state: currentState))
+    }
+
+    /// Stamps a recorded layer at the given point at its natural size.
+    public mutating func draw(_ layer: Layer, at point: Point) {
+        draw(layer, in: Rect(x: point.x, y: point.y, width: layer.width, height: layer.height))
+    }
+
     public mutating func clip(to rect: Rect, mask: Image) {
         currentState.maskImage = mask
         currentState.maskRect = rect

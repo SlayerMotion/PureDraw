@@ -33,7 +33,7 @@ public struct PDFRenderer: Renderer {
         // We concatenate a transform to flip the Y axis.
         contentStream += "1 0 0 -1 0 \(height) cm\n"
 
-        for (opIndex, op) in context.commands.enumerated() {
+        for (opIndex, op) in context.flattenedCommands.enumerated() {
             contentStream += "q\n"
 
             // 1. Transform
@@ -128,7 +128,7 @@ public struct PDFRenderer: Renderer {
                         contentStream += pathStr
                         contentStream += "f\n"
                     }
-                case .beginTransparencyLayer, .endTransparencyLayer, .drawImage:
+                case .beginTransparencyLayer, .endTransparencyLayer, .drawImage, .drawLayer:
                     break
                 }
                 contentStream += "Q\n"
@@ -289,6 +289,8 @@ public struct PDFRenderer: Renderer {
                 contentStream += "Q\n"
             case .beginTransparencyLayer, .endTransparencyLayer:
                 break
+            case .drawLayer:
+                break // expanded by flattenedCommands
             }
 
             contentStream += "Q\n"

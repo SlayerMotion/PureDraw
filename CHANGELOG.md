@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Layer`, the `CGLayer` equivalent: record into `layer.context`, stamp with
+  `GraphicsContext.draw(_:in:)` or `draw(_:at:)`. `BitmapRenderer` rasterizes
+  each layer once per pass and reuses the cached image; `CoreGraphicsRenderer`
+  renders into a native `CGLayer`; vector backends inline the layer's
+  commands per stamp via `GraphicsContext.flattenedCommands`.
+- `DataProvider` and `DataConsumer`, the `CGDataProvider`/`CGDataConsumer`
+  equivalents, plus `Image(provider:)` and `PNGEncoder.encode(_:to:)`.
+- `ImageMetadata.parse` extracts dimensions, EXIF camera fields, GPS
+  coordinates, and PNG text chunks from PNG, JPEG, and TIFF containers.
 - `PNGEncoder.encode(_:)` turns any `Image` into a standards-correct PNG
   (8-bit RGBA, stored deflate blocks) with no external dependencies, on every
   supported platform.
@@ -45,6 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The validation walker now visits each reference-type instance once, so
+  cyclic object graphs (such as a layer drawn into itself) validate instead
+  of overflowing the stack.
 - `BitmapRenderer` no longer strokes a phantom closing segment on open paths:
   stroking now flattens through `Path.toPolylines()`, which preserves whether
   each subpath was explicitly closed.

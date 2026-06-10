@@ -40,7 +40,7 @@ public struct PostScriptRenderer: Renderer {
             var overallMaxX = -Double.infinity
             var overallMaxY = -Double.infinity
 
-            for op in context.commands {
+            for op in context.flattenedCommands {
                 let path: Path
                 switch op.kind {
                 case let .fill(p, _):
@@ -67,7 +67,7 @@ public struct PostScriptRenderer: Renderer {
                     p.addLine(to: Point(x: rect.minX, y: rect.maxY))
                     p.closeSubpath()
                     path = p
-                case .beginTransparencyLayer, .endTransparencyLayer:
+                case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer:
                     continue
                 }
 
@@ -98,7 +98,7 @@ public struct PostScriptRenderer: Renderer {
         // Map Y-axis from top-left (PureDraw) to bottom-left (PostScript)
         ps += "1 -1 scale 0 -\(viewBoxHeight) translate\n\n"
 
-        for op in context.commands {
+        for op in context.flattenedCommands {
             ps += "gsave\n"
 
             // 1. Transform
@@ -257,7 +257,7 @@ public struct PostScriptRenderer: Renderer {
                 grestore
 
                 """
-            case .beginTransparencyLayer, .endTransparencyLayer:
+            case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer:
                 break
             }
 
