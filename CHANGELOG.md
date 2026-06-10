@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the O(pixels x segments) per-pixel containment loop.
 - `Path.toPolylines()` flattens a path into per-subpath polylines that
   preserve whether each subpath was explicitly closed.
+- `BitmapRenderer` strokes with true join geometry: miter joins honor
+  `miterLimit` and fall back to bevel, bevel joins cut the outer corner, and
+  round joins keep their disk. The whole stroke renders as one
+  winding-consistent shape, so overlapping segments blend exactly once even
+  with translucent stroke colors.
 - Image-based clipping masks: `GraphicsContext.clip(to:mask:)`, honored by
   `BitmapRenderer` and `CoreGraphicsRenderer`.
 - Color masking on `Image` via `maskingColors`, applied consistently by both
@@ -28,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `BitmapRenderer` no longer strokes a phantom closing segment on open paths:
+  stroking now flattens through `Path.toPolylines()`, which preserves whether
+  each subpath was explicitly closed.
 - `CoreGraphicsRenderer` mask clipping rendered nothing: the vertical flip was
   composed with CoreGraphics ordering on `AffineTransform` builders that append
   instead of prepending, pushing the clip off-canvas. The mask and drawing

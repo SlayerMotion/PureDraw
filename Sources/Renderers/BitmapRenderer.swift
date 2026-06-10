@@ -110,136 +110,192 @@ public final class BitmapRenderer: Renderer, Sendable {
         let halfW = deviceLineWidth / 2.0
 
         let transformedPath = path.applying(state.transform)
-        let polygons = transformedPath.toPolygons()
 
-        let clipPath = state.clipPath?.applying(state.transform)
+        // Build one winding-consistent shape for the whole stroke (segment
+        // quads, joins, caps) and fill it in a single coverage pass, so
+        // overlapping pieces blend exactly once.
+        var strokeShape = Path()
+        for polyline in transformedPath.toPolylines() {
+            appendStrokeGeometry(
+                for: polyline,
+                halfW: halfW,
+                lineCap: state.lineCap,
+                lineJoin: state.lineJoin,
+                miterLimit: state.miterLimit,
+                into: &strokeShape
+            )
+        }
+        guard !strokeShape.elements.isEmpty else { return }
 
-        for poly in polygons {
-            guard poly.count >= 2 else {
-                if poly.count == 1, state.lineCap == .round {
-                    drawDisk(center: poly[0], radius: halfW, color: color, state: state, clipPath: clipPath, buffer: &buffer)
-                }
-                continue
+        // The shape is in device space, so reset the CTM and carry the
+        // pre-transformed clip together.
+        var strokeState = state
+        strokeState.transform = .identity
+        strokeState.clipPath = state.clipPath?.applying(state.transform)
+        rasterizeFill(path: strokeShape, state: strokeState, color: color, rule: .winding, buffer: &buffer)
+    }
+
+    private func appendStrokeGeometry(
+        for polyline: (points: [Point], isClosed: Bool),
+        halfW: Double,
+        lineCap: LineCap,
+        lineJoin: LineJoin,
+        miterLimit: Double,
+        into shape: inout Path
+    ) {
+        // Collapse consecutive duplicates so joins are well defined.
+        var points: [Point] = []
+        for point in polyline.points where point != points.last {
+            points.append(point)
+        }
+        var isClosed = polyline.isClosed
+        if isClosed, points.count >= 2, points.first == points.last {
+            points.removeLast()
+        }
+        if isClosed, points.count < 3 {
+            isClosed = false
+        }
+
+        guard points.count >= 2 else {
+            if points.count == 1, lineCap == .round {
+                appendDisk(center: points[0], radius: halfW, into: &shape)
             }
+            return
+        }
 
-            for i in 0 ..< (poly.count - 1) {
-                let a = poly[i]
-                let b = poly[i + 1]
-                drawSegment(a: a, b: b, halfW: halfW, color: color, state: state, clipPath: clipPath, buffer: &buffer)
-            }
+        let segmentCount = isClosed ? points.count : points.count - 1
+        for i in 0 ..< segmentCount {
+            appendSegmentQuad(a: points[i], b: points[(i + 1) % points.count], halfW: halfW, into: &shape)
+        }
 
-            for i in 0 ..< poly.count {
-                let pt = poly[i]
-                let isStart = (i == 0)
-                let isEnd = (i == poly.count - 1)
+        let joinIndices = isClosed ? Array(0 ..< points.count) : Array(1 ..< points.count - 1)
+        for i in joinIndices {
+            let previous = points[(i - 1 + points.count) % points.count]
+            let next = points[(i + 1) % points.count]
+            appendJoin(at: points[i], from: previous, to: next, halfW: halfW, lineJoin: lineJoin, miterLimit: miterLimit, into: &shape)
+        }
 
-                if isStart || isEnd {
-                    switch state.lineCap {
-                    case .round:
-                        drawDisk(center: pt, radius: halfW, color: color, state: state, clipPath: clipPath, buffer: &buffer)
-                    case .square:
-                        drawSquareCap(pt: pt, index: i, poly: poly, halfW: halfW, color: color, state: state, clipPath: clipPath, buffer: &buffer)
-                    case .butt:
-                        break
-                    }
-                } else {
-                    switch state.lineJoin {
-                    case .round:
-                        drawDisk(center: pt, radius: halfW, color: color, state: state, clipPath: clipPath, buffer: &buffer)
-                    case .miter, .bevel:
-                        drawDisk(center: pt, radius: halfW, color: color, state: state, clipPath: clipPath, buffer: &buffer)
-                    }
-                }
-            }
+        if !isClosed {
+            appendCap(at: points[0], awayFrom: points[1], halfW: halfW, lineCap: lineCap, into: &shape)
+            appendCap(at: points[points.count - 1], awayFrom: points[points.count - 2], halfW: halfW, lineCap: lineCap, into: &shape)
         }
     }
 
-    private func drawDisk(center: Point, radius: Double, color: Color, state: GraphicState, clipPath: Path?, buffer: inout [UInt8]) {
-        let minX = max(0, Int(floor(center.x - radius)))
-        let maxX = min(width - 1, Int(ceil(center.x + radius)))
-        let minY = max(0, Int(floor(center.y - radius)))
-        let maxY = min(height - 1, Int(ceil(center.y + radius)))
-
-        guard minX <= maxX, minY <= maxY else { return }
-
-        let r2 = radius * radius
-        for y in minY ... maxY {
-            for x in minX ... maxX {
-                let deltaX = Double(x) + 0.5 - center.x
-                let deltaY = Double(y) + 0.5 - center.y
-                if deltaX * deltaX + deltaY * deltaY <= r2 {
-                    let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
-                    if let clip = clipPath {
-                        guard clip.contains(pt, using: .winding) else { continue }
-                    }
-                    blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
-                }
-            }
-        }
-    }
-
-    private func drawSegment(a: Point, b: Point, halfW: Double, color: Color, state: GraphicState, clipPath: Path?, buffer: inout [UInt8]) {
+    /// Appends the rectangle covering a stroked segment. Vertex order keeps a
+    /// positive orientation for any direction, which the winding-rule union
+    /// of the stroke shape relies on.
+    private func appendSegmentQuad(a: Point, b: Point, halfW: Double, into shape: inout Path) {
         let deltaX = b.x - a.x
         let deltaY = b.y - a.y
-        let len = sqrt(deltaX * deltaX + deltaY * deltaY)
-        guard len > 1e-9 else { return }
+        let length = sqrt(deltaX * deltaX + deltaY * deltaY)
+        guard length > 1e-9 else { return }
 
-        let nx = -deltaY / len
-        let ny = deltaX / len
+        let nx = -deltaY / length * halfW
+        let ny = deltaX / length * halfW
 
-        let p0 = Point(x: a.x + nx * halfW, y: a.y + ny * halfW)
-        let p1 = Point(x: a.x - nx * halfW, y: a.y - ny * halfW)
-        let p2 = Point(x: b.x - nx * halfW, y: b.y - ny * halfW)
-        let p3 = Point(x: b.x + nx * halfW, y: b.y + ny * halfW)
-
-        var rectPath = Path()
-        rectPath.move(to: p0)
-        rectPath.addLine(to: p1)
-        rectPath.addLine(to: p2)
-        rectPath.addLine(to: p3)
-        rectPath.closeSubpath()
-
-        // The quad is in device space, so the clip must be too: store the
-        // pre-transformed clip alongside the reset CTM.
-        var segmentState = state
-        segmentState.transform = .identity
-        segmentState.clipPath = clipPath
-        rasterizeFill(path: rectPath, state: segmentState, color: color, rule: .winding, buffer: &buffer)
+        shape.move(to: Point(x: a.x + nx, y: a.y + ny))
+        shape.addLine(to: Point(x: a.x - nx, y: a.y - ny))
+        shape.addLine(to: Point(x: b.x - nx, y: b.y - ny))
+        shape.addLine(to: Point(x: b.x + nx, y: b.y + ny))
+        shape.closeSubpath()
     }
 
-    private func drawSquareCap(pt: Point, index: Int, poly: [Point], halfW: Double, color: Color, state: GraphicState, clipPath: Path?, buffer: inout [UInt8]) {
-        let isStart = (index == 0)
-        let neighbor = isStart ? poly[1] : poly[poly.count - 2]
+    private func appendDisk(center: Point, radius: Double, into shape: inout Path) {
+        let segments = max(16, min(64, Int(ceil(radius * 4.0))))
+        shape.move(to: Point(x: center.x + radius, y: center.y))
+        for step in 1 ..< segments {
+            let angle = 2.0 * Double.pi * Double(step) / Double(segments)
+            shape.addLine(to: Point(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle)))
+        }
+        shape.closeSubpath()
+    }
 
-        let deltaX = neighbor.x - pt.x
-        let deltaY = neighbor.y - pt.y
-        let len = sqrt(deltaX * deltaX + deltaY * deltaY)
-        guard len > 1e-9 else { return }
+    private func appendJoin(
+        at pt: Point,
+        from previous: Point,
+        to next: Point,
+        halfW: Double,
+        lineJoin: LineJoin,
+        miterLimit: Double,
+        into shape: inout Path
+    ) {
+        let inX = pt.x - previous.x
+        let inY = pt.y - previous.y
+        let outX = next.x - pt.x
+        let outY = next.y - pt.y
+        let inLength = sqrt(inX * inX + inY * inY)
+        let outLength = sqrt(outX * outX + outY * outY)
+        guard inLength > 1e-9, outLength > 1e-9 else { return }
 
-        let dirX = isStart ? -deltaX / len : deltaX / len
-        let dirY = isStart ? -deltaY / len : deltaY / len
+        let d1 = Point(x: inX / inLength, y: inY / inLength)
+        let d2 = Point(x: outX / outLength, y: outY / outLength)
+        let turn = d1.x * d2.y - d1.y * d2.x
+        guard abs(turn) > 1e-12 else { return } // Collinear: the quads already overlap.
 
-        let nx = -dirY
-        let ny = dirX
+        if lineJoin == .round {
+            appendDisk(center: pt, radius: halfW, into: &shape)
+            return
+        }
 
-        let capEnd = Point(x: pt.x + dirX * halfW, y: pt.y + dirY * halfW)
+        // Outer normals point away from the inside of the turn; the wedge gap
+        // between the two segment quads opens on that side.
+        let outer1: Point
+        let outer2: Point
+        if turn > 0 {
+            outer1 = Point(x: d1.y, y: -d1.x)
+            outer2 = Point(x: d2.y, y: -d2.x)
+        } else {
+            outer1 = Point(x: -d1.y, y: d1.x)
+            outer2 = Point(x: -d2.y, y: d2.x)
+        }
+        let corner1 = Point(x: pt.x + outer1.x * halfW, y: pt.y + outer1.y * halfW)
+        let corner2 = Point(x: pt.x + outer2.x * halfW, y: pt.y + outer2.y * halfW)
 
-        let p0 = Point(x: pt.x + nx * halfW, y: pt.y + ny * halfW)
-        let p1 = Point(x: pt.x - nx * halfW, y: pt.y - ny * halfW)
-        let p2 = Point(x: capEnd.x - nx * halfW, y: capEnd.y - ny * halfW)
-        let p3 = Point(x: capEnd.x + nx * halfW, y: capEnd.y + ny * halfW)
+        // CoreGraphics compares 1 / sin(half the angle between segments)
+        // against the miter limit; cosHalf below equals that sine.
+        var miterTip: Point?
+        if lineJoin == .miter {
+            let bisectorX = outer1.x + outer2.x
+            let bisectorY = outer1.y + outer2.y
+            let bisectorLength = sqrt(bisectorX * bisectorX + bisectorY * bisectorY)
+            if bisectorLength > 1e-9 {
+                let cosHalf = (bisectorX * outer1.x + bisectorY * outer1.y) / bisectorLength
+                if cosHalf > 1e-9, 1.0 / cosHalf <= miterLimit {
+                    let reach = halfW / cosHalf
+                    miterTip = Point(x: pt.x + bisectorX / bisectorLength * reach, y: pt.y + bisectorY / bisectorLength * reach)
+                }
+            }
+        }
 
-        var capPath = Path()
-        capPath.move(to: p0)
-        capPath.addLine(to: p1)
-        capPath.addLine(to: p2)
-        capPath.addLine(to: p3)
-        capPath.closeSubpath()
+        // Emit with positive orientation so the union stays winding-consistent.
+        let orientation = (corner1.x - pt.x) * (corner2.y - pt.y) - (corner1.y - pt.y) * (corner2.x - pt.x)
+        let first = orientation >= 0 ? corner1 : corner2
+        let second = orientation >= 0 ? corner2 : corner1
+        shape.move(to: pt)
+        shape.addLine(to: first)
+        if let miterTip {
+            shape.addLine(to: miterTip)
+        }
+        shape.addLine(to: second)
+        shape.closeSubpath()
+    }
 
-        var capState = state
-        capState.transform = .identity
-        capState.clipPath = clipPath
-        rasterizeFill(path: capPath, state: capState, color: color, rule: .winding, buffer: &buffer)
+    private func appendCap(at end: Point, awayFrom neighbor: Point, halfW: Double, lineCap: LineCap, into shape: inout Path) {
+        switch lineCap {
+        case .butt:
+            return
+
+        case .round:
+            appendDisk(center: end, radius: halfW, into: &shape)
+
+        case .square:
+            let dirX = end.x - neighbor.x
+            let dirY = end.y - neighbor.y
+            let length = sqrt(dirX * dirX + dirY * dirY)
+            guard length > 1e-9 else { return }
+            let capEnd = Point(x: end.x + dirX / length * halfW, y: end.y + dirY / length * halfW)
+            appendSegmentQuad(a: end, b: capEnd, halfW: halfW, into: &shape)
+        }
     }
 
     private func rasterizeLinearGradient(grad: Gradient, start: Point, end: Point, state: GraphicState, buffer: inout [UInt8]) {

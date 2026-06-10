@@ -164,6 +164,59 @@ struct BitmapRendererTests {
         #expect(data[rightIndex + 3] == 0)
     }
 
+    @Test func openStrokeHasNoPhantomClosingSegment() throws {
+        var context = GraphicsContext()
+        context.setStrokeColor(Color(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0))
+        context.setLineWidth(2.0)
+        context.setLineCap(.butt)
+        context.move(to: Point(x: 2, y: 2))
+        context.addLine(to: Point(x: 2, y: 13))
+        context.addLine(to: Point(x: 13, y: 13))
+        context.strokePath()
+
+        let image = try BitmapRenderer(width: 16, height: 16).render(context)
+        let data = image.data
+
+        // Both legs are painted.
+        #expect(data[(7 * 16 + 2) * 4 + 3] == 255)
+        #expect(data[(13 * 16 + 7) * 4 + 3] == 255)
+        // The diagonal from (13, 13) back to (2, 2) must not be: an open path
+        // has no closing segment.
+        #expect(data[(7 * 16 + 8) * 4 + 3] == 0)
+        #expect(data[(8 * 16 + 7) * 4 + 3] == 0)
+    }
+
+    @Test(arguments: [LineJoin.miter, LineJoin.bevel, LineJoin.round])
+    func strokeJoinGeometry(join: LineJoin) throws {
+        var context = GraphicsContext()
+        context.setStrokeColor(Color(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0))
+        context.setLineWidth(4.0)
+        context.setLineCap(.butt)
+        context.setLineJoin(join)
+        context.move(to: Point(x: 3, y: 9))
+        context.addLine(to: Point(x: 3, y: 3))
+        context.addLine(to: Point(x: 9, y: 3))
+        context.strokePath()
+
+        let image = try BitmapRenderer(width: 12, height: 12).render(context)
+        let data = image.data
+
+        let outerCorner = Int(data[(1 * 12 + 1) * 4 + 3]) // only a full miter reaches here
+        let edgePixel = Int(data[(2 * 12 + 1) * 4 + 3]) // pixel (1, 2): bisected by the bevel edge
+
+        switch join {
+        case .miter:
+            #expect(outerCorner == 255, "miter should fill the outer corner, got \(outerCorner)")
+            #expect(edgePixel == 255)
+        case .bevel:
+            #expect(outerCorner == 0, "bevel should cut the outer corner, got \(outerCorner)")
+            #expect(edgePixel > 100 && edgePixel < 160, "bevel edge should bisect (1, 2), got \(edgePixel)")
+        case .round:
+            #expect(outerCorner < 100, "round join should only graze the outer corner, got \(outerCorner)")
+            #expect(edgePixel > 200, "round join should mostly cover (1, 2), got \(edgePixel)")
+        }
+    }
+
     @Test func drawImage() throws {
         // Create a 2x2 test image (RGBA: un-premultiplied color values)
         // Red, Green, Blue, Yellow
