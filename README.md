@@ -137,7 +137,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::done --> Epic38["Epic #38: Rasterizer Quality"]:::partial --> Epic13["Epic #13: Masking, Caching & Streams"]:::partial --> Epic40["Epic #40: PNG Export & Golden Tests"]:::todo --> Epic18["Epic #18: Typography & Text Layout"]:::todo --> Epic22["Epic #22: Advanced PDF Systems"]:::todo
+    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::done --> Epic38["Epic #38: Rasterizer Quality"]:::done --> Epic13["Epic #13: Masking, Caching & Streams"]:::partial --> Epic40["Epic #40: PNG Export & Golden Tests"]:::done --> Epic18["Epic #18: Typography & Text Layout"]:::todo --> Epic22["Epic #22: Advanced PDF Systems"]:::todo
 
     click E0 href "https://github.com/mihaelamj/PureDraw/issues/1" "E0"
     click E1 href "https://github.com/mihaelamj/PureDraw/issues/2" "E1"
@@ -218,13 +218,14 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    Epic38["Epic #38: Rasterizer Quality"]:::partial --> I41["#41: Stroke Clip-Space Fix"]:::done --> I42["#42: Scanline AA Fill"]:::next --> I43["#43: Miter & Bevel Joins"]:::todo --> I44["#44: Bilinear Sampling"]:::todo
+    Epic38["Epic #38: Rasterizer Quality"]:::done --> I41["#41: Stroke Clip-Space Fix"]:::done --> I42["#42: Scanline AA Fill"]:::done --> I43["#43: Miter & Bevel Joins"]:::done --> I44["#44: Bilinear Sampling"]:::done --> I51["#51: Phantom Closing Segment"]:::done
 
     click Epic38 href "https://github.com/mihaelamj/PureDraw/issues/38" "Epic #38"
     click I41 href "https://github.com/mihaelamj/PureDraw/issues/41" "Issue #41"
     click I42 href "https://github.com/mihaelamj/PureDraw/issues/42" "Issue #42"
     click I43 href "https://github.com/mihaelamj/PureDraw/issues/43" "Issue #43"
     click I44 href "https://github.com/mihaelamj/PureDraw/issues/44" "Issue #44"
+    click I51 href "https://github.com/mihaelamj/PureDraw/issues/51" "Issue #51"
 ```
 
 ### Epic #13: Image Masking, Caching & Data Streams
@@ -256,7 +257,7 @@ flowchart TB
     classDef partial fill:#FF9500,color:#FFFFFF
     classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    Epic40["Epic #40: PNG Export & Golden Tests"]:::todo --> I48["#48: PNG Encoder"]:::todo --> I49["#49: Golden-Image CI Suite"]:::todo
+    Epic40["Epic #40: PNG Export & Golden Tests"]:::done --> I48["#48: PNG Encoder"]:::done --> I49["#49: Golden-Image CI Suite"]:::done
 
     click Epic40 href "https://github.com/mihaelamj/PureDraw/issues/40" "Epic #40"
     click I48 href "https://github.com/mihaelamj/PureDraw/issues/48" "Issue #48"
