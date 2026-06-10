@@ -109,6 +109,15 @@ public extension Validation {
                     ))
                 }
 
+                // A pattern's bounds are validated via the embedded Rect, but
+                // its step values are bare Doubles that escape reflection.
+                if let pattern = s.fillPattern, pattern.xStep <= 0 || pattern.yStep <= 0 {
+                    errors.append(ValidationError(
+                        reason: "fillPattern xStep and yStep must be positive",
+                        at: context.codingPath + [ValidationCodingKey("fillPattern")]
+                    ))
+                }
+
                 if s.maskImage != nil {
                     if s.maskRect == nil {
                         errors.append(ValidationError(

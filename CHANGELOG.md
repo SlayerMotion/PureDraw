@@ -93,6 +93,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Validation now rejects a fill pattern with a non-positive `xStep`/`yStep`,
+  closing the last reflection gap (pattern bounds, text position, and text
+  matrix were already validated through the command graph).
 - `BitmapRenderer` throws `ValidationError` on non-positive dimensions instead
   of trapping at buffer allocation.
 - Validation now rejects unbalanced transparency layers (which produced
