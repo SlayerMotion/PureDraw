@@ -123,6 +123,11 @@ Alternatively, you can run all local verification gates with:
 bash scripts/check-all.sh
 ```
 
+To measure rasterizer throughput (deterministic scenes, no CI timing assertions):
+```bash
+swift run -c release puredraw-bench
+```
+
 ---
 
 ## Roadmap

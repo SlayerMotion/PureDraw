@@ -108,11 +108,32 @@ let targets: [Target] = {
         pureDrawTarget
     ]
 
-    return foundationTargets + coreTargets + rendererTargets + frontDoorTargets
+    // ---------- Benchmarks (executable, not run by `swift test`) ----------
+    let benchmarkTarget = Target.executableTarget(
+        name: "puredraw-bench",
+        dependencies: [
+            "Geometry",
+            "Core",
+            "Renderers"
+        ],
+        path: "Benchmarks/puredraw-bench"
+    )
+    let benchmarkTargets = [
+        benchmarkTarget
+    ]
+
+    return foundationTargets + coreTargets + rendererTargets + frontDoorTargets + benchmarkTargets
 }()
 
 let package = Package(
     name: "PureDraw",
+    platforms: [
+        .macOS(.v13),
+        .iOS(.v16),
+        .tvOS(.v16),
+        .watchOS(.v9),
+        .visionOS(.v1)
+    ],
     products: allProducts,
     dependencies: deps,
     targets: targets

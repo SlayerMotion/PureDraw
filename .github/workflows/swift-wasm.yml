@@ -36,5 +36,8 @@ jobs:
             echo "No Package.swift yet; skipping WASM build."
             exit 0
           fi
-          swift build --swift-sdk wasm32-unknown-wasi
-          swift build -c release --swift-sdk wasm32-unknown-wasi
+          # Build the library product only; the umbrella pulls in every
+          # library target. The host-only benchmark executable is not part of
+          # the WASM contract.
+          swift build --product PureDraw --swift-sdk wasm32-unknown-wasi
+          swift build -c release --product PureDraw --swift-sdk wasm32-unknown-wasi
