@@ -83,7 +83,7 @@ public struct SVGRenderer: Renderer {
                     p.addLine(to: Point(x: rect.minX, y: rect.maxY))
                     p.closeSubpath()
                     path = p
-                case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer:
+                case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer, .showText:
                     continue
                 }
 
@@ -192,7 +192,7 @@ public struct SVGRenderer: Renderer {
                 elements.append("  <g \(attrsStr)>")
             case .endTransparencyLayer:
                 elements.append("  </g>")
-            case .drawLayer:
+            case .drawLayer, .showText:
                 break // expanded by flattenedCommands
             }
         }

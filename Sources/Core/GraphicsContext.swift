@@ -479,31 +479,25 @@ public struct GraphicsContext: Sendable, Validatable {
     /// matrix's x axis.
     public mutating func showGlyphs(_ glyphs: [Int]) {
         guard let font = currentState.font, font.unitsPerEm > 0 else { return }
+
+        // Record the text as a single high-level operation. Backends without
+        // native text expand it to glyph outlines via `textLoweredCommands`;
+        // SVG and PDF can render it as real selectable text.
+        commands.append(DrawOperation(
+            kind: .showText(
+                glyphs: glyphs,
+                font: font,
+                fontSize: currentState.fontSize,
+                drawingMode: currentState.textDrawingMode,
+                textMatrix: textMatrix,
+                position: textPosition
+            ),
+            state: currentState
+        ))
+
+        // Advance the pen so the next show starts after this run.
         let scale = currentState.fontSize / Double(font.unitsPerEm)
-
         for glyph in glyphs {
-            if currentState.textDrawingMode != .invisible, let outline = font.outline(forGlyph: glyph) {
-                // Font units are y-up; user space is y-down, so flip while
-                // scaling, then apply the text matrix and the pen position.
-                let placement = Geometry.AffineTransform.identity
-                    .scaledBy(x: scale, y: -scale)
-                    .concatenating(textMatrix)
-                    .translatedBy(x: textPosition.x, y: textPosition.y)
-                let placed = outline.applying(placement)
-
-                switch currentState.textDrawingMode {
-                case .fill:
-                    commands.append(DrawOperation(kind: .fill(placed, rule: .winding), state: currentState))
-                case .stroke:
-                    commands.append(DrawOperation(kind: .stroke(placed), state: currentState))
-                case .fillStroke:
-                    commands.append(DrawOperation(kind: .fill(placed, rule: .winding), state: currentState))
-                    commands.append(DrawOperation(kind: .stroke(placed), state: currentState))
-                case .invisible:
-                    break
-                }
-            }
-
             let advance = font.advanceWidth(forGlyph: glyph) * scale + currentState.characterSpacing
             textPosition = Point(
                 x: textPosition.x + advance * textMatrix.a,

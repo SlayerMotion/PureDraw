@@ -40,7 +40,53 @@ public extension GraphicsContext {
     /// `commands`. Nesting is capped at eight levels; deeper (or cyclic)
     /// layer references are dropped.
     var flattenedCommands: [DrawOperation] {
-        Self.flattenLayers(commands, depth: 8)
+        Self.flattenLayers(Self.lowerText(commands), depth: 8)
+    }
+
+    /// The recorded commands with `showText` operations lowered to glyph
+    /// outline fills/strokes, leaving layers intact. Pixel backends render
+    /// this so text becomes vector paths; SVG and PDF can read the raw
+    /// `showText` operations instead to emit native selectable text.
+    var textLoweredCommands: [DrawOperation] {
+        Self.lowerText(commands)
+    }
+
+    static func lowerText(_ operations: [DrawOperation]) -> [DrawOperation] {
+        var result: [DrawOperation] = []
+        for operation in operations {
+            guard case let .showText(glyphs, font, fontSize, drawingMode, textMatrix, position) = operation.kind else {
+                result.append(operation)
+                continue
+            }
+            guard font.unitsPerEm > 0, drawingMode != .invisible else { continue }
+            let scale = fontSize / Double(font.unitsPerEm)
+            var pen = position
+            for glyph in glyphs {
+                if let outline = font.outline(forGlyph: glyph) {
+                    // Font units are y-up; user space is y-down, so flip while
+                    // scaling, then apply the text matrix and the pen position.
+                    let placement = AffineTransform.identity
+                        .scaledBy(x: scale, y: -scale)
+                        .concatenating(textMatrix)
+                        .translatedBy(x: pen.x, y: pen.y)
+                    let placed = outline.applying(placement)
+                    switch drawingMode {
+                    case .fill:
+                        result.append(DrawOperation(kind: .fill(placed, rule: .winding), state: operation.state))
+                    case .stroke:
+                        result.append(DrawOperation(kind: .stroke(placed), state: operation.state))
+                    case .fillStroke:
+                        result.append(DrawOperation(kind: .fill(placed, rule: .winding), state: operation.state))
+                        result.append(DrawOperation(kind: .stroke(placed), state: operation.state))
+                    case .invisible:
+                        break
+                    }
+                }
+                let advance = font.advanceWidth(forGlyph: glyph) * scale + operation.state.characterSpacing
+                pen = Point(x: pen.x + advance * textMatrix.a, y: pen.y + advance * textMatrix.b)
+            }
+        }
+        return result
     }
 
     private static func flattenLayers(_ operations: [DrawOperation], depth: Int) -> [DrawOperation] {

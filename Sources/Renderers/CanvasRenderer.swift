@@ -137,8 +137,8 @@ public struct CanvasRenderer: Renderer {
                 case .beginTransparencyLayer, .endTransparencyLayer:
                     break
 
-                case .drawLayer:
-                    break // expanded by flattenedCommands
+                case .drawLayer, .showText:
+                    break // expanded by flattenedCommands / textLoweredCommands
 
                 case let .drawImage(image, rect):
                     let canvasVar = "imgCanvas_\(opIndex)"

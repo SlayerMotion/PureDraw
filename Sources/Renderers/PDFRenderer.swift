@@ -217,7 +217,7 @@ public struct PDFRenderer: Renderer {
                         contentStream += pathStr
                         contentStream += "f\n"
                     }
-                case .beginTransparencyLayer, .endTransparencyLayer, .drawImage, .drawLayer:
+                case .beginTransparencyLayer, .endTransparencyLayer, .drawImage, .drawLayer, .showText:
                     break
                 }
                 contentStream += "Q\n"
@@ -378,7 +378,7 @@ public struct PDFRenderer: Renderer {
                 contentStream += "Q\n"
             case .beginTransparencyLayer, .endTransparencyLayer:
                 break
-            case .drawLayer:
+            case .drawLayer, .showText:
                 break // expanded by flattenedCommands
             }
 

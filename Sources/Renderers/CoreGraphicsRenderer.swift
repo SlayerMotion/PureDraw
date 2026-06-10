@@ -35,7 +35,7 @@
             var maskCache = [(source: Image, mask: CGImage)]()
             // Each layer renders once per pass into a native CGLayer.
             var layerCache: [ObjectIdentifier: CGLayer] = [:]
-            for operation in context.commands {
+            for operation in context.textLoweredCommands {
                 switch operation.kind {
                 case .beginTransparencyLayer:
                     targetContext.saveGState()
@@ -199,7 +199,7 @@
                             targetContext.draw(cgLayer, in: CGRect(x: rect.origin.x, y: rect.origin.y, width: rect.width, height: rect.height))
                         }
 
-                    case .beginTransparencyLayer, .endTransparencyLayer:
+                    case .beginTransparencyLayer, .endTransparencyLayer, .showText:
                         break
                     }
 

@@ -50,7 +50,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         // rasterize their clip coverage once per pass instead of once per op.
         let clipCache = ClipCache()
 
-        for op in context.commands {
+        for op in context.textLoweredCommands {
             switch op.kind {
             case .beginTransparencyLayer:
                 bufferStack.append(currentBuffer)
@@ -106,6 +106,9 @@ public final class BitmapRenderer: Renderer, Sendable {
                     layerCache[key] = stamp
                 }
                 rasterizeImage(stamp, in: rect, state: op.state, clipCache: clipCache, buffer: &currentBuffer)
+
+            case .showText:
+                break // lowered to fills/strokes by textLoweredCommands
             }
         }
 
