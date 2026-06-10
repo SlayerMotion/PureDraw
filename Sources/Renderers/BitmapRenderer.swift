@@ -181,7 +181,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         }
     }
 
-    private func drawSegment(a: Point, b: Point, halfW: Double, color: Color, state: GraphicState, clipPath _: Path?, buffer: inout [UInt8]) {
+    private func drawSegment(a: Point, b: Point, halfW: Double, color: Color, state: GraphicState, clipPath: Path?, buffer: inout [UInt8]) {
         let deltaX = b.x - a.x
         let deltaY = b.y - a.y
         let len = sqrt(deltaX * deltaX + deltaY * deltaY)
@@ -202,12 +202,15 @@ public final class BitmapRenderer: Renderer, Sendable {
         rectPath.addLine(to: p3)
         rectPath.closeSubpath()
 
+        // The quad is in device space, so the clip must be too: store the
+        // pre-transformed clip alongside the reset CTM.
         var segmentState = state
         segmentState.transform = .identity
+        segmentState.clipPath = clipPath
         rasterizeFill(path: rectPath, state: segmentState, color: color, rule: .winding, buffer: &buffer)
     }
 
-    private func drawSquareCap(pt: Point, index: Int, poly: [Point], halfW: Double, color: Color, state: GraphicState, clipPath _: Path?, buffer: inout [UInt8]) {
+    private func drawSquareCap(pt: Point, index: Int, poly: [Point], halfW: Double, color: Color, state: GraphicState, clipPath: Path?, buffer: inout [UInt8]) {
         let isStart = (index == 0)
         let neighbor = isStart ? poly[1] : poly[poly.count - 2]
 
@@ -238,6 +241,7 @@ public final class BitmapRenderer: Renderer, Sendable {
 
         var capState = state
         capState.transform = .identity
+        capState.clipPath = clipPath
         rasterizeFill(path: capPath, state: capState, color: color, rule: .winding, buffer: &buffer)
     }
 

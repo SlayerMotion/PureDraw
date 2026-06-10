@@ -88,6 +88,38 @@ struct BitmapRendererTests {
         }
     }
 
+    @Test func strokeRespectsClipUnderTransform() throws {
+        var context = GraphicsContext()
+
+        // Device space: clip covers x in [10, 15).
+        context.translate(by: 10, 0)
+        context.addRect(Rect(x: 0, y: 0, width: 5, height: 20))
+        context.clip()
+
+        // Device space: the stroked line spans x in [5, 20).
+        context.setStrokeColor(Color(red: 0.0, green: 0.0, blue: 1.0, alpha: 1.0))
+        context.setLineWidth(2.0)
+        context.setLineCap(.butt)
+        context.move(to: Point(x: -5, y: 10))
+        context.addLine(to: Point(x: 10, y: 10))
+        context.strokePath()
+
+        let renderer = BitmapRenderer(width: 20, height: 20)
+        let image = try renderer.render(context)
+        let data = image.data
+
+        // Inside both the stroke and the clip: painted.
+        let insideIndex = (10 * 20 + 12) * 4
+        #expect(data[insideIndex + 2] == 255)
+        #expect(data[insideIndex + 3] == 255)
+
+        // Inside the stroke but left and right of the clip: clear.
+        let leftIndex = (10 * 20 + 7) * 4
+        #expect(data[leftIndex + 3] == 0)
+        let rightIndex = (10 * 20 + 17) * 4
+        #expect(data[rightIndex + 3] == 0)
+    }
+
     @Test func drawImage() throws {
         // Create a 2x2 test image (RGBA: un-premultiplied color values)
         // Red, Green, Blue, Yellow

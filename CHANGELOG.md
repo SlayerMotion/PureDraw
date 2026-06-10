@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Validation now rejects images whose `bitsPerComponent` is not 8, making the
   assumption baked into pixel decoding explicit.
 
+### Fixed
+
+- `BitmapRenderer` now evaluates the clip path in device space when stroking
+  segments and square caps; previously a non-identity CTM clipped strokes
+  against the untransformed clip path.
+
 ### Changed
 
 - **Breaking:** `Image.init` throws `ValidationError` when the data buffer is
