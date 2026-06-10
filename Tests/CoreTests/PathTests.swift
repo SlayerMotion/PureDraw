@@ -170,4 +170,65 @@ struct PathTests {
         path.move(to: Point(x: 50, y: 60))
         #expect(path.currentPoint == Point(x: 50, y: 60))
     }
+
+    @Test func pathContainment() {
+        // 1. Simple Rect Path
+        var rectPath = Path()
+        rectPath.addRect(Rect(x: 10, y: 10, width: 100, height: 100))
+
+        #expect(rectPath.contains(Point(x: 50, y: 50), using: .winding))
+        #expect(rectPath.contains(Point(x: 50, y: 50), using: .evenOdd))
+
+        #expect(!rectPath.contains(Point(x: 5, y: 5), using: .winding))
+        #expect(!rectPath.contains(Point(x: 150, y: 50), using: .winding))
+
+        // 2. Simple Triangle Path
+        var trianglePath = Path()
+        trianglePath.move(to: Point(x: 0, y: 0))
+        trianglePath.addLine(to: Point(x: 100, y: 0))
+        trianglePath.addLine(to: Point(x: 50, y: 100))
+        trianglePath.closeSubpath()
+
+        #expect(trianglePath.contains(Point(x: 50, y: 30), using: .winding))
+        #expect(!trianglePath.contains(Point(x: 10, y: 80), using: .winding))
+
+        // 3. Donut Path (Nested squares)
+        // Outer: Clockwise (0,0) -> (100,0) -> (100,100) -> (0,100) -> close
+        var outerPath = Path()
+        outerPath.move(to: Point(x: 0, y: 0))
+        outerPath.addLine(to: Point(x: 100, y: 0))
+        outerPath.addLine(to: Point(x: 100, y: 100))
+        outerPath.addLine(to: Point(x: 0, y: 100))
+        outerPath.closeSubpath()
+
+        // Inner: Clockwise (same direction) (25,25) -> (75,25) -> (75,75) -> (25,75) -> close
+        var donutSame = outerPath
+        donutSame.move(to: Point(x: 25, y: 25))
+        donutSame.addLine(to: Point(x: 75, y: 25))
+        donutSame.addLine(to: Point(x: 75, y: 75))
+        donutSame.addLine(to: Point(x: 25, y: 75))
+        donutSame.closeSubpath()
+
+        // Inner: Counter-Clockwise (opposite direction) (25,25) -> (25,75) -> (75,75) -> (75,25) -> close
+        var donutOpposite = outerPath
+        donutOpposite.move(to: Point(x: 25, y: 25))
+        donutOpposite.addLine(to: Point(x: 25, y: 75))
+        donutOpposite.addLine(to: Point(x: 75, y: 75))
+        donutOpposite.addLine(to: Point(x: 75, y: 25))
+        donutOpposite.closeSubpath()
+
+        let holePoint = Point(x: 50, y: 50)
+        let ringPoint = Point(x: 15, y: 15)
+
+        // Even-Odd: hole point must be OUTSIDE (toggle twice: inside -> outside)
+        #expect(!donutSame.contains(holePoint, using: .evenOdd))
+        #expect(!donutOpposite.contains(holePoint, using: .evenOdd))
+        #expect(donutSame.contains(ringPoint, using: .evenOdd))
+
+        // Winding:
+        // same direction: hole point winding number is 2 (non-zero) -> INSIDE
+        #expect(donutSame.contains(holePoint, using: .winding))
+        // opposite direction: hole point winding number is 1 - 1 = 0 -> OUTSIDE
+        #expect(!donutOpposite.contains(holePoint, using: .winding))
+    }
 }

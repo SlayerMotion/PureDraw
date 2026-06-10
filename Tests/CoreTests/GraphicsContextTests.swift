@@ -296,4 +296,50 @@ struct GraphicsContextTests {
         #expect(context.commands.last?.state.alpha == 0.6)
         #expect(context.commands.last?.state.blendMode == .multiply)
     }
+
+    @Test func newGraphicStatePropertiesAndContainment() {
+        var context = GraphicsContext()
+
+        // Check initial default values
+        #expect(context.currentState.shouldAntialias)
+        #expect(context.currentState.allowsAntialiasing)
+        #expect(context.currentState.interpolationQuality == .default)
+        #expect(context.currentState.renderingIntent == .default)
+        #expect(context.currentState.shouldSmoothFonts)
+        #expect(context.currentState.allowsFontSmoothing)
+        #expect(context.currentState.shouldSubpixelPositionFonts)
+        #expect(context.currentState.shouldSubpixelQuantizeFonts)
+
+        // Mutate properties
+        context.setShouldAntialias(false)
+        context.setAllowsAntialiasing(false)
+        context.setInterpolationQuality(.high)
+        context.setRenderingIntent(.perceptual)
+        context.setShouldSmoothFonts(false)
+        context.setAllowsFontSmoothing(false)
+        context.setShouldSubpixelPositionFonts(false)
+        context.setShouldSubpixelQuantizeFonts(false)
+
+        // Verify mutations
+        #expect(!context.currentState.shouldAntialias)
+        #expect(!context.currentState.allowsAntialiasing)
+        #expect(context.currentState.interpolationQuality == .high)
+        #expect(context.currentState.renderingIntent == .perceptual)
+        #expect(!context.currentState.shouldSmoothFonts)
+        #expect(!context.currentState.allowsFontSmoothing)
+        #expect(!context.currentState.shouldSubpixelPositionFonts)
+        #expect(!context.currentState.shouldSubpixelQuantizeFonts)
+
+        // Save and restore
+        context.saveGState()
+        context.setShouldAntialias(true)
+        #expect(context.currentState.shouldAntialias)
+        context.restoreGState()
+        #expect(!context.currentState.shouldAntialias)
+
+        // Verify pathContains
+        context.addRect(Rect(x: 10, y: 10, width: 50, height: 50))
+        #expect(context.pathContains(Point(x: 20, y: 20)))
+        #expect(!context.pathContains(Point(x: 100, y: 100)))
+    }
 }

@@ -105,6 +105,46 @@ public struct GraphicsContext: Sendable, Validatable {
         currentState.blendMode = mode
     }
 
+    /// Sets whether anti-aliasing is enabled for subsequent drawing.
+    public mutating func setShouldAntialias(_ shouldAntialias: Bool) {
+        currentState.shouldAntialias = shouldAntialias
+    }
+
+    /// Sets whether anti-aliasing is allowed for this context.
+    public mutating func setAllowsAntialiasing(_ allowsAntialiasing: Bool) {
+        currentState.allowsAntialiasing = allowsAntialiasing
+    }
+
+    /// Sets the image interpolation quality for scaling images.
+    public mutating func setInterpolationQuality(_ quality: InterpolationQuality) {
+        currentState.interpolationQuality = quality
+    }
+
+    /// Sets the rendering intent for subsequent drawing operations.
+    public mutating func setRenderingIntent(_ intent: RenderingIntent) {
+        currentState.renderingIntent = intent
+    }
+
+    /// Sets whether font smoothing is enabled.
+    public mutating func setShouldSmoothFonts(_ shouldSmoothFonts: Bool) {
+        currentState.shouldSmoothFonts = shouldSmoothFonts
+    }
+
+    /// Sets whether font smoothing is allowed.
+    public mutating func setAllowsFontSmoothing(_ allowsFontSmoothing: Bool) {
+        currentState.allowsFontSmoothing = allowsFontSmoothing
+    }
+
+    /// Sets whether to position fonts at subpixel coordinates.
+    public mutating func setShouldSubpixelPositionFonts(_ shouldSubpixelPositionFonts: Bool) {
+        currentState.shouldSubpixelPositionFonts = shouldSubpixelPositionFonts
+    }
+
+    /// Sets whether to quantize fonts at subpixel positions.
+    public mutating func setShouldSubpixelQuantizeFonts(_ shouldSubpixelQuantizeFonts: Bool) {
+        currentState.shouldSubpixelQuantizeFonts = shouldSubpixelQuantizeFonts
+    }
+
     // MARK: - Coordinate Transformations
 
     /// Applies a translation to the Current Transformation Matrix (CTM).
@@ -361,6 +401,16 @@ public struct GraphicsContext: Sendable, Validatable {
             currentState.clipPath = currentPath
         }
         currentPath = Path()
+    }
+
+    /// Returns a boolean value indicating whether the context's current path contains the specified point.
+    ///
+    /// - Parameters:
+    ///   - point: The point to check.
+    ///   - rule: The fill rule to use (winding or evenOdd).
+    /// - Returns: `true` if the path contains the point; otherwise, `false`.
+    public func pathContains(_ point: Point, using rule: FillRule = .winding) -> Bool {
+        currentPath.contains(point, using: rule)
     }
 
     /// Begins a transparency layer. Subsequent drawing is accumulated and composite rendered as a single layer.

@@ -544,4 +544,155 @@ public struct Path: Equatable, Sendable, Validatable {
         }
         return subdividedPath
     }
+
+    /// Returns a boolean value indicating whether the path contains the specified point.
+    ///
+    /// - Parameters:
+    ///   - point: The point to check.
+    ///   - rule: The fill rule to use (winding or evenOdd).
+    /// - Returns: `true` if the path contains the point; otherwise, `false`.
+    public func contains(_ point: Point, using rule: FillRule = .winding) -> Bool {
+        guard !isEmpty else { return false }
+
+        let polygons = toPolygons()
+
+        switch rule {
+        case .winding:
+            var wn = 0
+            for poly in polygons {
+                guard poly.count >= 2 else { continue }
+                let count = poly.count
+                for i in 0 ..< count {
+                    let p1 = poly[i]
+                    let p2 = poly[(i + 1) % count]
+
+                    if p1.y <= point.y {
+                        if p2.y > point.y {
+                            if isLeft(p1, p2, point) > 0 {
+                                wn += 1
+                            }
+                        }
+                    } else {
+                        if p2.y <= point.y {
+                            if isLeft(p1, p2, point) < 0 {
+                                wn -= 1
+                            }
+                        }
+                    }
+                }
+            }
+            return wn != 0
+
+        case .evenOdd:
+            var inside = false
+            for poly in polygons {
+                guard poly.count >= 2 else { continue }
+                let count = poly.count
+                for i in 0 ..< count {
+                    let p1 = poly[i]
+                    let p2 = poly[(i + 1) % count]
+
+                    if (p1.y > point.y) != (p2.y > point.y) {
+                        let intersectX = (p2.x - p1.x) * (point.y - p1.y) / (p2.y - p1.y) + p1.x
+                        if point.x < intersectX {
+                            inside.toggle()
+                        }
+                    }
+                }
+            }
+            return inside
+        }
+    }
+
+    private func isLeft(_ p0: Point, _ p1: Point, _ p2: Point) -> Double {
+        (p1.x - p0.x) * (p2.y - p0.y) - (p2.x - p0.x) * (p1.y - p0.y)
+    }
+
+    private func toPolygons() -> [[Point]] {
+        var polygons: [[Point]] = []
+        var currentPolygon: [Point] = []
+        var currentPoint = Point.zero
+        var subpathStart = Point.zero
+
+        for element in elements {
+            switch element {
+            case let .move(to):
+                if !currentPolygon.isEmpty {
+                    if currentPolygon.last != subpathStart {
+                        currentPolygon.append(subpathStart)
+                    }
+                    polygons.append(currentPolygon)
+                }
+                currentPolygon = [to]
+                currentPoint = to
+                subpathStart = to
+
+            case let .line(to):
+                if currentPolygon.isEmpty {
+                    currentPolygon.append(currentPoint)
+                }
+                currentPolygon.append(to)
+                currentPoint = to
+
+            case let .quadCurve(to, control):
+                if currentPolygon.isEmpty {
+                    currentPolygon.append(currentPoint)
+                }
+                let dx1 = control.x - currentPoint.x
+                let dy1 = control.y - currentPoint.y
+                let dx2 = to.x - control.x
+                let dy2 = to.y - control.y
+                let approxLength = sqrt(dx1 * dx1 + dy1 * dy1) + sqrt(dx2 * dx2 + dy2 * dy2)
+                let steps = max(4, Int(ceil(approxLength / 2.0)))
+                for i in 1 ... steps {
+                    let t = Double(i) / Double(steps)
+                    let mt = 1.0 - t
+                    let x = mt * mt * currentPoint.x + 2.0 * mt * t * control.x + t * t * to.x
+                    let y = mt * mt * currentPoint.y + 2.0 * mt * t * control.y + t * t * to.y
+                    currentPolygon.append(Point(x: x, y: y))
+                }
+                currentPoint = to
+
+            case let .cubicCurve(to, control1, control2):
+                if currentPolygon.isEmpty {
+                    currentPolygon.append(currentPoint)
+                }
+                let dx1 = control1.x - currentPoint.x
+                let dy1 = control1.y - currentPoint.y
+                let dx2 = control2.x - control1.x
+                let dy2 = control2.y - control1.y
+                let dx3 = to.x - control2.x
+                let dy3 = to.y - control2.y
+                let approxLength = sqrt(dx1 * dx1 + dy1 * dy1) + sqrt(dx2 * dx2 + dy2 * dy2) + sqrt(dx3 * dx3 + dy3 * dy3)
+                let steps = max(4, Int(ceil(approxLength / 2.0)))
+                for i in 1 ... steps {
+                    let t = Double(i) / Double(steps)
+                    let mt = 1.0 - t
+                    let x = mt * mt * mt * currentPoint.x + 3.0 * mt * mt * t * control1.x + 3.0 * mt * t * t * control2.x + t * t * t * to.x
+                    let y = mt * mt * mt * currentPoint.y + 3.0 * mt * mt * t * control1.y + 3.0 * mt * t * t * control2.y + t * t * t * to.y
+                    currentPolygon.append(Point(x: x, y: y))
+                }
+                currentPoint = to
+
+            case .close:
+                if !currentPolygon.isEmpty {
+                    if currentPolygon.last != subpathStart {
+                        currentPolygon.append(subpathStart)
+                    }
+                    polygons.append(currentPolygon)
+                    currentPolygon = []
+                }
+                currentPoint = subpathStart
+            }
+        }
+
+        if !currentPolygon.isEmpty {
+            if currentPolygon.last != subpathStart {
+                currentPolygon.append(subpathStart)
+            }
+            polygons.append(currentPolygon)
+        }
+
+        return polygons
+    }
 }

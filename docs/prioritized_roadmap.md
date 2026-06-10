@@ -9,14 +9,14 @@ This roadmap outlines the recommended prioritization for implementing the missin
 ### Status Diagram
 ```mermaid
 flowchart TB
-    classDef done fill:#34C759,stroke:#000,color:#fff
-    classDef active fill:#007AFF,stroke:#000,color:#fff
-    classDef next fill:#FFCC00,stroke:#000,color:#000
-    classDef review fill:#30B0C7,stroke:#000,color:#fff
-    classDef partial fill:#FF9500,stroke:#000,color:#fff
-    classDef todo fill:#8E8E93,stroke:#000,color:#fff
+    classDef done    fill:#34C759,color:#FFFFFF
+    classDef active  fill:#007AFF,color:#FFFFFF
+    classDef review  fill:#30B0C7,color:#FFFFFF
+    classDef next    fill:#5856D6,color:#FFFFFF
+    classDef partial fill:#FF9500,color:#FFFFFF
+    classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::active --> P1_2["#28: Path Hit-Testing"]:::next --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::todo --> Epic13["Epic #13: Masking, Caching & Streams"]:::todo --> Epic18["Epic #18: Typography & Text Layout"]:::todo --> Epic22["Epic #22: Advanced PDF Systems"]:::todo
+    E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::next --> Epic13["Epic #13: Masking, Caching & Streams"]:::todo --> Epic18["Epic #18: Typography & Text Layout"]:::todo --> Epic22["Epic #22: Advanced PDF Systems"]:::todo
 
     click E0 href "https://github.com/mihaelamj/PureDraw/issues/1" "E0"
     click E1 href "https://github.com/mihaelamj/PureDraw/issues/2" "E1"
@@ -33,12 +33,12 @@ flowchart TB
 ### Status Legend
 ```mermaid
 flowchart TB
-    classDef done fill:#34C759,stroke:#000,color:#fff
-    classDef active fill:#007AFF,stroke:#000,color:#fff
-    classDef next fill:#FFCC00,stroke:#000,color:#000
-    classDef review fill:#30B0C7,stroke:#000,color:#fff
-    classDef partial fill:#FF9500,stroke:#000,color:#fff
-    classDef todo fill:#8E8E93,stroke:#000,color:#fff
+    classDef done    fill:#34C759,color:#FFFFFF
+    classDef active  fill:#007AFF,color:#FFFFFF
+    classDef review  fill:#30B0C7,color:#FFFFFF
+    classDef next    fill:#5856D6,color:#FFFFFF
+    classDef partial fill:#FF9500,color:#FFFFFF
+    classDef todo    fill:#8E8E93,color:#FFFFFF
 
     L_done["Shipped (done)"]:::done ~~~
     L_active["In Progress (active)"]:::active ~~~

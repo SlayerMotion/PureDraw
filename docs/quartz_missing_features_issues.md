@@ -13,14 +13,14 @@ Introduce a native structure representing raw raster pixel data (RGBA) and a bit
 
 ```mermaid
 flowchart TB
-    classDef done fill:#34C759,stroke:#000,color:#fff
-    classDef active fill:#007AFF,stroke:#000,color:#fff
-    classDef next fill:#FFCC00,stroke:#000,color:#000
-    classDef review fill:#30B0C7,stroke:#000,color:#fff
-    classDef partial fill:#FF9500,stroke:#000,color:#fff
-    classDef todo fill:#8E8E93,stroke:#000,color:#fff
+    classDef done    fill:#34C759,color:#FFFFFF
+    classDef active  fill:#007AFF,color:#FFFFFF
+    classDef review  fill:#30B0C7,color:#FFFFFF
+    classDef next    fill:#5856D6,color:#FFFFFF
+    classDef partial fill:#FF9500,color:#FFFFFF
+    classDef todo    fill:#8E8E93,color:#FFFFFF
 
-    Epic9["Epic #9: Bitmap Images & Rasterization"]:::todo --> I10["#10: Raw Pixel Buffer Structure"]:::todo --> I11["#11: Bitmap Context Renderer"]:::todo --> I12["#12: Image Drawing on Context"]:::todo
+    Epic9["Epic #9: Bitmap Images & Rasterization"]:::next --> I10["#10: Raw Pixel Buffer Structure"]:::todo --> I11["#11: Bitmap Context Renderer"]:::todo --> I12["#12: Image Drawing on Context"]:::todo
 
     click Epic9 href "https://github.com/mihaelamj/PureDraw/issues/9" "Epic #9"
     click I10 href "https://github.com/mihaelamj/PureDraw/issues/10" "Issue #10"
@@ -55,12 +55,12 @@ Support image-based clipping masks, hardware-optimized cached drawing layers, an
 
 ```mermaid
 flowchart TB
-    classDef done fill:#34C759,stroke:#000,color:#fff
-    classDef active fill:#007AFF,stroke:#000,color:#fff
-    classDef next fill:#FFCC00,stroke:#000,color:#000
-    classDef review fill:#30B0C7,stroke:#000,color:#fff
-    classDef partial fill:#FF9500,stroke:#000,color:#fff
-    classDef todo fill:#8E8E93,stroke:#000,color:#fff
+    classDef done    fill:#34C759,color:#FFFFFF
+    classDef active  fill:#007AFF,color:#FFFFFF
+    classDef review  fill:#30B0C7,color:#FFFFFF
+    classDef next    fill:#5856D6,color:#FFFFFF
+    classDef partial fill:#FF9500,color:#FFFFFF
+    classDef todo    fill:#8E8E93,color:#FFFFFF
 
     Epic13["Epic #13: Masking, Caching & Streams"]:::todo --> I16["#16: Data Providers & Consumers"]:::todo --> I17["#17: Image I/O Metadata"]:::todo --> I14["#14: Stencil & Chroma Masking"]:::todo --> I15["#15: CGLayer Caching"]:::todo
 
@@ -102,12 +102,12 @@ Support loading font files (TTF/OTF), managing text transformations, measuring l
 
 ```mermaid
 flowchart TB
-    classDef done fill:#34C759,stroke:#000,color:#fff
-    classDef active fill:#007AFF,stroke:#000,color:#fff
-    classDef next fill:#FFCC00,stroke:#000,color:#000
-    classDef review fill:#30B0C7,stroke:#000,color:#fff
-    classDef partial fill:#FF9500,stroke:#000,color:#fff
-    classDef todo fill:#8E8E93,stroke:#000,color:#fff
+    classDef done    fill:#34C759,color:#FFFFFF
+    classDef active  fill:#007AFF,color:#FFFFFF
+    classDef review  fill:#30B0C7,color:#FFFFFF
+    classDef next    fill:#5856D6,color:#FFFFFF
+    classDef partial fill:#FF9500,color:#FFFFFF
+    classDef todo    fill:#8E8E93,color:#FFFFFF
 
     Epic18["Epic #18: Typography & Text Layout"]:::todo --> I19["#19: Font File Parser & Glyphs"]:::todo --> I20["#20: Text State Stack & Matrix"]:::todo --> I21["#21: Text Showing Context Operations"]:::todo
 
@@ -144,12 +144,12 @@ Extend the PDF engine with outlines, page bounds, content scanning/parsing, and 
 
 ```mermaid
 flowchart TB
-    classDef done fill:#34C759,stroke:#000,color:#fff
-    classDef active fill:#007AFF,stroke:#000,color:#fff
-    classDef next fill:#FFCC00,stroke:#000,color:#000
-    classDef review fill:#30B0C7,stroke:#000,color:#fff
-    classDef partial fill:#FF9500,stroke:#000,color:#fff
-    classDef todo fill:#8E8E93,stroke:#000,color:#fff
+    classDef done    fill:#34C759,color:#FFFFFF
+    classDef active  fill:#007AFF,color:#FFFFFF
+    classDef review  fill:#30B0C7,color:#FFFFFF
+    classDef next    fill:#5856D6,color:#FFFFFF
+    classDef partial fill:#FF9500,color:#FFFFFF
+    classDef todo    fill:#8E8E93,color:#FFFFFF
 
     Epic22["Epic #22: Advanced PDF Systems"]:::todo --> I23["#23: PDF Outlines & Hyperlinks"]:::todo --> I24["#24: PDF Page Boxes & Transforms"]:::todo --> I25["#25: Low-Level PDF Scanning"]:::todo --> I26["#26: PDF Encryption & Permissions"]:::todo
 

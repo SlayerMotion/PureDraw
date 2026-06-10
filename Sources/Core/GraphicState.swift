@@ -50,6 +50,30 @@ public struct GraphicState: Equatable, Sendable, Validatable {
     /// The shadow properties to apply to drawing operations.
     public var shadow: Shadow?
 
+    /// Whether anti-aliasing is enabled for this state.
+    public var shouldAntialias: Bool
+
+    /// Whether anti-aliasing is allowed for the context.
+    public var allowsAntialiasing: Bool
+
+    /// The interpolation quality to use when scaling images.
+    public var interpolationQuality: InterpolationQuality
+
+    /// The rendering intent for color space mappings.
+    public var renderingIntent: RenderingIntent
+
+    /// Whether font smoothing is enabled.
+    public var shouldSmoothFonts: Bool
+
+    /// Whether font smoothing is allowed.
+    public var allowsFontSmoothing: Bool
+
+    /// Whether to position fonts at subpixel coordinates.
+    public var shouldSubpixelPositionFonts: Bool
+
+    /// Whether to quantize fonts at subpixel positions.
+    public var shouldSubpixelQuantizeFonts: Bool
+
     public init(
         transform: Geometry.AffineTransform = .identity,
         strokeColor: Color = .black,
@@ -64,7 +88,15 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         alpha: Double = 1.0,
         blendMode: BlendMode = .normal,
         clipPath: Path? = nil,
-        shadow: Shadow? = nil
+        shadow: Shadow? = nil,
+        shouldAntialias: Bool = true,
+        allowsAntialiasing: Bool = true,
+        interpolationQuality: InterpolationQuality = .default,
+        renderingIntent: RenderingIntent = .default,
+        shouldSmoothFonts: Bool = true,
+        allowsFontSmoothing: Bool = true,
+        shouldSubpixelPositionFonts: Bool = true,
+        shouldSubpixelQuantizeFonts: Bool = true
     ) {
         self.transform = transform
         self.strokeColor = strokeColor
@@ -80,6 +112,14 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         self.blendMode = blendMode
         self.clipPath = clipPath
         self.shadow = shadow
+        self.shouldAntialias = shouldAntialias
+        self.allowsAntialiasing = allowsAntialiasing
+        self.interpolationQuality = interpolationQuality
+        self.renderingIntent = renderingIntent
+        self.shouldSmoothFonts = shouldSmoothFonts
+        self.allowsFontSmoothing = allowsFontSmoothing
+        self.shouldSubpixelPositionFonts = shouldSubpixelPositionFonts
+        self.shouldSubpixelQuantizeFonts = shouldSubpixelQuantizeFonts
     }
 
     public static var defaultValidator: Validator<GraphicState> {
