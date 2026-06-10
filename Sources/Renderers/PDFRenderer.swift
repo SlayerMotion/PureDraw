@@ -296,9 +296,15 @@ public struct PDFRenderer: Renderer {
             contentStream += "Q\n"
         }
 
-        // Assemble resources and document catalog objects
-        _ = writer.append("<< /Type /Catalog /Pages 2 0 R >>")
-        _ = writer.append("<< /Type /Pages /Kids [ 3 0 R ] /Count 1 >>")
+        // Assemble resources and document catalog objects. Image objects may
+        // already occupy low IDs, so every reference is computed, not assumed.
+        let catalogID = writer.nextObjectID
+        let pagesID = catalogID + 1
+        let pageID = catalogID + 2
+        let contentsID = catalogID + 3
+        writer.rootObjectID = catalogID
+        _ = writer.append("<< /Type /Catalog /Pages \(pagesID) 0 R >>")
+        _ = writer.append("<< /Type /Pages /Kids [ \(pageID) 0 R ] /Count 1 >>")
 
         var resourcesStr = "<<"
         if !extGStates.isEmpty {
@@ -343,7 +349,7 @@ public struct PDFRenderer: Renderer {
         }
         resourcesStr += "\n>>"
 
-        _ = writer.append("<< /Type /Page /Parent 2 0 R /MediaBox [ 0 0 \(width) \(height) ] /Contents 4 0 R /Resources \(resourcesStr) >>")
+        _ = writer.append("<< /Type /Page /Parent \(pagesID) 0 R /MediaBox [ 0 0 \(width) \(height) ] /Contents \(contentsID) 0 R /Resources \(resourcesStr) >>")
         _ = writer.append("<< /Length \(contentStream.data(using: .utf8)?.count ?? 0) >>\nstream\n\(contentStream)\nendstream")
 
         return writer.buildData()
@@ -451,6 +457,11 @@ public struct PDFRenderer: Renderer {
 
     private class PDFWriter {
         var objects: [Data] = []
+        var rootObjectID = 1
+
+        var nextObjectID: Int {
+            objects.count + 1
+        }
 
         func append(_ objectContent: String) -> Int {
             let objIndex = objects.count + 1
@@ -496,7 +507,7 @@ public struct PDFRenderer: Renderer {
             trailer
             <<
               /Size \(objects.count + 1)
-              /Root 1 0 R
+              /Root \(rootObjectID) 0 R
             >>
             startxref
             \(xrefOffset)
