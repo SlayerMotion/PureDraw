@@ -11,7 +11,7 @@
 [![Swift Linux](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-linux.yml/badge.svg)](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-linux.yml)
 [![Swift Windows](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-windows.yml/badge.svg)](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-windows.yml)
 [![Swift WASM](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-wasm.yml/badge.svg)](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-wasm.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
 ![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)
 ![SwiftPM](https://img.shields.io/badge/SwiftPM-compatible-brightgreen.svg)
 
@@ -330,4 +330,4 @@ flowchart TB
 * [SUPPORT.md](SUPPORT.md) : How to get help or ask questions.
 * [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) : Community guidelines.
 * [AGENTS.md](AGENTS.md) : AI agent instructions.
-* [LICENSE](LICENSE) : Licensed under the MIT License.
+* [LICENSE](LICENSE) : Proprietary. All rights reserved; source published for reference only.

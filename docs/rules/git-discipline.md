@@ -292,7 +292,7 @@ Use GitHub's native per-workflow badge (it reflects the real status of that one 
 [![Style and namespacing](https://github.com/<owner>/<repo>/actions/workflows/style.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/style.yml)
 [![Swift macOS](https://github.com/<owner>/<repo>/actions/workflows/swift-macos.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/swift-macos.yml)
 [![Swift Linux](https://github.com/<owner>/<repo>/actions/workflows/swift-linux.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/swift-linux.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
 ```
 
 The license badge is static and links to the repo's `LICENSE`; match the label to the actual license (`MIT`, `AGPL--3.0`, etc.).
