@@ -566,6 +566,13 @@ public struct GraphicsContext: Sendable, Validatable {
         commands.append(DrawOperation(kind: .drawImage(image, rect: rect), state: currentState))
     }
 
+    /// Casts the drop shadow of `path` using the current shadow state, without
+    /// painting the path itself. With no shadow set (`setShadow`), this draws
+    /// nothing. The shape-explicit analog of `CALayer.shadowPath`.
+    public mutating func drawShadow(of path: Path) {
+        commands.append(DrawOperation(kind: .dropShadow(path), state: currentState))
+    }
+
     public static var defaultValidator: Validator<GraphicsContext> {
         Validator().validating(.transparencyLayersAreBalanced)
     }

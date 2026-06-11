@@ -16,6 +16,11 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
         case beginTransparencyLayer
         case endTransparencyLayer
         case drawImage(Image, rect: Rect)
+        /// Casts the drop shadow of `path`'s silhouette using the current shadow
+        /// state, without painting the path itself. The analog of
+        /// `CALayer.shadowPath`: a shadow whose shape is given explicitly instead of
+        /// derived from the alpha of rendered content.
+        case dropShadow(Path)
         case drawLayer(Layer, rect: Rect)
         case showText(glyphs: [Int], text: String?, font: Font, fontSize: Double, drawingMode: TextDrawingMode, textMatrix: AffineTransform, position: Point)
     }

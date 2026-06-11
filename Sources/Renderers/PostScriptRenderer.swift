@@ -67,7 +67,7 @@ public struct PostScriptRenderer: Renderer {
                     p.addLine(to: Point(x: rect.minX, y: rect.maxY))
                     p.closeSubpath()
                     path = p
-                case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer, .showText:
+                case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer, .dropShadow, .showText:
                     continue
                 }
 
@@ -257,7 +257,7 @@ public struct PostScriptRenderer: Renderer {
                 grestore
 
                 """
-            case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer, .showText:
+            case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer, .dropShadow, .showText:
                 break
             }
 
