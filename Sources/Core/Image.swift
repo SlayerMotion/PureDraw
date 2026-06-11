@@ -205,10 +205,15 @@ public extension Image {
     /// space, alpha, masking) is preserved; only `bytesPerRow` tightens to the new
     /// width. This is the analog of cropping a `CGImage` to a sub-rectangle.
     func cropped(x cropX: Int, y cropY: Int, width cropWidth: Int, height cropHeight: Int) -> Image? {
+        guard cropWidth > 0, cropHeight > 0 else { return nil }
         let x0 = max(0, cropX)
         let y0 = max(0, cropY)
-        let x1 = min(width, cropX + cropWidth)
-        let y1 = min(height, cropY + cropHeight)
+        // Compute the far edges without trapping: a request whose far edge overflows
+        // Int extends past the image, so it clamps to the image bound.
+        let (sumX, overflowX) = cropX.addingReportingOverflow(cropWidth)
+        let (sumY, overflowY) = cropY.addingReportingOverflow(cropHeight)
+        let x1 = overflowX ? width : min(width, sumX)
+        let y1 = overflowY ? height : min(height, sumY)
         let croppedW = x1 - x0
         let croppedH = y1 - y0
         guard croppedW > 0, croppedH > 0 else { return nil }

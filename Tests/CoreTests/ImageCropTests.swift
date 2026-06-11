@@ -60,4 +60,48 @@ struct ImageCropTests {
         #expect(cropped.colorSpace == .deviceRGB)
         #expect(cropped.alphaInfo == .last)
     }
+
+    @Test func cropsAcrossRowPaddingCorrectly() throws {
+        // A 2x2 RGBA image with 8 bytes of trailing padding per row (bytesPerRow 16,
+        // not 8). The crop must follow the stride, not assume tight packing.
+        var data: [UInt8] = []
+        for y in 0 ..< 2 {
+            for x in 0 ..< 2 {
+                data.append(contentsOf: [UInt8(x + 1), UInt8(y + 1), 0, 255])
+            }
+            data.append(contentsOf: [0, 0, 0, 0, 0, 0, 0, 0]) // row padding
+        }
+        let padded = try Image(width: 2, height: 2, bytesPerRow: 16, alphaInfo: .last, data: data)
+        let cropped = try #require(padded.cropped(x: 1, y: 0, width: 1, height: 2))
+        #expect(cropped.width == 1 && cropped.height == 2)
+        #expect(cropped.bytesPerRow == 4) // tight, padding dropped
+        #expect(cropped.pixelColor(x: 0, y: 0).red == padded.pixelColor(x: 1, y: 0).red)
+        #expect(cropped.pixelColor(x: 0, y: 1).green == padded.pixelColor(x: 1, y: 1).green)
+    }
+
+    @Test func overflowingRequestReturnsNilWithoutTrapping() throws {
+        // A far edge that overflows Int must clamp, not crash.
+        let image = try grid()
+        let cropped = try #require(image.cropped(x: 1, y: 0, width: Int.max, height: Int.max))
+        #expect(cropped.width == 2 && cropped.height == 2) // clamped to the image
+        #expect(image.cropped(x: Int.max, y: 0, width: Int.max, height: 1) == nil)
+    }
+
+    @Test func preservesPremultipliedAlpha() throws {
+        // Premultiplied red at 50% alpha: raw bytes (128, 0, 0, 128). The crop must
+        // copy the raw bytes so the un-premultiply in pixelColor still recovers red.
+        let source = try Image(width: 2, height: 1, alphaInfo: .premultipliedLast, data: [128, 0, 0, 128, 0, 0, 0, 0])
+        let cropped = try #require(source.cropped(x: 0, y: 0, width: 1, height: 1))
+        #expect(cropped.alphaInfo == .premultipliedLast)
+        let color = cropped.pixelColor(x: 0, y: 0)
+        #expect(color.red == 1.0)
+        #expect(abs(color.alpha - 128.0 / 255.0) < 0.001)
+    }
+
+    @Test func fullImageCropRoundTripsEveryPixel() throws {
+        let source = try grid()
+        let cropped = try #require(source.cropped(x: 0, y: 0, width: 3, height: 2))
+        #expect(cropped.width == 3 && cropped.height == 2)
+        #expect(cropped.data == source.data)
+    }
 }
