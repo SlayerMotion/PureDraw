@@ -103,7 +103,7 @@ struct ShowcaseGenerationTests {
 
         // Head: a squircle with a soft drop shadow and an orange gradient.
         var headPath = Path()
-        headPath.addContinuousRoundedRect(in: head, cornerRadius: 56, smoothing: 0.6)
+        headPath.addContinuousRoundedRect(in: head, cornerRadius: 56)
         ctx.saveGState()
         ctx.setShadow(offset: Point(x: 0, y: 9), blur: 16, color: Color(red: 0, green: 0, blue: 0, alpha: 0.5))
         ctx.addPath(headPath)
@@ -172,7 +172,7 @@ struct ShowcaseGenerationTests {
         let panel = Rect(x: 40, y: originY + 14, width: 240, height: 150)
         ctx.saveGState()
         var clip = Path()
-        clip.addContinuousRoundedRect(in: panel, cornerRadius: 24, smoothing: 0.6)
+        clip.addContinuousRoundedRect(in: panel, cornerRadius: 24)
         ctx.addPath(clip)
         ctx.clip()
 
