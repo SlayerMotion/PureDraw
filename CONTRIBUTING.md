@@ -37,12 +37,12 @@ git config core.hooksPath .githooks
 This wires three hooks: `commit-msg` and `pre-commit` reject forbidden style tells
 (em dashes, tool-attribution) in messages and staged content, and `pre-push` runs
 the style, namespacing, format, lint, build, and test gates. The same gates run in
-GitHub CI (`.github/workflows/ci.yml`) as the backstop.
+GitHub CI (the workflows under `.github/workflows/`) as the backstop.
 
 ## Conventions
 
-Engine and tooling code follows the conventions documented in
-[`docs/CONVENTIONS.md`](docs/CONVENTIONS.md). The short version:
+Engine and tooling code follows the conventions described in
+[`docs/DESIGN.md`](docs/DESIGN.md). The short version:
 
 - Progressive architecture: simplest thing that works first; add abstraction only
   when a second real consumer exists.

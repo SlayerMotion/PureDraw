@@ -326,6 +326,7 @@ flowchart TB
 ## Community & Documentation
 
 * [CONTRIBUTING.md](CONTRIBUTING.md) : How to contribute and code conventions.
+* [CHANGELOG.md](CHANGELOG.md) : Notable changes.
 * [SECURITY.md](SECURITY.md) : Vulnerability reporting policy.
 * [SUPPORT.md](SUPPORT.md) : How to get help or ask questions.
 * [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) : Community guidelines.
