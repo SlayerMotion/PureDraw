@@ -66,7 +66,7 @@ struct GeometryValidationTests {
             in: ()
         )
         #expect(invalidResult.count == 1)
-        #expect(invalidResult.first?.description == "Failed to satisfy: Rectangle width and height are positive at path: .rect")
+        #expect(invalidResult.first?.description == "Failed to satisfy: Rectangle width and height are non-negative at path: .rect")
     }
 
     @Test func pointFiniteValidation() {
@@ -121,7 +121,7 @@ struct GeometryValidationTests {
         } catch let errors as ValidationErrorCollection {
             #expect(errors.values.count == 2) // Fails rectHasValidDimensions (nan >= 0 is false) and rectIsFinite
             let descriptions = errors.values.map(\.description)
-            #expect(descriptions.contains { $0.contains("Rectangle width and height are positive") })
+            #expect(descriptions.contains { $0.contains("Rectangle width and height are non-negative") })
             #expect(descriptions.contains { $0.contains("Rectangle dimensions are finite") })
         } catch {
             Issue.record("Unexpected error: \(error)")

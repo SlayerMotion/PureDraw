@@ -55,7 +55,7 @@ public extension Validation {
     /// Negative dimensions are mathematically undefined for physical bounds and lead to undefined clipping.
     static var rectHasValidDimensions: Validation<Document, Rect> {
         .init(
-            description: "Rectangle width and height are positive",
+            description: "Rectangle width and height are non-negative",
             check: { context in
                 context.subject.width >= 0 && context.subject.height >= 0
             }
