@@ -82,6 +82,13 @@ struct ValidationBoundaryTests {
         #expect(fails(.shadowIsValid, Shadow(offset: Point(x: 0, y: 0), blur: -0.0001, color: .black)))
     }
 
+    @Test func crumpleDeformerBoundary() {
+        // Any finite values pass (a zero/negative radius is tolerated); a non-finite
+        // field fails.
+        #expect(passes(.crumpleDeformerValuesAreFinite, CrumpleDeformer(center: Point(x: 0, y: 0), radius: 0)))
+        #expect(fails(.crumpleDeformerValuesAreFinite, CrumpleDeformer(center: Point(x: 0, y: 0), radius: .nan)))
+    }
+
     @Test func graphicStateLineWidthBoundary() {
         #expect(passes(.graphicStateIsValid, GraphicState(lineWidth: 0)))
         #expect(fails(.graphicStateIsValid, GraphicState(lineWidth: -1)))

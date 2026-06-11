@@ -1,5 +1,6 @@
 import Foundation
 import Geometry
+import Validation
 
 /// A non-linear deformation field that simulates paper being crumpled or squashed by a hand.
 ///
@@ -70,5 +71,26 @@ public struct CrumpleDeformer: Sendable {
         let finalY = pinchedPoint.y + wy * wrinkleStrength
 
         return Point(x: finalX, y: finalY)
+    }
+}
+
+public extension Validation {
+    /// A `CrumpleDeformer`'s center, radius, and strengths are finite. The transform
+    /// tolerates any finite values (a zero or negative radius simply disables or
+    /// inverts the pinch), but a NaN or infinite field produces an un-renderable
+    /// point, so finiteness is the genuine invariant.
+    static var crumpleDeformerValuesAreFinite: Validation<Document, CrumpleDeformer> {
+        .init(description: "CrumpleDeformer center, radius, and strengths are finite", check: { context in
+            let deformer = context.subject
+            return deformer.center.x.isFinite && deformer.center.y.isFinite
+                && deformer.radius.isFinite
+                && deformer.pinchStrength.isFinite && deformer.wrinkleStrength.isFinite
+        })
+    }
+}
+
+extension CrumpleDeformer: Validatable {
+    public static var defaultValidator: Validator<CrumpleDeformer> {
+        Validator().validating(.crumpleDeformerValuesAreFinite)
     }
 }

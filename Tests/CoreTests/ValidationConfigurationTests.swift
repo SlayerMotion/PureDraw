@@ -79,6 +79,12 @@ struct ValidationConfigurationTests {
         ])
     }
 
+    @Test func crumpleDeformerPinsItsRule() {
+        #expect(CrumpleDeformer.defaultValidator.validationDescriptions == [
+            "CrumpleDeformer center, radius, and strengths are finite",
+        ])
+    }
+
     @Test func graphicStatePinsItsRule() {
         #expect(GraphicState.defaultValidator.validationDescriptions == [
             "Graphic state properties are valid",
