@@ -96,5 +96,6 @@ For features, an issue is recommended when the scope is non-trivial.
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the
-project's [MIT License](LICENSE).
+By contributing, you assign your contributions to the copyright holder under the
+project's proprietary [LICENSE](LICENSE), and confirm you hold the rights to do
+so.
