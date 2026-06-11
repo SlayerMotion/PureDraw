@@ -95,6 +95,41 @@ struct DropShadowTests {
             // ...but not the whole canvas (a shadow, not a fill).
             #expect(painted < 60 * 60)
         }
+
+        /// Renders a single drop shadow into a fresh premultiplied CG bitmap and
+        /// returns the peak alpha byte, so the CG path can be compared to itself.
+        private func cgShadowPeakAlpha(layerAlpha: Double) throws -> Int {
+            let colorSpace = CGColorSpaceCreateDeviceRGB()
+            guard let cgContext = CGContext(
+                data: nil, width: 60, height: 60, bitsPerComponent: 8, bytesPerRow: 0,
+                space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return -1 }
+            var context = GraphicsContext()
+            context.setAlpha(layerAlpha)
+            context.setShadow(offset: Point(x: 8, y: 8), blur: 0, color: Color(red: 0, green: 0, blue: 0, alpha: 1))
+            context.drawShadow(of: rectPath(Rect(x: 10, y: 10, width: 20, height: 20)))
+            try CoreGraphicsRenderer(context: cgContext).render(context)
+            guard let raw = cgContext.data else { return -1 }
+            let bytesPerRow = cgContext.bytesPerRow
+            let pixels = raw.bindMemory(to: UInt8.self, capacity: bytesPerRow * 60)
+            var peak = 0
+            for y in 0 ..< 60 {
+                for x in 0 ..< 60 {
+                    peak = max(peak, Int(pixels[y * bytesPerRow + x * 4 + 3]))
+                }
+            }
+            return peak
+        }
+
+        @Test func coreGraphicsRendererAppliesLayerAlphaOnce() throws {
+            // A hard (blur 0) shadow of an opaque rect is fully opaque at full alpha,
+            // and ~half as opaque at alpha 0.5. If state.alpha were applied twice (once
+            // baked in, once via the gstate), it would land near 0.25, not 0.5.
+            let full = try cgShadowPeakAlpha(layerAlpha: 1)
+            let half = try cgShadowPeakAlpha(layerAlpha: 0.5)
+            #expect(full > 240)
+            #expect(half > 110 && half < 145) // ~0.5 * 255, not ~0.25 * 255
+        }
     #endif
 
     @Test func transparencyLayerShadowStillWorks() throws {

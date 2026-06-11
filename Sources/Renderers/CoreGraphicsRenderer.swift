@@ -243,6 +243,9 @@
             for i in 0 ..< canvasWidth * canvasHeight {
                 let a = shadowAlpha[i] * baseAlpha
                 guard a > 0 else { continue }
+                // Keep 255 as min's FIRST argument: an unvalidated out-of-range color
+                // or alpha can make the product NaN/huge, and `min(255, nan)` returns
+                // 255 (NaN compares false), so UInt8(...) never traps. Do not reorder.
                 data[i * 4] = UInt8(max(0, min(255, shadow.color.red * a * 255)))
                 data[i * 4 + 1] = UInt8(max(0, min(255, shadow.color.green * a * 255)))
                 data[i * 4 + 2] = UInt8(max(0, min(255, shadow.color.blue * a * 255)))
@@ -251,9 +254,20 @@
             guard let shadowImage = try? Image(
                 width: canvasWidth, height: canvasHeight, alphaInfo: .premultipliedLast, data: data
             ), let cgImage = createCGImage(from: shadowImage) else { return }
-            // The shadow is in device space; draw it under the identity CTM, flipping
-            // for CoreGraphics's bottom-left origin like the drawImage path.
+            // The shadow is already a finished device-space image, so draw it raw:
+            // - Disable the native CG shadow set up for this op, or it would cast a
+            //   shadow of the shadow.
+            // - Reset alpha to 1 and the blend mode to normal: `state.alpha` is already
+            //   baked into `baseAlpha`, so leaving the op's `setAlpha(state.alpha)`
+            //   active would fade it twice (matching BitmapRenderer's single fade).
+            // - Reset the CTM to draw at device pixels (the coverage was rasterized in
+            //   device space). This assumes the caller's base CTM is the identity, the
+            //   same 1:1 device mapping every PureDraw renderer assumes.
+            // Then flip for CoreGraphics's bottom-left origin, like the drawImage path.
             targetContext.saveGState()
+            targetContext.setShadow(offset: .zero, blur: 0, color: nil)
+            targetContext.setAlpha(1)
+            targetContext.setBlendMode(.normal)
             targetContext.concatenate(targetContext.ctm.inverted())
             targetContext.translateBy(x: 0, y: CGFloat(canvasHeight))
             targetContext.scaleBy(x: 1, y: -1)

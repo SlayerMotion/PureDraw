@@ -72,7 +72,7 @@ public final class BitmapRenderer: Renderer, Sendable {
                 rasterizeStroke(path: path, state: op.state, color: op.state.strokeColor, clipCache: clipCache, buffer: &currentBuffer)
 
             case let .dropShadow(path):
-                drawDropShadow(of: path, state: op.state, clipCache: clipCache, buffer: &currentBuffer)
+                drawDropShadow(of: path, state: op.state, buffer: &currentBuffer)
 
             case let .drawLinearGradient(grad, start, end, _):
                 rasterizeLinearGradient(grad: grad, start: start, end: end, state: op.state, clipCache: clipCache, buffer: &currentBuffer)
@@ -594,8 +594,9 @@ public final class BitmapRenderer: Renderer, Sendable {
 
     /// Casts the drop shadow of `path` (in user space) using `state.shadow`, with no
     /// body painted: the silhouette is rasterized, then blurred and offset by the
-    /// shared shadow kernel.
-    private func drawDropShadow(of path: Path, state: GraphicState, clipCache _: ClipCache, buffer: inout [UInt8]) {
+    /// shared shadow kernel. Like the transparency-layer shadow, the shadow itself is
+    /// not re-clipped by the current clip path.
+    private func drawDropShadow(of path: Path, state: GraphicState, buffer: inout [UInt8]) {
         guard let shadow = state.shadow else { return }
         let transformedPath = path.applying(state.transform)
         let rasterizer = CoverageRasterizer(canvasWidth: width, canvasHeight: height)
