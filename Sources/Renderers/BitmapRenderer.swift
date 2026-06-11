@@ -71,6 +71,9 @@ public final class BitmapRenderer: Renderer, Sendable {
             case let .stroke(path):
                 rasterizeStroke(path: path, state: op.state, color: op.state.strokeColor, clipCache: clipCache, buffer: &currentBuffer)
 
+            case let .dropShadow(path):
+                drawDropShadow(of: path, state: op.state, clipCache: clipCache, buffer: &currentBuffer)
+
             case let .drawLinearGradient(grad, start, end, _):
                 rasterizeLinearGradient(grad: grad, start: start, end: end, state: op.state, clipCache: clipCache, buffer: &currentBuffer)
 
@@ -561,11 +564,16 @@ public final class BitmapRenderer: Renderer, Sendable {
         for i in 0 ..< width * height {
             coverage[i] = Double(layer[i * 4 + 3]) / 255.0
         }
-        // Clamp the radius so an adversarial blur cannot run an unbounded inner loop.
-        let radius = min(Int(shadow.blur.rounded()), max(width, height))
-        let blurred = boxBlurredAlpha(coverage, radius: radius)
-        let dx = Int(shadow.offset.x.rounded())
-        let dy = Int(shadow.offset.y.rounded())
+        compositeShadow(fromCoverage: coverage, shadow: shadow, state: state, into: &parent)
+    }
+
+    /// Paints the blurred, offset shadow of a coverage plane in the shadow color,
+    /// the shared core of both the transparency-layer shadow (coverage from the
+    /// layer's alpha) and `dropShadow` (coverage from an explicit path).
+    private func compositeShadow(fromCoverage coverage: [Double], shadow: Shadow, state: GraphicState, into parent: inout [UInt8]) {
+        let shadowAlpha = ShadowRasterizer.shadowAlpha(
+            coverage: coverage, width: width, height: height, offset: shadow.offset, blur: shadow.blur
+        )
         // The shadow keeps the group alpha (so it fades with the content) but drops
         // the layer's own mask: an offset shadow may legitimately fall outside the
         // masked content and should not be re-clipped by it.
@@ -575,10 +583,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         shadowState.maskTransform = nil
         for y in 0 ..< height {
             for x in 0 ..< width {
-                let sx = x - dx
-                let sy = y - dy
-                guard sx >= 0, sx < width, sy >= 0, sy < height else { continue }
-                let alpha = blurred[sy * width + sx]
+                let alpha = shadowAlpha[y * width + x]
                 // blendPixel ignores state.shadow, so the shadow does not recurse.
                 if alpha > 0 {
                     blendPixel(x: x, y: y, color: shadow.color, state: shadowState, coverage: alpha, buffer: &parent)
@@ -587,34 +592,21 @@ public final class BitmapRenderer: Renderer, Sendable {
         }
     }
 
-    /// A separable box blur of an alpha plane, clamping at the edges. The identity
-    /// when `radius <= 0`.
-    private func boxBlurredAlpha(_ source: [Double], radius: Int) -> [Double] {
-        guard radius > 0 else { return source }
-        let window = Double(radius * 2 + 1)
-        var horizontal = [Double](repeating: 0, count: source.count)
+    /// Casts the drop shadow of `path` (in user space) using `state.shadow`, with no
+    /// body painted: the silhouette is rasterized, then blurred and offset by the
+    /// shared shadow kernel.
+    private func drawDropShadow(of path: Path, state: GraphicState, clipCache _: ClipCache, buffer: inout [UInt8]) {
+        guard let shadow = state.shadow else { return }
+        let transformedPath = path.applying(state.transform)
+        let rasterizer = CoverageRasterizer(canvasWidth: width, canvasHeight: height)
+        guard let map = rasterizer.coverage(of: transformedPath, rule: .winding, antialiased: state.shouldAntialias) else { return }
+        var coverage = [Double](repeating: 0, count: width * height)
         for y in 0 ..< height {
             for x in 0 ..< width {
-                var sum = 0.0
-                for k in -radius ... radius {
-                    let xx = min(width - 1, max(0, x + k))
-                    sum += source[y * width + xx]
-                }
-                horizontal[y * width + x] = sum / window
+                coverage[y * width + x] = map.value(atX: x, y: y)
             }
         }
-        var blurred = [Double](repeating: 0, count: source.count)
-        for x in 0 ..< width {
-            for y in 0 ..< height {
-                var sum = 0.0
-                for k in -radius ... radius {
-                    let yy = min(height - 1, max(0, y + k))
-                    sum += horizontal[yy * width + x]
-                }
-                blurred[y * width + x] = sum / window
-            }
-        }
-        return blurred
+        compositeShadow(fromCoverage: coverage, shadow: shadow, state: state, into: &buffer)
     }
 
     private func blendPixel(x: Int, y: Int, color: Color, state: GraphicState, coverage: Double = 1.0, buffer: inout [UInt8]) {

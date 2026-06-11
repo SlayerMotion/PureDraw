@@ -199,6 +199,9 @@
                             targetContext.draw(cgLayer, in: CGRect(x: rect.origin.x, y: rect.origin.y, width: rect.width, height: rect.height))
                         }
 
+                    case let .dropShadow(path):
+                        drawDropShadow(of: path, state: operation.state)
+
                     case .beginTransparencyLayer, .endTransparencyLayer, .showText:
                         break
                     }
@@ -212,6 +215,50 @@
         private enum RenderingError: Error {
             case cannotCreateColorSpace
             case cannotCreateGradient
+        }
+
+        /// Casts the drop shadow of `path` using the shared software shadow kernel, so
+        /// it matches `BitmapRenderer`. CoreGraphics cannot cast a shadow without also
+        /// painting the shape, so the shadow is computed in software and composited as
+        /// a device-space image.
+        private func drawDropShadow(of path: Path, state: GraphicState) {
+            guard let shadow = state.shadow else { return }
+            let canvasWidth = targetContext.width
+            let canvasHeight = targetContext.height
+            guard canvasWidth > 0, canvasHeight > 0 else { return }
+            let transformedPath = path.applying(state.transform)
+            let rasterizer = CoverageRasterizer(canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+            guard let map = rasterizer.coverage(of: transformedPath, rule: .winding, antialiased: state.shouldAntialias) else { return }
+            var coverage = [Double](repeating: 0, count: canvasWidth * canvasHeight)
+            for y in 0 ..< canvasHeight {
+                for x in 0 ..< canvasWidth {
+                    coverage[y * canvasWidth + x] = map.value(atX: x, y: y)
+                }
+            }
+            let shadowAlpha = ShadowRasterizer.shadowAlpha(
+                coverage: coverage, width: canvasWidth, height: canvasHeight, offset: shadow.offset, blur: shadow.blur
+            )
+            let baseAlpha = shadow.color.alpha * state.alpha
+            var data = [UInt8](repeating: 0, count: canvasWidth * canvasHeight * 4)
+            for i in 0 ..< canvasWidth * canvasHeight {
+                let a = shadowAlpha[i] * baseAlpha
+                guard a > 0 else { continue }
+                data[i * 4] = UInt8(max(0, min(255, shadow.color.red * a * 255)))
+                data[i * 4 + 1] = UInt8(max(0, min(255, shadow.color.green * a * 255)))
+                data[i * 4 + 2] = UInt8(max(0, min(255, shadow.color.blue * a * 255)))
+                data[i * 4 + 3] = UInt8(max(0, min(255, a * 255)))
+            }
+            guard let shadowImage = try? Image(
+                width: canvasWidth, height: canvasHeight, alphaInfo: .premultipliedLast, data: data
+            ), let cgImage = createCGImage(from: shadowImage) else { return }
+            // The shadow is in device space; draw it under the identity CTM, flipping
+            // for CoreGraphics's bottom-left origin like the drawImage path.
+            targetContext.saveGState()
+            targetContext.concatenate(targetContext.ctm.inverted())
+            targetContext.translateBy(x: 0, y: CGFloat(canvasHeight))
+            targetContext.scaleBy(x: 1, y: -1)
+            targetContext.draw(cgImage, in: CGRect(x: 0, y: 0, width: CGFloat(canvasWidth), height: CGFloat(canvasHeight)))
+            targetContext.restoreGState()
         }
 
         private func applyCTMAndMask(state: GraphicState, maskCache: inout [(source: Image, mask: CGImage)]) {
