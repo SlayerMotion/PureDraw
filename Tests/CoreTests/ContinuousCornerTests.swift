@@ -30,138 +30,44 @@ struct ContinuousCornerTests {
         return result
     }
 
-    @Test func cornerConsumesMoreThanRadius() {
+    @Test func edgeConsumptionMatchesAppleRatio() {
         var path = Path()
-        path.addContinuousRoundedRect(in: Rect(x: 0, y: 0, width: 200, height: 200), cornerRadius: 40, smoothing: 0.6)
-        // The top straight edge runs from x = p to x = 200 - p, with
-        // p = 1.6 * 40 = 64. The move-to starts the straight edge at x = p.
+        path.addContinuousRoundedRect(in: Rect(x: 0, y: 0, width: 400, height: 400), cornerRadius: 80)
+        // Apple's corner consumes exactly 1.528665r = 122.2932 of each edge; the
+        // leading move starts the top straight edge there.
         guard case let .move(start) = path.elements.first else {
             Issue.record("expected a leading move")
             return
         }
-        #expect(abs(start.x - 64) < 0.01, "corner should start 1.6r from the corner, got \(start.x)")
+        #expect(abs(start.x - 122.2932) < 0.001, "corner should start 1.528665r from the corner, got \(start.x)")
     }
 
-    @Test func curvatureRampsInsteadOfJumping() {
+    @Test func continuousCornerRedistributesCurvature() {
         let rect = Rect(x: 0, y: 0, width: 200, height: 200)
-
         var circular = Path()
         circular.addRoundedRect(in: rect, cornerWidth: 40, cornerHeight: 40)
-
         var continuous = Path()
-        continuous.addContinuousRoundedRect(in: rect, cornerRadius: 40, smoothing: 0.6)
-
-        /// The largest single jump in curvature between adjacent samples. A
-        /// circular corner jumps from 0 to 1/r at the straight-to-arc junction;
-        /// a continuous corner spreads that change out, so its largest jump is
-        /// markedly smaller.
-        func maxJump(_ ks: [Double]) -> Double {
-            var m = 0.0
-            for i in 1 ..< ks.count {
-                m = max(m, abs(ks[i] - ks[i - 1]))
-            }
-            return m
-        }
-
-        let circularJump = maxJump(curvatures(of: circular))
-        let continuousJump = maxJump(curvatures(of: continuous))
-
-        #expect(circularJump > 0)
-        // Measured ~0.55x: the continuous corner spreads the curvature change
-        // out instead of jumping it at a single junction.
-        #expect(
-            continuousJump < circularJump * 0.7,
-            "continuous corner should ramp curvature: continuous \(continuousJump) vs circular \(circularJump)"
-        )
+        continuous.addContinuousRoundedRect(in: rect, cornerRadius: 40)
+        // A circular corner has constant curvature 1/r along its arc; Apple's
+        // continuous corner redistributes it: flatter where it meets the straight
+        // edge and a higher peak in the middle, so its peak curvature exceeds 1/r.
+        // (Apple's real corner is three cubics with small kinks at their joins, so it
+        // is faithful to iOS rather than perfectly G2 continuous.)
+        let circularPeak = curvatures(of: circular).max() ?? 0
+        let continuousPeak = curvatures(of: continuous).max() ?? 0
+        #expect(circularPeak > 0)
+        #expect(continuousPeak > circularPeak, "continuous peak \(continuousPeak) vs circular peak \(circularPeak)")
     }
 
-    @Test func zeroRadiusIsPlainRectangle() {
+    @Test func exactCornerHasTwelveCubicsAndLeavesTheEdgeTangentially() {
         var path = Path()
-        path.addContinuousRoundedRect(in: Rect(x: 0, y: 0, width: 100, height: 80), cornerRadius: 0)
-        // move + 4 lines + close = 6 elements, no curves.
-        let hasCurve = path.elements.contains { if case .cubicCurve = $0 { return true }
-            return false
-        }
-        #expect(!hasCurve)
-    }
-
-    @Test func staysWithinBounds() {
-        let rect = Rect(x: 10, y: 20, width: 120, height: 90)
-        var path = Path()
-        path.addContinuousRoundedRect(in: rect, cornerRadius: 30, smoothing: 0.7)
-        let box = path.boundingBox
-        #expect(box.minX >= rect.minX - 0.01 && box.maxX <= rect.maxX + 0.01)
-        #expect(box.minY >= rect.minY - 0.01 && box.maxY <= rect.maxY + 0.01)
-        // It should reach each edge (corners touch the sides at the midpoints).
-        #expect(abs(box.minX - rect.minX) < 0.5 && abs(box.maxX - rect.maxX) < 0.5)
-    }
-}
-
-extension ContinuousCornerTests {
-    @Test func largeRadiusDegradesToCircleWithoutBreaking() {
-        // At radius = half the short side, the corner must reduce to a clean
-        // circle (no self-intersection or NaN), not a degenerate shape.
-        var path = Path()
-        path.addContinuousRoundedRect(in: Rect(x: 0, y: 0, width: 100, height: 100), cornerRadius: 50, smoothing: 1.0)
-        let box = path.boundingBox
-        #expect(box.minX >= -0.01 && box.maxX <= 100.01)
-        #expect(box.minY >= -0.01 && box.maxY <= 100.01)
-        // Every control point is finite.
-        let allFinite = path.elements.allSatisfy { element in
-            switch element {
-            case let .move(p), let .line(p): p.x.isFinite && p.y.isFinite
-            case let .quadCurve(p, c): p.x.isFinite && c.x.isFinite
-            case let .cubicCurve(p, c1, c2): p.x.isFinite && c1.x.isFinite && c2.x.isFinite
-            case .close: true
-            }
-        }
-        #expect(allFinite)
-    }
-
-    @Test func appleEdgeConsumptionMatchesMeasuredRatio() {
-        // Apple's measured corner consumes ~1.5287r; smoothing 0.5287 hits it.
-        var path = Path()
-        path.addContinuousRoundedRect(in: Rect(x: 0, y: 0, width: 400, height: 400), cornerRadius: 80, smoothing: 0.528665)
-        guard case let .move(start) = path.elements.first else {
-            Issue.record("expected a leading move")
-            return
-        }
-        // p = (1 + 0.528665) * 80 = 122.2932
-        #expect(abs(start.x - 122.2932) < 0.01)
-    }
-}
-
-extension ContinuousCornerTests {
-    @Test func appleExactCornerConsumesLimitRatio() {
-        var path = Path()
-        path.addAppleRoundedRect(in: Rect(x: 0, y: 0, width: 400, height: 400), cornerRadius: 80)
-        // The corner consumes exactly 1.528665r = 122.2932 of each edge.
-        guard case let .move(start) = path.elements.first else {
-            Issue.record("expected a leading move")
-            return
-        }
-        #expect(abs(start.x - 122.2932) < 0.001)
-    }
-
-    @Test func appleExactCornerStructureAndEdgeTangency() {
-        var path = Path()
-        path.addAppleRoundedRect(in: Rect(x: 0, y: 0, width: 200, height: 200), cornerRadius: 44)
-
-        // 4 corners x 3 cubics + 4 lines + move + close.
-        let curves = path.elements.filter { if case .cubicCurve = $0 { return true }
-            return false
-        }.count
-        #expect(curves == 12)
+        path.addContinuousRoundedRect(in: Rect(x: 0, y: 0, width: 200, height: 200), cornerRadius: 44)
+        let curves = path.elements.filter { if case .cubicCurve = $0 { true } else { false } }.count
+        #expect(curves == 12) // 4 corners x 3 cubics
         if case .close = path.elements.last {} else { Issue.record("path must be closed") }
-
-        // The corner leaves the straight edge tangentially: the first cubic's
-        // first control point sits on the top edge (y == minY), a horizontal
-        // departure with near-zero curvature, the seamless property. (Apple's
-        // exact corner has small kinks between its three sub-curves, so it is
-        // faithful to iOS rather than perfectly G2.)
-        let firstCubic = path.elements.first { if case .cubicCurve = $0 { return true }
-            return false
-        }
+        // The first cubic's first control point sits on the top edge (y == minY): a
+        // horizontal, tangential departure from the straight edge.
+        let firstCubic = path.elements.first { if case .cubicCurve = $0 { true } else { false } }
         guard case let .cubicCurve(_, c1, _) = firstCubic else {
             Issue.record("expected a cubic")
             return
@@ -169,21 +75,75 @@ extension ContinuousCornerTests {
         #expect(abs(c1.y) < 0.001, "first control point should sit on the top edge")
     }
 
-    @Test func appleExactCornerClampsLargeRadius() {
-        // Asking for a radius larger than the corners can hold must not
-        // overlap or produce NaN.
+    @Test func zeroRadiusIsPlainRectangle() {
         var path = Path()
-        path.addAppleRoundedRect(in: Rect(x: 0, y: 0, width: 100, height: 100), cornerRadius: 1000)
+        path.addContinuousRoundedRect(in: Rect(x: 0, y: 0, width: 100, height: 80), cornerRadius: 0)
+        #expect(!path.elements.contains { if case .cubicCurve = $0 { true } else { false } })
+    }
+
+    @Test func staysWithinBoundsAndTouchesEachEdge() {
+        let rect = Rect(x: 10, y: 20, width: 120, height: 90)
+        var path = Path()
+        path.addContinuousRoundedRect(in: rect, cornerRadius: 30)
         let box = path.boundingBox
-        #expect(box.minX >= -0.01 && box.maxX <= 100.01 && box.minY >= -0.01 && box.maxY <= 100.01)
-        let finite = path.elements.allSatisfy {
-            switch $0 {
-            case let .move(p), let .line(p): p.x.isFinite && p.y.isFinite
-            case let .quadCurve(p, _): p.x.isFinite
-            case let .cubicCurve(p, _, _): p.x.isFinite
-            case .close: true
+        #expect(box.minX >= rect.minX - 0.01 && box.maxX <= rect.maxX + 0.01)
+        #expect(box.minY >= rect.minY - 0.01 && box.maxY <= rect.maxY + 0.01)
+        #expect(abs(box.minX - rect.minX) < 0.5 && abs(box.maxX - rect.maxX) < 0.5)
+        #expect(abs(box.minY - rect.minY) < 0.5 && abs(box.maxY - rect.maxY) < 0.5)
+    }
+
+    @Test func everySegmentJoinsTheLastAndTheCornerCloses() {
+        var path = Path()
+        path.addContinuousRoundedRect(in: Rect(x: 10, y: 20, width: 120, height: 90), cornerRadius: 30)
+        var current: Point?
+        var subpathStart: Point?
+        func end(of element: PathElement) -> Point? {
+            switch element {
+            case let .move(p), let .line(p): p
+            case let .quadCurve(p, _), let .cubicCurve(p, _, _): p
+            case .close: subpathStart
             }
         }
-        #expect(finite)
+        func start(of element: PathElement) -> Point? {
+            if case let .move(p) = element { return p }
+            return current // every non-move segment starts at the running point
+        }
+        for element in path.elements {
+            if case .move = element {} else if let from = current, let into = start(of: element) {
+                #expect(abs(from.x - into.x) < 1e-9 && abs(from.y - into.y) < 1e-9, "disconnected segment")
+            }
+            if case let .move(p) = element { subpathStart = p }
+            current = end(of: element)
+        }
+        // The closing edge collapses to zero: the last corner ends exactly at the
+        // leading move, with no stray hairline segment.
+        if case let .move(startPoint) = path.elements.first,
+           case let .cubicCurve(lastEnd, _, _) = path.elements.dropLast().last
+        {
+            #expect(abs(lastEnd.x - startPoint.x) < 1e-9 && abs(lastEnd.y - startPoint.y) < 1e-9)
+        } else {
+            Issue.record("expected a leading move and a trailing cubic before close")
+        }
+    }
+
+    @Test func largeRadiusScalesToFitWithoutBreaking() {
+        // At (or beyond) half the short side, the corner scales to fit: a smooth
+        // continuous capsule with no self-intersection or NaN.
+        for radius in [50.0, 1000.0] {
+            var path = Path()
+            path.addContinuousRoundedRect(in: Rect(x: 0, y: 0, width: 100, height: 100), cornerRadius: radius)
+            let box = path.boundingBox
+            #expect(box.minX >= -0.01 && box.maxX <= 100.01 && box.minY >= -0.01 && box.maxY <= 100.01)
+            let finite = path.elements.allSatisfy {
+                switch $0 {
+                case let .move(p), let .line(p): p.x.isFinite && p.y.isFinite
+                case let .quadCurve(p, c): p.x.isFinite && p.y.isFinite && c.x.isFinite && c.y.isFinite
+                case let .cubicCurve(p, c1, c2):
+                    p.x.isFinite && p.y.isFinite && c1.x.isFinite && c1.y.isFinite && c2.x.isFinite && c2.y.isFinite
+                case .close: true
+                }
+            }
+            #expect(finite)
+        }
     }
 }

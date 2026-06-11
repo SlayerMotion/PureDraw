@@ -184,26 +184,41 @@ public struct Path: Equatable, Sendable, Validatable {
         closeSubpath()
     }
 
-    /// Adds a rectangle with Apple-style *continuous* (squircle) corners: the
-    /// curvature ramps smoothly from the straight edge into the corner instead
-    /// of jumping at a circular arc, so there is no visible junction. This is
-    /// the SwiftUI `RoundedCornerStyle.continuous` / app-icon shape.
+    /// Adds a rectangle with Apple's *continuous* (squircle) corners: the exact
+    /// shape `UIBezierPath(roundedRect:cornerRadius:)` and SwiftUI's
+    /// `RoundedCornerStyle.continuous` produce. The curvature ramps smoothly from
+    /// the straight edge into the corner instead of jumping at a circular arc, so
+    /// there is no visible junction.
     ///
-    /// Each corner is three cubic Bézier segments (an ease-in, a shortened
-    /// circular arc, and a symmetric ease-out), and consumes `(1 + smoothing)`
-    /// times the radius along each edge. `smoothing` runs 0 (circular) to 1
-    /// (maximum). This is the established tunable construction shared by
-    /// Figma's corner smoothing and SwiftUI's `RoundedCornerStyle.continuous`.
+    /// Each corner is three cubic Bézier segments whose control points are the
+    /// fixed dimensionless ratios of the corner radius reverse-engineered from
+    /// `UIBezierPath`; the corner consumes `1.528665` times the radius along each
+    /// edge. This is a fixed shape, not a tunable smoothing: Apple's real corner is
+    /// a fixed-ratio Bézier, not a superellipse (a superellipse fits it worse than a
+    /// plain circle).
     ///
-    /// `smoothing` 0.6 is the common default; Apple's measured app-icon corner
-    /// consumes about `1.53` times the radius, i.e. `smoothing` ≈ 0.53. Note
-    /// that Apple's exact corner is a fixed-ratio Bézier, not a superellipse:
-    /// a superellipse fits Apple's real corner *worse* than a plain circle, so
-    /// this Bézier construction is the right model.
-    public mutating func addContinuousRoundedRect(in rect: Rect, cornerRadius: Double, smoothing: Double = 0.6) {
-        let budget = min(rect.width, rect.height) / 2.0
-        let radius = min(abs(cornerRadius), budget)
-        guard radius > 0, budget > 0 else {
+    /// Source for the exact constants: Liam Rosenfeld, "My Quest for the Apple Icon
+    /// Shape" (https://liamrosenfeld.com/posts/apple_icon_quest/), an inverse-mapping
+    /// extraction of the `UIBezierPath` control points.
+    ///
+    /// Large-radius behavior: Apple's exact near-capsule corner is proprietary and
+    /// not publicly specified (see Figma, "Desperately seeking squircles",
+    /// https://www.figma.com/blog/desperately-seeking-squircles/, on how corner
+    /// smoothing degrades at capsules). When `1.528665 * radius` would exceed half
+    /// the shorter side, the corner is scaled so adjacent corners exactly meet,
+    /// preserving the continuous-curvature shape (a smooth capsule) rather than
+    /// reverting to a circular arc.
+    public mutating func addContinuousRoundedRect(in rect: Rect, cornerRadius: Double) {
+        let minSide = min(rect.width, rect.height)
+        guard minSide > 0 else { return }
+        // Consumption along each edge is edgeRatio * radius, clamped to half the
+        // shorter side so adjacent corners never overlap; the corner then scales to
+        // that consumption. edgeRatio is also the corner's terminal (u, v) ratio
+        // below, so the same constant drives both: the edges meet the curve exactly
+        // and the closing segment collapses to zero.
+        let edgeRatio = 1.52866498
+        let consumption = min(edgeRatio * abs(cornerRadius), minSide / 2.0)
+        guard consumption > 0 else {
             move(to: rect.origin)
             addLine(to: Point(x: rect.maxX, y: rect.minY))
             addLine(to: Point(x: rect.maxX, y: rect.maxY))
@@ -211,90 +226,36 @@ public struct Path: Equatable, Sendable, Validatable {
             closeSubpath()
             return
         }
+        let p = consumption
+        let r = consumption / edgeRatio // effective corner scale
 
-        // Clamp smoothing so the corner fits the available budget.
-        var s = min(max(smoothing, 0.0), 1.0)
-        s = min(s, max(0.0, budget / radius - 1.0))
-        let p = min((1.0 + s) * radius, budget)
-
-        let arcMeasure = 90.0 * (1.0 - s)
-        let arcSectionLength = sin(arcMeasure / 2.0 * .pi / 180.0) * radius * 2.0.squareRoot()
-        let angleAlpha = (90.0 - arcMeasure) / 2.0
-        let p3ToP4 = radius * tan(angleAlpha / 2.0 * .pi / 180.0)
-        let angleBeta = 45.0 * s
-        let c = p3ToP4 * cos(angleBeta * .pi / 180.0)
-        let d = c * tan(angleBeta * .pi / 180.0)
-        let b = (p - arcSectionLength - c - d) / 3.0
-        let a = 2.0 * b
-
-        /// Per-corner local frame: `e` is travel along the incoming edge, `f`
-        /// along the outgoing edge (a clockwise quarter turn from `e`).
-        func emitCorner(start: Point, e: Point, f: Point) {
-            func at(_ base: Point, _ ex: Double, _ fy: Double) -> Point {
-                Point(x: base.x + ex * e.x + fy * f.x, y: base.y + ex * e.y + fy * f.y)
+        /// One corner: `inAxis` points from the corner vertex toward where the curve
+        /// starts (along the incoming edge), `outAxis` toward where it ends (along
+        /// the outgoing edge). The (u, v) literals are Rosenfeld's extracted ratios.
+        func corner(_ vertex: Point, inAxis: Point, outAxis: Point) {
+            func at(_ u: Double, _ v: Double) -> Point {
+                Point(x: vertex.x + (u * inAxis.x + v * outAxis.x) * r, y: vertex.y + (u * inAxis.y + v * outAxis.y) * r)
             }
-            // Ease-in cubic.
-            let end1 = at(start, a + b + c, d)
-            addCurve(to: end1, control1: at(start, a, 0), control2: at(start, a + b, 0))
-            // Shortened circular arc, as one cubic with matched tangents.
-            let arcEnd = at(end1, arcSectionLength, arcSectionLength)
-            let handle = (4.0 / 3.0) * tan(arcMeasure / 4.0 * .pi / 180.0) * radius
-            // When the ease segments vanish (smoothing 0, a pure arc), the
-            // arc tangents are simply the edge directions e and f.
-            let tangentLen = (c * c + d * d).squareRoot()
-            let startTangent: Point
-            let endTangent: Point
-            if tangentLen > 1e-9 {
-                startTangent = Point(x: (c * e.x + d * f.x) / tangentLen, y: (c * e.y + d * f.y) / tangentLen)
-                endTangent = Point(x: (d * e.x + c * f.x) / tangentLen, y: (d * e.y + c * f.y) / tangentLen)
-            } else {
-                startTangent = e
-                endTangent = f
-            }
-            addCurve(
-                to: arcEnd,
-                control1: Point(x: end1.x + handle * startTangent.x, y: end1.y + handle * startTangent.y),
-                control2: Point(x: arcEnd.x - handle * endTangent.x, y: arcEnd.y - handle * endTangent.y)
-            )
-            // Ease-out cubic (symmetric to the ease-in).
-            addCurve(
-                to: at(arcEnd, d, a + b + c),
-                control1: at(arcEnd, d, c),
-                control2: at(arcEnd, d, b + c)
-            )
+            addCurve(to: at(0.63149379, 0.07491139), control1: at(1.08849296, 0), control2: at(0.86840694, 0))
+            addCurve(to: at(0.07491139, 0.63149379), control1: at(0.37282383, 0.16905956), control2: at(0.16905956, 0.37282383))
+            addCurve(to: at(0, edgeRatio), control1: at(0, 0.86840694), control2: at(0, 1.08849296))
         }
 
         move(to: Point(x: rect.minX + p, y: rect.minY))
         addLine(to: Point(x: rect.maxX - p, y: rect.minY))
-        emitCorner(start: Point(x: rect.maxX - p, y: rect.minY), e: Point(x: 1, y: 0), f: Point(x: 0, y: 1))
+        corner(Point(x: rect.maxX, y: rect.minY), inAxis: Point(x: -1, y: 0), outAxis: Point(x: 0, y: 1))
         addLine(to: Point(x: rect.maxX, y: rect.maxY - p))
-        emitCorner(start: Point(x: rect.maxX, y: rect.maxY - p), e: Point(x: 0, y: 1), f: Point(x: -1, y: 0))
+        corner(Point(x: rect.maxX, y: rect.maxY), inAxis: Point(x: 0, y: -1), outAxis: Point(x: -1, y: 0))
         addLine(to: Point(x: rect.minX + p, y: rect.maxY))
-        emitCorner(start: Point(x: rect.minX + p, y: rect.maxY), e: Point(x: -1, y: 0), f: Point(x: 0, y: -1))
+        corner(Point(x: rect.minX, y: rect.maxY), inAxis: Point(x: 1, y: 0), outAxis: Point(x: 0, y: -1))
         addLine(to: Point(x: rect.minX, y: rect.minY + p))
-        emitCorner(start: Point(x: rect.minX, y: rect.minY + p), e: Point(x: 0, y: -1), f: Point(x: 1, y: 0))
+        corner(Point(x: rect.minX, y: rect.minY), inAxis: Point(x: 0, y: 1), outAxis: Point(x: 1, y: 0))
         closeSubpath()
-    }
-
-    /// Adds a rounded rectangle whose corners are Apple's exact continuous
-    /// corner: the same shape `UIBezierPath(roundedRect:cornerRadius:)` and
-    /// SwiftUI's `RoundedCornerStyle.continuous` produce, reproduced
-    /// pixel-for-pixel.
-    ///
-    /// Each corner is three cubic Bézier segments using the dimensionless
-    /// control-point ratios extracted from `UIBezierPath` (each corner consumes
-    /// `1.528665` times the radius along its edges). Unlike
-    /// `addContinuousRoundedRect(in:cornerRadius:smoothing:)`, this is not
-    /// tunable; it is the fixed Apple shape. The radius is clamped so the
-    /// corners never overlap. Constants are from Liam Rosenfeld's extraction of
-    /// the iOS corner (`liamrosenfeld.com/apple_icon_quest`).
-    public mutating func addAppleRoundedRect(in rect: Rect, cornerRadius: Double) {
-        addContinuousRoundedRect(in: rect, cornerRadius: cornerRadius, smoothing: 0.528665)
     }
 
     /// Adds a rounded rectangle with circular corners of the specified
     /// dimensions. For Apple-style continuous corners, use
-    /// `addContinuousRoundedRect(in:cornerRadius:smoothing:)`.
+    /// `addContinuousRoundedRect(in:cornerRadius:)`.
     public mutating func addRoundedRect(in rect: Rect, cornerWidth: Double, cornerHeight: Double) {
         let rx = min(abs(cornerWidth), rect.width / 2.0)
         let ry = min(abs(cornerHeight), rect.height / 2.0)
