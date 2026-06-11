@@ -21,6 +21,11 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
         /// `CALayer.shadowPath`: a shadow whose shape is given explicitly instead of
         /// derived from the alpha of rendered content.
         case dropShadow(Path)
+        /// Draws `image` (placed in `rect`) warped onto a device-space quad through
+        /// `transform`, a projective (perspective) texture map. Unlike `drawImage`,
+        /// which transforms `rect` by the affine CTM, this carries the complete
+        /// rect-to-device projective mapping, so it can render a 3D-projected quad.
+        case drawImageProjective(Image, rect: Rect, transform: ProjectiveTransform)
         case drawLayer(Layer, rect: Rect)
         case showText(glyphs: [Int], text: String?, font: Font, fontSize: Double, drawingMode: TextDrawingMode, textMatrix: AffineTransform, position: Point)
     }

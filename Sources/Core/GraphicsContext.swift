@@ -573,6 +573,13 @@ public struct GraphicsContext: Sendable, Validatable {
         commands.append(DrawOperation(kind: .dropShadow(path), state: currentState))
     }
 
+    /// Draws `image` (placed in `rect`) warped onto a device-space quad through
+    /// `transform`, a projective (perspective) texture map. The transform carries
+    /// the complete `rect`-to-device mapping, so it renders a 3D-projected quad.
+    public mutating func draw(_ image: Image, in rect: Rect, mappingTo transform: ProjectiveTransform) {
+        commands.append(DrawOperation(kind: .drawImageProjective(image, rect: rect, transform: transform), state: currentState))
+    }
+
     public static var defaultValidator: Validator<GraphicsContext> {
         Validator().validating(.transparencyLayersAreBalanced)
     }

@@ -92,6 +92,9 @@ public final class BitmapRenderer: Renderer, Sendable {
             case let .drawImage(image, rect):
                 rasterizeImage(image, in: rect, state: op.state, clipCache: clipCache, buffer: &currentBuffer)
 
+            case let .drawImageProjective(image, rect, transform):
+                rasterizeImageProjective(image, in: rect, transform: transform, state: op.state, buffer: &currentBuffer)
+
             case let .drawLayer(layer, rect):
                 guard layerDepth < 8, layer.width > 0, layer.height > 0 else { continue }
                 let key = ObjectIdentifier(layer)
@@ -680,6 +683,32 @@ public final class BitmapRenderer: Renderer, Sendable {
         buffer[index + 1] = UInt8(min(255, max(0, Int(round(outG * 255.0)))))
         buffer[index + 2] = UInt8(min(255, max(0, Int(round(outB * 255.0)))))
         buffer[index + 3] = UInt8(min(255, max(0, Int(round(outA * 255.0)))))
+    }
+
+    /// Draws `image` warped from `rect` onto a device quad through a projective
+    /// `transform`, using the shared software texture-mapper so it matches
+    /// CoreGraphicsRenderer. The warped pixels composite source-over honoring the
+    /// state's alpha, blend mode, and mask.
+    private func rasterizeImageProjective(_ image: Image, in rect: Rect, transform: ProjectiveTransform, state: GraphicState, buffer: inout [UInt8]) {
+        guard let warped = ProjectiveImageRasterizer.warp(
+            image, in: rect, transform: transform, width: width, height: height, quality: state.interpolationQuality
+        ) else { return }
+        for y in 0 ..< height {
+            for x in 0 ..< width {
+                let index = (y * width + x) * 4
+                let alpha = Double(warped[index + 3]) / 255.0
+                guard alpha > 0 else { continue }
+                // Un-premultiply the warped sample back to a straight color; blendPixel
+                // re-applies the alpha (and the state alpha/mask) as coverage.
+                let color = Color(
+                    red: Double(warped[index]) / 255.0 / alpha,
+                    green: Double(warped[index + 1]) / 255.0 / alpha,
+                    blue: Double(warped[index + 2]) / 255.0 / alpha,
+                    alpha: alpha
+                )
+                blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
+            }
+        }
     }
 
     private func rasterizeImage(_ image: Image, in rect: Rect, state: GraphicState, clipCache: ClipCache, buffer: inout [UInt8]) {

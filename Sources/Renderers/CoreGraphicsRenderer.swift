@@ -202,6 +202,9 @@
                     case let .dropShadow(path):
                         drawDropShadow(of: path, state: operation.state)
 
+                    case let .drawImageProjective(image, rect, transform):
+                        drawImageProjective(image, in: rect, transform: transform, state: operation.state)
+
                     case .beginTransparencyLayer, .endTransparencyLayer, .showText:
                         break
                     }
@@ -215,6 +218,30 @@
         private enum RenderingError: Error {
             case cannotCreateColorSpace
             case cannotCreateGradient
+        }
+
+        /// Draws `image` warped onto a device quad through a projective `transform`.
+        /// CoreGraphics has no native projective image draw, so the warp is computed
+        /// in software (the shared texture-mapper, matching BitmapRenderer) and the
+        /// finished device-space image is blitted under the identity CTM.
+        private func drawImageProjective(_ image: Image, in rect: Rect, transform: ProjectiveTransform, state: GraphicState) {
+            let canvasWidth = targetContext.width
+            let canvasHeight = targetContext.height
+            guard canvasWidth > 0, canvasHeight > 0 else { return }
+            guard let data = ProjectiveImageRasterizer.warp(
+                image, in: rect, transform: transform, width: canvasWidth, height: canvasHeight, quality: state.interpolationQuality
+            ) else { return }
+            guard let warped = try? Image(
+                width: canvasWidth, height: canvasHeight, alphaInfo: .premultipliedLast, data: data
+            ), let cgImage = createCGImage(from: warped) else { return }
+            targetContext.saveGState()
+            targetContext.setAlpha(CGFloat(state.alpha))
+            targetContext.setBlendMode(.normal)
+            targetContext.concatenate(targetContext.ctm.inverted())
+            targetContext.translateBy(x: 0, y: CGFloat(canvasHeight))
+            targetContext.scaleBy(x: 1, y: -1)
+            targetContext.draw(cgImage, in: CGRect(x: 0, y: 0, width: CGFloat(canvasWidth), height: CGFloat(canvasHeight)))
+            targetContext.restoreGState()
         }
 
         /// Casts the drop shadow of `path` using the shared software shadow kernel, so
