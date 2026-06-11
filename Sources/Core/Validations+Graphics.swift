@@ -181,7 +181,8 @@ public extension Validation {
                             at: context.codingPath + [ValidationCodingKey("kind")]
                         )]
                     }
-                case .drawLinearGradient, .drawRadialGradient, .beginTransparencyLayer, .endTransparencyLayer, .drawImage, .dropShadow, .drawLayer, .showText:
+                case .drawLinearGradient, .drawRadialGradient, .beginTransparencyLayer, .endTransparencyLayer,
+                     .drawImage, .drawImageProjective, .dropShadow, .drawLayer, .showText:
                     // An empty shadow path simply casts no shadow, like an empty fill.
                     break
                 }
@@ -313,6 +314,23 @@ public extension Validation {
                     return errors
                 }
                 return []
+            }
+        )
+    }
+
+    /// Validates that a projective image draw's transform is invertible and finite,
+    /// so the image can actually be mapped onto its quad; a singular or non-finite
+    /// transform renders nothing. Delegates to the transform's own rules, which is
+    /// where invertibility and finiteness are authoritatively defined.
+    static var drawImageProjectiveIsValid: Validation<Document, DrawOperation> {
+        .init(
+            description: "Projective image transform is invertible and finite",
+            check: { context in
+                guard case let .drawImageProjective(_, _, transform) = context.subject.kind else { return [] }
+                return transform.runDefaultValidator(
+                    at: context.codingPath + [ValidationCodingKey("kind"), ValidationCodingKey("transform")],
+                    in: transform
+                )
             }
         )
     }

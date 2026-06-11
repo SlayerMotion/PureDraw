@@ -242,7 +242,7 @@ public struct PDFRenderer: Renderer {
                         contentStream += pathStr
                         contentStream += "f\n"
                     }
-                case .beginTransparencyLayer, .endTransparencyLayer, .drawImage, .drawLayer, .dropShadow, .showText:
+                case .beginTransparencyLayer, .endTransparencyLayer, .drawImage, .drawLayer, .drawImageProjective, .dropShadow, .showText:
                     break
                 }
                 contentStream += "Q\n"
@@ -413,7 +413,7 @@ public struct PDFRenderer: Renderer {
                     contentStream += "<\(hex)> Tj\n"
                     contentStream += "ET\n"
                 }
-            case .beginTransparencyLayer, .endTransparencyLayer, .dropShadow:
+            case .beginTransparencyLayer, .endTransparencyLayer, .drawImageProjective, .dropShadow:
                 break
             case .drawLayer:
                 break // expanded by layerFlattenedCommands

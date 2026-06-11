@@ -114,6 +114,15 @@ struct ValidationBoundaryTests {
         #expect(fails(.linearGradientPointsAreDistinct, coincident))
     }
 
+    @Test func drawImageProjectiveTransformBoundary() throws {
+        let image = try Image(width: 1, height: 1, alphaInfo: .last, data: [255, 0, 0, 255])
+        let rect = Rect(x: 0, y: 0, width: 1, height: 1)
+        let invertible = ProjectiveTransform.identity
+        let singular = ProjectiveTransform(m11: 1, m12: 0, m13: 0, m21: 0, m22: 0, m23: 0, m31: 0, m32: 0, m33: 1)
+        #expect(passes(.drawImageProjectiveIsValid, DrawOperation(kind: .drawImageProjective(image, rect: rect, transform: invertible), state: GraphicState())))
+        #expect(fails(.drawImageProjectiveIsValid, DrawOperation(kind: .drawImageProjective(image, rect: rect, transform: singular), state: GraphicState())))
+    }
+
     @Test func radialGradientRadiusBoundary() {
         let valid = DrawOperation(
             kind: .drawRadialGradient(gradient, startCenter: Point(x: 0, y: 0), startRadius: 0, endCenter: Point(x: 0, y: 0), endRadius: 1, options: []),

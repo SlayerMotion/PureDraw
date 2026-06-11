@@ -83,7 +83,7 @@ public struct SVGRenderer: Renderer {
                     p.addLine(to: Point(x: rect.minX, y: rect.maxY))
                     p.closeSubpath()
                     path = p
-                case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer, .dropShadow, .showText:
+                case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer, .drawImageProjective, .dropShadow, .showText:
                     continue
                 }
 
@@ -205,7 +205,7 @@ public struct SVGRenderer: Renderer {
                 ) {
                     elements.append(element)
                 }
-            case .drawLayer, .dropShadow:
+            case .drawLayer, .drawImageProjective, .dropShadow:
                 break // expanded by layerFlattenedCommands
             }
         }
