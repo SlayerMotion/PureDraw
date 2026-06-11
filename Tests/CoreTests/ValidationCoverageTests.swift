@@ -57,6 +57,7 @@ struct ValidationCoverageTests {
         "Draw operation path is not empty",
         "Linear gradient start and end points are distinct",
         "Radial gradient configuration is valid",
+        "Projective image transform is invertible and finite",
         "Layer stamp has positive dimensions",
         "Text-show operation parameters are valid",
         "CrumpleDeformer center, radius, and strengths are finite",

@@ -25,7 +25,9 @@ enum ProjectiveImageRasterizer {
         height: Int,
         quality: InterpolationQuality
     ) -> [UInt8]? {
-        guard width > 0, height > 0, rect.width > 0, rect.height > 0 else { return nil }
+        // A singular transform has no inverse to map device pixels back through, so
+        // it cannot be rasterized.
+        guard width > 0, height > 0, rect.width > 0, rect.height > 0, transform.determinant != 0 else { return nil }
 
         let corners = [
             Point(x: rect.minX, y: rect.minY), Point(x: rect.maxX, y: rect.minY),
@@ -39,12 +41,22 @@ enum ProjectiveImageRasterizer {
         let maxY = min(height - 1, Int(ceil(corners.map(\.y).max() ?? 0)))
         guard minX <= maxX, minY <= maxY else { return nil }
 
+        // The rect center always projects to the front (inside the quad); a sample
+        // whose homogeneous w has the opposite sign is behind the projection plane
+        // and must be rejected, or a quad straddling the horizon paints a mirrored
+        // ghost. (`w = m13·x + m23·y + m33`, matching `Point.applying`.)
+        let centerW = transform.m13 * (rect.minX + rect.width / 2)
+            + transform.m23 * (rect.minY + rect.height / 2) + transform.m33
+        let frontIsPositive = centerW > 0
+
         let inverse = transform.inverted()
         var output = [UInt8](repeating: 0, count: width * height * 4)
         for y in minY ... maxY {
             for x in minX ... maxX {
                 let userPoint = Point(x: Double(x) + 0.5, y: Double(y) + 0.5).applying(inverse)
-                guard userPoint.x.isFinite, userPoint.y.isFinite, rect.contains(userPoint) else { continue }
+                guard userPoint.x.isFinite, userPoint.y.isFinite else { continue }
+                let pointW = transform.m13 * userPoint.x + transform.m23 * userPoint.y + transform.m33
+                guard pointW != 0, (pointW > 0) == frontIsPositive, rect.contains(userPoint) else { continue }
                 let u = (userPoint.x - rect.minX) / rect.width
                 let v = (userPoint.y - rect.minY) / rect.height
                 let color = image.sampledColor(u: u, v: v, quality: quality)

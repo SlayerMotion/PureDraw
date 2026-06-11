@@ -318,6 +318,23 @@ public extension Validation {
         )
     }
 
+    /// Validates that a projective image draw's transform is invertible and finite,
+    /// so the image can actually be mapped onto its quad; a singular or non-finite
+    /// transform renders nothing. Delegates to the transform's own rules, which is
+    /// where invertibility and finiteness are authoritatively defined.
+    static var drawImageProjectiveIsValid: Validation<Document, DrawOperation> {
+        .init(
+            description: "Projective image transform is invertible and finite",
+            check: { context in
+                guard case let .drawImageProjective(_, _, transform) = context.subject.kind else { return [] }
+                return transform.runDefaultValidator(
+                    at: context.codingPath + [ValidationCodingKey("kind"), ValidationCodingKey("transform")],
+                    in: transform
+                )
+            }
+        )
+    }
+
     /// Validates that an image's dimensions, bits, and bytes are valid and matches data buffer size.
     static var imageIsValid: Validation<Document, Image> {
         .init(
