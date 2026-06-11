@@ -691,7 +691,8 @@ public final class BitmapRenderer: Renderer, Sendable {
     /// state's alpha, blend mode, mask, and clip path.
     private func rasterizeImageProjective(_ image: Image, in rect: Rect, transform: ProjectiveTransform, state: GraphicState, clipCache: ClipCache, buffer: inout [UInt8]) {
         guard let warped = ProjectiveImageRasterizer.warp(
-            image, in: rect, transform: transform, width: width, height: height, quality: state.interpolationQuality
+            image, in: rect, transform: transform, width: width, height: height,
+            quality: state.interpolationQuality, antialiased: state.shouldAntialias
         ) else { return }
         // The clip path is honored here so the bitmap path matches CoreGraphics,
         // which clips this op through the native gstate.

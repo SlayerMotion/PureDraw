@@ -229,7 +229,8 @@
             let canvasHeight = targetContext.height
             guard canvasWidth > 0, canvasHeight > 0 else { return }
             guard let data = ProjectiveImageRasterizer.warp(
-                image, in: rect, transform: transform, width: canvasWidth, height: canvasHeight, quality: state.interpolationQuality
+                image, in: rect, transform: transform, width: canvasWidth, height: canvasHeight,
+                quality: state.interpolationQuality, antialiased: state.shouldAntialias
             ) else { return }
             guard let warped = try? Image(
                 width: canvasWidth, height: canvasHeight, alphaInfo: .premultipliedLast, data: data
