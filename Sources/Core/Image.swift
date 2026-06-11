@@ -198,6 +198,47 @@ public extension Image {
         }
     }
 
+    /// Returns the sub-image covering the given pixel rectangle, or `nil` when the
+    /// rectangle does not overlap the image. The requested rectangle is clamped to
+    /// the image bounds first, so a partly out-of-bounds rectangle yields the
+    /// overlapping portion rather than failing. The pixel layout (depth, color
+    /// space, alpha, masking) is preserved; only `bytesPerRow` tightens to the new
+    /// width. This is the analog of cropping a `CGImage` to a sub-rectangle.
+    func cropped(x cropX: Int, y cropY: Int, width cropWidth: Int, height cropHeight: Int) -> Image? {
+        guard cropWidth > 0, cropHeight > 0 else { return nil }
+        let x0 = max(0, cropX)
+        let y0 = max(0, cropY)
+        // Compute the far edges without trapping: a request whose far edge overflows
+        // Int extends past the image, so it clamps to the image bound.
+        let (sumX, overflowX) = cropX.addingReportingOverflow(cropWidth)
+        let (sumY, overflowY) = cropY.addingReportingOverflow(cropHeight)
+        let x1 = overflowX ? width : min(width, sumX)
+        let y1 = overflowY ? height : min(height, sumY)
+        let croppedW = x1 - x0
+        let croppedH = y1 - y0
+        guard croppedW > 0, croppedH > 0 else { return nil }
+
+        let bytesPerPixel = bitsPerPixel / 8
+        let newBytesPerRow = croppedW * bytesPerPixel
+        var newData = [UInt8](repeating: 0, count: croppedH * newBytesPerRow)
+        for row in 0 ..< croppedH {
+            let srcStart = (y0 + row) * bytesPerRow + x0 * bytesPerPixel
+            let dstStart = row * newBytesPerRow
+            newData.replaceSubrange(dstStart ..< dstStart + newBytesPerRow, with: data[srcStart ..< srcStart + newBytesPerRow])
+        }
+        return try? Image(
+            width: croppedW,
+            height: croppedH,
+            bitsPerComponent: bitsPerComponent,
+            bitsPerPixel: bitsPerPixel,
+            bytesPerRow: newBytesPerRow,
+            colorSpace: colorSpace,
+            alphaInfo: alphaInfo,
+            maskingColors: maskingColors,
+            data: newData
+        )
+    }
+
     /// Resolves the clip-mask coverage of a pixel: the alpha channel when the image has one, luminance otherwise.
     /// White (or opaque) reveals, black (or transparent) hides. The result is clamped to 0...1.
     func maskCoverage(x: Int, y: Int) -> Double {
