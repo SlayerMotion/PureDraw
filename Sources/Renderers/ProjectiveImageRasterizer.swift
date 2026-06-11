@@ -23,7 +23,8 @@ enum ProjectiveImageRasterizer {
         transform: ProjectiveTransform,
         width: Int,
         height: Int,
-        quality: InterpolationQuality
+        quality: InterpolationQuality,
+        antialiased: Bool
     ) -> [UInt8]? {
         // A singular transform has no inverse to map device pixels back through, so
         // it cannot be rasterized.
@@ -50,23 +51,45 @@ enum ProjectiveImageRasterizer {
         let frontIsPositive = centerW > 0
 
         let inverse = transform.inverted()
+        // Antialiasing is subpixel coverage sampling, the way Quartz rasterizes (a
+        // pixel's contribution is the fraction of its area inside the quad, not the
+        // naive "touch any part" rule). Sample an N x N grid of subpixel positions per
+        // device pixel; uncovered samples contribute zero, so the premultiplied
+        // average is coverage-weighted and the quad edges fade smoothly. N = 1
+        // (`!antialiased`) is a single centered sample, exact for an axis-aligned quad.
+        let samplesPerAxis = antialiased ? 4 : 1
+        let sampleCount = Double(samplesPerAxis * samplesPerAxis)
+        let step = 1.0 / Double(samplesPerAxis)
+
         var output = [UInt8](repeating: 0, count: width * height * 4)
         for y in minY ... maxY {
             for x in minX ... maxX {
-                let userPoint = Point(x: Double(x) + 0.5, y: Double(y) + 0.5).applying(inverse)
-                guard userPoint.x.isFinite, userPoint.y.isFinite else { continue }
-                let pointW = transform.m13 * userPoint.x + transform.m23 * userPoint.y + transform.m33
-                guard pointW != 0, (pointW > 0) == frontIsPositive, rect.contains(userPoint) else { continue }
-                let u = (userPoint.x - rect.minX) / rect.width
-                let v = (userPoint.y - rect.minY) / rect.height
-                let color = image.sampledColor(u: u, v: v, quality: quality)
-                let alpha = color.alpha
-                guard alpha > 0 else { continue }
+                var sumRed = 0.0, sumGreen = 0.0, sumBlue = 0.0, sumAlpha = 0.0
+                for subY in 0 ..< samplesPerAxis {
+                    for subX in 0 ..< samplesPerAxis {
+                        let deviceX = Double(x) + (Double(subX) + 0.5) * step
+                        let deviceY = Double(y) + (Double(subY) + 0.5) * step
+                        let userPoint = Point(x: deviceX, y: deviceY).applying(inverse)
+                        guard userPoint.x.isFinite, userPoint.y.isFinite else { continue }
+                        let pointW = transform.m13 * userPoint.x + transform.m23 * userPoint.y + transform.m33
+                        guard pointW != 0, (pointW > 0) == frontIsPositive, rect.contains(userPoint) else { continue }
+                        let u = (userPoint.x - rect.minX) / rect.width
+                        let v = (userPoint.y - rect.minY) / rect.height
+                        let color = image.sampledColor(u: u, v: v, quality: quality)
+                        let alpha = color.alpha
+                        guard alpha > 0 else { continue }
+                        sumRed += color.red * alpha
+                        sumGreen += color.green * alpha
+                        sumBlue += color.blue * alpha
+                        sumAlpha += alpha
+                    }
+                }
+                guard sumAlpha > 0 else { continue }
                 let index = (y * width + x) * 4
-                output[index] = UInt8(max(0, min(255, color.red * alpha * 255)))
-                output[index + 1] = UInt8(max(0, min(255, color.green * alpha * 255)))
-                output[index + 2] = UInt8(max(0, min(255, color.blue * alpha * 255)))
-                output[index + 3] = UInt8(max(0, min(255, alpha * 255)))
+                output[index] = UInt8(max(0, min(255, sumRed / sampleCount * 255)))
+                output[index + 1] = UInt8(max(0, min(255, sumGreen / sampleCount * 255)))
+                output[index + 2] = UInt8(max(0, min(255, sumBlue / sampleCount * 255)))
+                output[index + 3] = UInt8(max(0, min(255, sumAlpha / sampleCount * 255)))
             }
         }
         return output

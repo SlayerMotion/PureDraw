@@ -66,7 +66,7 @@ struct ProjectiveImageTests {
         let rect = Rect(x: 0, y: 0, width: 10, height: 10)
         // A rank-deficient transform (collapses y) has no inverse; nothing should paint.
         let singular = ProjectiveTransform(m11: 1, m12: 0, m13: 0, m21: 0, m22: 0, m23: 0, m31: 0, m32: 0, m33: 1)
-        #expect(ProjectiveImageRasterizer.warp(image, in: rect, transform: singular, width: 60, height: 60, quality: .default) == nil)
+        #expect(ProjectiveImageRasterizer.warp(image, in: rect, transform: singular, width: 60, height: 60, quality: .default, antialiased: false) == nil)
         var context = GraphicsContext()
         context.draw(image, in: rect, mappingTo: singular)
         let result = try BitmapRenderer(width: 60, height: 60).draw(context)
@@ -84,7 +84,7 @@ struct ProjectiveImageTests {
         // w = 1 - 0.04*y, so the horizon is at y = 25: the rect straddles it (front for
         // y < 25, behind for y > 25). No painted device pixel may map behind the plane.
         let straddle = ProjectiveTransform(m11: 1, m12: 0, m13: 0, m21: 0, m22: 1, m23: -0.04, m31: 0, m32: 0, m33: 1)
-        let warped = try #require(ProjectiveImageRasterizer.warp(image, in: rect, transform: straddle, width: 200, height: 200, quality: .default))
+        let warped = try #require(ProjectiveImageRasterizer.warp(image, in: rect, transform: straddle, width: 200, height: 200, quality: .default, antialiased: false))
         let inverse = straddle.inverted()
         let centerW = straddle.m23 * 20 + straddle.m33 // 0.2 > 0
         var paintedCount = 0
@@ -97,6 +97,29 @@ struct ProjectiveImageTests {
             }
         }
         #expect(paintedCount > 0) // the front half still renders
+    }
+
+    @Test func antialiasingProducesFractionalEdgeCoverage() throws {
+        let image = try solidImage(10, 255, 0, 0) // uniformly opaque
+        let rect = Rect(x: 0, y: 0, width: 10, height: 10)
+        // A diamond (square rotated 45 degrees): every edge crosses pixels diagonally.
+        let transform = ProjectiveTransform.rectToQuad(
+            rect, p0: Point(x: 30, y: 8), p1: Point(x: 52, y: 30), p2: Point(x: 30, y: 52), p3: Point(x: 8, y: 30)
+        )
+        func fractionalEdgePixels(antialiased: Bool) throws -> Int {
+            let warped = try #require(ProjectiveImageRasterizer.warp(
+                image, in: rect, transform: transform, width: 60, height: 60, quality: .default, antialiased: antialiased
+            ))
+            var count = 0
+            for i in stride(from: 3, to: warped.count, by: 4) where warped[i] > 0 && warped[i] < 255 {
+                count += 1
+            }
+            return count
+        }
+        // Without AA every pixel is fully in (255) or out (0): hard, jagged edges.
+        #expect(try fractionalEdgePixels(antialiased: false) == 0)
+        // With AA the diagonal edges carry partial coverage (fractional alpha).
+        #expect(try fractionalEdgePixels(antialiased: true) > 0)
     }
 
     @Test func partialAlphaRoundTripsAndFadesWithStateAlpha() throws {
