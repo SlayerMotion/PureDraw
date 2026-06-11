@@ -89,6 +89,41 @@ struct ContinuousCornerTests {
         #expect(box.minX >= rect.minX - 0.01 && box.maxX <= rect.maxX + 0.01)
         #expect(box.minY >= rect.minY - 0.01 && box.maxY <= rect.maxY + 0.01)
         #expect(abs(box.minX - rect.minX) < 0.5 && abs(box.maxX - rect.maxX) < 0.5)
+        #expect(abs(box.minY - rect.minY) < 0.5 && abs(box.maxY - rect.maxY) < 0.5)
+    }
+
+    @Test func everySegmentJoinsTheLastAndTheCornerCloses() {
+        var path = Path()
+        path.addContinuousRoundedRect(in: Rect(x: 10, y: 20, width: 120, height: 90), cornerRadius: 30)
+        var current: Point?
+        var subpathStart: Point?
+        func end(of element: PathElement) -> Point? {
+            switch element {
+            case let .move(p), let .line(p): p
+            case let .quadCurve(p, _), let .cubicCurve(p, _, _): p
+            case .close: subpathStart
+            }
+        }
+        func start(of element: PathElement) -> Point? {
+            if case let .move(p) = element { return p }
+            return current // every non-move segment starts at the running point
+        }
+        for element in path.elements {
+            if case .move = element {} else if let from = current, let into = start(of: element) {
+                #expect(abs(from.x - into.x) < 1e-9 && abs(from.y - into.y) < 1e-9, "disconnected segment")
+            }
+            if case let .move(p) = element { subpathStart = p }
+            current = end(of: element)
+        }
+        // The closing edge collapses to zero: the last corner ends exactly at the
+        // leading move, with no stray hairline segment.
+        if case let .move(startPoint) = path.elements.first,
+           case let .cubicCurve(lastEnd, _, _) = path.elements.dropLast().last
+        {
+            #expect(abs(lastEnd.x - startPoint.x) < 1e-9 && abs(lastEnd.y - startPoint.y) < 1e-9)
+        } else {
+            Issue.record("expected a leading move and a trailing cubic before close")
+        }
     }
 
     @Test func largeRadiusScalesToFitWithoutBreaking() {
@@ -102,8 +137,9 @@ struct ContinuousCornerTests {
             let finite = path.elements.allSatisfy {
                 switch $0 {
                 case let .move(p), let .line(p): p.x.isFinite && p.y.isFinite
-                case let .quadCurve(p, c): p.x.isFinite && c.x.isFinite
-                case let .cubicCurve(p, c1, c2): p.x.isFinite && c1.x.isFinite && c2.x.isFinite
+                case let .quadCurve(p, c): p.x.isFinite && p.y.isFinite && c.x.isFinite && c.y.isFinite
+                case let .cubicCurve(p, c1, c2):
+                    p.x.isFinite && p.y.isFinite && c1.x.isFinite && c1.y.isFinite && c2.x.isFinite && c2.y.isFinite
                 case .close: true
                 }
             }

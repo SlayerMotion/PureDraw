@@ -211,10 +211,13 @@ public struct Path: Equatable, Sendable, Validatable {
     public mutating func addContinuousRoundedRect(in rect: Rect, cornerRadius: Double) {
         let minSide = min(rect.width, rect.height)
         guard minSide > 0 else { return }
-        // Consumption along each edge is 1.528665 * radius, clamped to half the
+        // Consumption along each edge is edgeRatio * radius, clamped to half the
         // shorter side so adjacent corners never overlap; the corner then scales to
-        // that consumption.
-        let consumption = min(1.528665 * abs(cornerRadius), minSide / 2.0)
+        // that consumption. edgeRatio is also the corner's terminal (u, v) ratio
+        // below, so the same constant drives both: the edges meet the curve exactly
+        // and the closing segment collapses to zero.
+        let edgeRatio = 1.52866498
+        let consumption = min(edgeRatio * abs(cornerRadius), minSide / 2.0)
         guard consumption > 0 else {
             move(to: rect.origin)
             addLine(to: Point(x: rect.maxX, y: rect.minY))
@@ -224,7 +227,7 @@ public struct Path: Equatable, Sendable, Validatable {
             return
         }
         let p = consumption
-        let r = consumption / 1.528665 // effective corner scale
+        let r = consumption / edgeRatio // effective corner scale
 
         /// One corner: `inAxis` points from the corner vertex toward where the curve
         /// starts (along the incoming edge), `outAxis` toward where it ends (along
@@ -235,7 +238,7 @@ public struct Path: Equatable, Sendable, Validatable {
             }
             addCurve(to: at(0.63149379, 0.07491139), control1: at(1.08849296, 0), control2: at(0.86840694, 0))
             addCurve(to: at(0.07491139, 0.63149379), control1: at(0.37282383, 0.16905956), control2: at(0.16905956, 0.37282383))
-            addCurve(to: at(0, 1.52866498), control1: at(0, 0.86840694), control2: at(0, 1.08849296))
+            addCurve(to: at(0, edgeRatio), control1: at(0, 0.86840694), control2: at(0, 1.08849296))
         }
 
         move(to: Point(x: rect.minX + p, y: rect.minY))
