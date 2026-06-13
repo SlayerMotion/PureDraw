@@ -863,22 +863,81 @@ public final class BitmapRenderer: Renderer, Sendable {
         let clipCoverage = clipPath.flatMap { cachedClipCoverage($0, antialiased: false, cache: clipCache) }
         if clipPath != nil, clipCoverage == nil { return }
 
+        /// `interpolationQuality` controls how the *source* is sampled (nearest vs
+        /// bilinear); `shouldAntialias` controls *destination-edge coverage*. A pixel
+        /// fully inside the (inverse-mapped) image rect needs no coverage work and is
+        /// sampled once at its centre, so integer-aligned interior draws are byte-for-
+        /// byte unchanged. Only a pixel the rect edge crosses is supersampled on a 4x4
+        /// grid and weighted by the fraction of subsamples inside the rect, so a
+        /// transformed/non-integer edge fades instead of stepping. This matches
+        /// `ProjectiveImageRasterizer`'s coverage sampling at the edge. Without
+        /// antialiasing, every pixel takes the binary centre test.
+        func sampleCentre(_ x: Int, _ y: Int) {
+            let userPt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5).applying(invTransform)
+            guard rect.contains(userPt) else { return }
+            let u = rect.width > 0 ? (userPt.x - rect.minX) / rect.width : 0.0
+            let v = rect.height > 0 ? (userPt.y - rect.minY) / rect.height : 0.0
+            blendPixel(x: x, y: y, color: image.sampledColor(u: u, v: v, quality: state.interpolationQuality), state: state, buffer: &buffer)
+        }
+
+        let samplesPerAxis = 4
+        let step = 1.0 / Double(samplesPerAxis)
+        let sampleCount = Double(samplesPerAxis * samplesPerAxis)
+
         for y in minY ... maxY {
             for x in minX ... maxX {
                 if let clipCoverage {
                     guard clipCoverage.value(atX: x, y: y) > 0 else { continue }
                 }
-
-                let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
-                let userPt = pt.applying(invTransform)
-
-                if rect.contains(userPt) {
-                    let u = rect.width > 0 ? (userPt.x - rect.minX) / rect.width : 0.0
-                    let v = rect.height > 0 ? (userPt.y - rect.minY) / rect.height : 0.0
-
-                    let color = image.sampledColor(u: u, v: v, quality: state.interpolationQuality)
-                    blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
+                if !state.shouldAntialias {
+                    sampleCentre(x, y)
+                    continue
                 }
+                // A pixel whose four corners all map inside the rect is fully covered
+                // (the rect is convex), so it needs only a centre sample.
+                let corners = [
+                    Point(x: Double(x), y: Double(y)), Point(x: Double(x + 1), y: Double(y)),
+                    Point(x: Double(x + 1), y: Double(y + 1)), Point(x: Double(x), y: Double(y + 1)),
+                ].map { $0.applying(invTransform) }
+                if corners.allSatisfy({ rect.contains($0) }) {
+                    sampleCentre(x, y)
+                    continue
+                }
+
+                var inside = 0
+                var sumAlpha = 0.0, sumRed = 0.0, sumGreen = 0.0, sumBlue = 0.0
+                for subY in 0 ..< samplesPerAxis {
+                    for subX in 0 ..< samplesPerAxis {
+                        let userPt = Point(
+                            x: Double(x) + (Double(subX) + 0.5) * step,
+                            y: Double(y) + (Double(subY) + 0.5) * step
+                        ).applying(invTransform)
+                        guard rect.contains(userPt) else { continue }
+                        inside += 1
+                        let u = rect.width > 0 ? (userPt.x - rect.minX) / rect.width : 0.0
+                        let v = rect.height > 0 ? (userPt.y - rect.minY) / rect.height : 0.0
+                        let color = image.sampledColor(u: u, v: v, quality: state.interpolationQuality)
+                        // Accumulate premultiplied so the average is coverage-weighted.
+                        sumAlpha += color.alpha
+                        sumRed += color.red * color.alpha
+                        sumGreen += color.green * color.alpha
+                        sumBlue += color.blue * color.alpha
+                    }
+                }
+                guard inside > 0, sumAlpha > 0 else { continue }
+
+                // Edge-coverage fraction of the pixel, and the alpha-weighted mean
+                // colour of the covered subsamples. `blendPixel` premultiplies by
+                // `color.alpha * coverage`, reproducing the projective path's
+                // `sum / sampleCount` premultiplied output.
+                let coverage = Double(inside) / sampleCount
+                let color = Color(
+                    red: sumRed / sumAlpha,
+                    green: sumGreen / sumAlpha,
+                    blue: sumBlue / sumAlpha,
+                    alpha: sumAlpha / Double(inside)
+                )
+                blendPixel(x: x, y: y, color: color, state: state, coverage: coverage, buffer: &buffer)
             }
         }
     }
