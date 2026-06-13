@@ -163,19 +163,31 @@ public final class BitmapRenderer: Renderer, Sendable {
 
         let transformedPath = path.applying(state.transform)
 
+        // Dash lengths and phase are user-space stroke parameters, so scale them to
+        // device space like the line width. An empty (or all-zero) pattern strokes
+        // solid. Each "on" run is stroked as an open sub-polyline, so the caps apply
+        // at the dash ends, matching CoreGraphics. The vector renderers emit dash
+        // natively (Canvas setLineDash, PDF `d`, SVG stroke-dasharray); this brings
+        // the software oracle to parity.
+        let deviceDash = state.dashPattern.contains { $0 > 0 } ? state.dashPattern.map { $0 * scale } : []
+        let deviceDashPhase = state.dashPhase * scale
+
         // Build one winding-consistent shape for the whole stroke (segment
         // quads, joins, caps) and fill it in a single coverage pass, so
         // overlapping pieces blend exactly once.
         var strokeShape = Path()
         for polyline in transformedPath.toPolylines() {
-            appendStrokeGeometry(
-                for: polyline,
-                halfW: halfW,
-                lineCap: state.lineCap,
-                lineJoin: state.lineJoin,
-                miterLimit: state.miterLimit,
-                into: &strokeShape
-            )
+            let runs = deviceDash.isEmpty ? [polyline] : Self.dashedRuns(polyline, lengths: deviceDash, phase: deviceDashPhase)
+            for run in runs {
+                appendStrokeGeometry(
+                    for: run,
+                    halfW: halfW,
+                    lineCap: state.lineCap,
+                    lineJoin: state.lineJoin,
+                    miterLimit: state.miterLimit,
+                    into: &strokeShape
+                )
+            }
         }
         guard !strokeShape.elements.isEmpty else { return }
 
@@ -231,6 +243,110 @@ public final class BitmapRenderer: Renderer, Sendable {
             appendCap(at: points[0], awayFrom: points[1], halfW: halfW, lineCap: lineCap, into: &shape)
             appendCap(at: points[points.count - 1], awayFrom: points[points.count - 2], halfW: halfW, lineCap: lineCap, into: &shape)
         }
+    }
+
+    /// Splits `polyline` into its "on"-dash runs along its arc length, given
+    /// device-space `lengths` (alternating on/off) and a starting `phase`. Each run
+    /// is an open polyline so the stroke caps land at the dash ends. An odd-count
+    /// pattern repeats to an even length and a closed polyline is walked around its
+    /// closing edge, both matching CoreGraphics. A pattern with no positive length
+    /// returns the polyline unchanged (solid).
+    static func dashedRuns(
+        _ polyline: (points: [Point], isClosed: Bool),
+        lengths rawLengths: [Double],
+        phase: Double
+    ) -> [(points: [Point], isClosed: Bool)] {
+        var lengths = rawLengths.map { max(0, $0) }
+        if !lengths.count.isMultiple(of: 2) { lengths += lengths }
+        let cycle = lengths.reduce(0, +)
+        guard cycle > 0 else { return [polyline] }
+
+        var points = polyline.points
+        if polyline.isClosed, let first = points.first, let last = points.last, first != last {
+            points.append(first)
+        }
+        guard points.count >= 2 else { return [] }
+
+        // Walk the dash cursor forward by `phase` (reduced into one cycle).
+        var index = 0
+        var remaining = lengths[0]
+        var on = true
+        var skip = phase.truncatingRemainder(dividingBy: cycle)
+        if skip < 0 { skip += cycle }
+        // Each iteration either consumes `skip` or steps past a zero-length entry;
+        // bounded because every cycle contains a positive length.
+        var steps = 0
+        while skip > 1e-12, steps < lengths.count * 2 + 2 {
+            steps += 1
+            if remaining <= 1e-12 {
+                index = (index + 1) % lengths.count
+                remaining = lengths[index]
+                on.toggle()
+                continue
+            }
+            let step = min(remaining, skip)
+            remaining -= step
+            skip -= step
+            if remaining <= 1e-12 {
+                index = (index + 1) % lengths.count
+                remaining = lengths[index]
+                on.toggle()
+            }
+        }
+
+        var runs: [(points: [Point], isClosed: Bool)] = []
+        var current: [Point] = []
+        func flush() {
+            if current.count >= 2 { runs.append((current, false)) }
+            current = []
+        }
+
+        for segment in 0 ..< points.count - 1 {
+            let a = points[segment]
+            let b = points[segment + 1]
+            let segmentLength = distance(a, b)
+            guard segmentLength > 0 else { continue }
+            var consumed = 0.0
+            var zeroGuard = 0
+            while consumed < segmentLength - 1e-12 {
+                if remaining <= 1e-12 {
+                    // A zero-length entry toggles in place; bound the spin per segment.
+                    zeroGuard += 1
+                    if zeroGuard > lengths.count + 1 { break }
+                    if on { flush() }
+                    index = (index + 1) % lengths.count
+                    remaining = lengths[index]
+                    on.toggle()
+                    continue
+                }
+                zeroGuard = 0
+                let step = min(remaining, segmentLength - consumed)
+                if on {
+                    if current.isEmpty { current.append(lerp(a, b, consumed / segmentLength)) }
+                    current.append(lerp(a, b, (consumed + step) / segmentLength))
+                }
+                consumed += step
+                remaining -= step
+                if remaining <= 1e-12 {
+                    if on { flush() }
+                    index = (index + 1) % lengths.count
+                    remaining = lengths[index]
+                    on.toggle()
+                }
+            }
+        }
+        if on { flush() }
+        return runs
+    }
+
+    private static func distance(_ a: Point, _ b: Point) -> Double {
+        let dx = b.x - a.x
+        let dy = b.y - a.y
+        return (dx * dx + dy * dy).squareRoot()
+    }
+
+    private static func lerp(_ a: Point, _ b: Point, _ t: Double) -> Point {
+        Point(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t)
     }
 
     /// Appends the rectangle covering a stroked segment. Vertex order keeps a

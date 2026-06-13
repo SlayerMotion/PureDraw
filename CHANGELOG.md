@@ -105,6 +105,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `BitmapRenderer` now applies `dashPattern` / `dashPhase` when stroking. The
+  software path previously ignored the dash and painted a solid line, diverging
+  from the vector renderers (Canvas, PDF, SVG), which already emit it. Each "on"
+  span is stroked as its own capped run; dash lengths and phase scale with the
+  CTM like the line width, an odd-count pattern repeats to even, and an empty
+  pattern stays solid (#98).
 - Validation now rejects a fill pattern with a non-positive `xStep`/`yStep`,
   closing the last reflection gap (pattern bounds, text position, and text
   matrix were already validated through the command graph).
