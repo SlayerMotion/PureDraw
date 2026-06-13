@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Affine `drawImage` now antialiases its destination edge. With
+  `shouldAntialias` enabled, a pixel the transformed image rect crosses is
+  supersampled on a 4x4 grid and coverage-weighted, so a rotated or non-integer
+  image edge fades instead of stepping (at parity with the projective image path).
+  Fully-interior pixels still take a single centre sample, so integer-aligned
+  draws are byte-for-byte unchanged, and `shouldAntialias == false` keeps the
+  binary edge. Source sampling stays governed by `interpolationQuality`,
+  independent of destination coverage (#97).
+
 ## [0.2.0] - 2026-06-14
 
 ### Added
