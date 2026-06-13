@@ -251,6 +251,12 @@ public final class BitmapRenderer: Renderer, Sendable {
     /// pattern repeats to an even length and a closed polyline is walked around its
     /// closing edge, both matching CoreGraphics. A pattern with no positive length
     /// returns the polyline unchanged (solid).
+    ///
+    /// Dash is applied in device space (lengths and phase pre-scaled by the CTM),
+    /// which is exact for conformal transforms (translation, rotation, uniform
+    /// scale) and matches how the line width is already scaled. A zero-length "on"
+    /// dash (a cap-only dot) yields a single-point run and is not painted; only runs
+    /// spanning a positive length are stroked.
     static func dashedRuns(
         _ polyline: (points: [Point], isClosed: Bool),
         lengths rawLengths: [Double],
