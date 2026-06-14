@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-15
+
+Version-only bump to stay in lockstep with PureLayer 0.6.0 (which adds an Examples
+catalog and a pixel-parity primitive). No PureDraw code changes since 0.5.0.
+
 ## [0.5.0] - 2026-06-14
 
 PureDraw and PureLayer stay in version lockstep: this bump aligns both at 0.5.0.
