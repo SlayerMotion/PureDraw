@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Selective corner rounding: `Path.addRoundedRect(in:cornerWidth:cornerHeight:corners:)`
+  and `addContinuousRoundedRect(in:cornerRadius:corners:)` take a `RectCorner` option
+  set so only the chosen corners round and the rest stay square. The default `.all`
+  keeps the existing fully-rounded shape, so present callers are unchanged. Supports
+  `CALayer.maskedCorners`-style selective rounding in higher layers.
+
 ## [0.2.1] - 2026-06-14
 
 ### Fixed
