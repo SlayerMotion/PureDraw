@@ -80,21 +80,75 @@ struct SVGPathDataTests {
         #expect(Path(svgPathData: "M 1 2") == Path(elements: [.move(to: p(1, 2))]))
     }
 
-    // MARK: - Rejection (malformed or not-yet-supported, never silent corruption)
+    // MARK: - Full grammar: relative, implicit repeats, H/V
 
-    @Test func rejectsMalformedAndUnsupported() {
+    @Test func parsesRelativeImplicitRepeatsAndHV() {
+        // Relative move then relative line: l 2 2 from (1,1) lands at (3,3).
+        #expect(Path(svgPathData: "m 1 1 l 2 2") == Path(elements: [.move(to: p(1, 1)), .line(to: p(3, 3))]))
+        // Implicit repeated lineto coordinates after an explicit L.
+        #expect(
+            Path(svgPathData: "M 0 0 L 1 1 2 2")
+                == Path(elements: [.move(to: p(0, 0)), .line(to: p(1, 1)), .line(to: p(2, 2))])
+        )
+        // Implicit lineto pairs after a moveto.
+        #expect(
+            Path(svgPathData: "M 0 0 1 1 2 2")
+                == Path(elements: [.move(to: p(0, 0)), .line(to: p(1, 1)), .line(to: p(2, 2))])
+        )
+        // Absolute and relative H/V fold to lines.
+        #expect(
+            Path(svgPathData: "M 0 0 H 5 V 5")
+                == Path(elements: [.move(to: p(0, 0)), .line(to: p(5, 0)), .line(to: p(5, 5))])
+        )
+        #expect(
+            Path(svgPathData: "m 0 0 h 5 v 5")
+                == Path(elements: [.move(to: p(0, 0)), .line(to: p(5, 0)), .line(to: p(5, 5))])
+        )
+    }
+
+    // MARK: - Full grammar: smooth S/T control reflection
+
+    @Test func parsesSmoothCubicAndQuadReflection() {
+        // After C with second control (2,2) ending at (3,3), S's first control is
+        // the reflection of (2,2) about (3,3) = (4,4).
+        #expect(
+            Path(svgPathData: "M 0 0 C 1 1 2 2 3 3 S 4 4 5 5")
+                == Path(elements: [
+                    .move(to: p(0, 0)),
+                    .cubicCurve(to: p(3, 3), control1: p(1, 1), control2: p(2, 2)),
+                    .cubicCurve(to: p(5, 5), control1: p(4, 4), control2: p(4, 4)),
+                ])
+        )
+        // A leading S with no prior cubic uses the current point as the first control.
+        #expect(
+            Path(svgPathData: "M 1 1 S 2 2 3 3")
+                == Path(elements: [.move(to: p(1, 1)), .cubicCurve(to: p(3, 3), control1: p(1, 1), control2: p(2, 2))])
+        )
+    }
+
+    // MARK: - Full grammar: arcs lower to cubics ending exactly on target
+
+    @Test func parsesArcLoweredToCubicsEndingOnTarget() {
+        let path = Path(svgPathData: "M 0 0 A 5 5 0 0 1 10 0")
+        let elements = path?.elements ?? []
+        #expect(elements.first == .move(to: p(0, 0)))
+        #expect(elements.count >= 2) // at least one cubic segment
+        // Every lowered element is a cubic, and the last lands exactly on (10, 0).
+        let curves = elements.dropFirst()
+        #expect(curves.allSatisfy { if case .cubicCurve = $0 { true } else { false } })
+        #expect(path?.currentPoint == p(10, 0))
+    }
+
+    // MARK: - Rejection (malformed only, never silent corruption)
+
+    @Test func rejectsMalformed() {
         let rejected = [
             "garbage",
             "X 1 2", // unknown command
-            "m 1 1", // relative move (later slice)
-            "H 5", // horizontal line (later slice)
-            "V 5", // vertical line (later slice)
-            "S 1 2 3 4", // smooth cubic (later slice)
-            "T 1 2", // smooth quad (later slice)
-            "A 1 1 0 0 1 2 2", // arc (later slice)
-            "L 1 1 2 2", // implicit repeated coordinates (later slice)
             "M 1", // missing y coordinate
             "M 1 2 Z @", // trailing garbage after a valid path
+            "M 1 2 C 3 4 5 6", // cubic missing its final coordinate pair
+            "Z 1 2", // close followed by stray coordinates
         ]
         for surface in rejected {
             #expect(Path(svgPathData: surface) == nil, "expected nil for: \(surface)")
