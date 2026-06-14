@@ -769,6 +769,25 @@ public final class BitmapRenderer: Renderer, Sendable {
         var outB = 0.0
         var outA = 0.0
 
+        /// A W3C separable blend mode (Compositing and Blending Level 1, §8-9, which the
+        /// CGBlendMode constants follow) composites a per-channel blend function `b(cs, cd)`
+        /// of the *unpremultiplied* source/backdrop colours, folded back into the
+        /// premultiplied source-over result: `co = cs·αs·(1-αd) + cd·αd·(1-αs) + αs·αd·b`.
+        /// The first two terms are the premultiplied operands already to hand.
+        func unpremul(_ premultiplied: Double, _ alpha: Double) -> Double {
+            alpha > 0 ? premultiplied / alpha : 0
+        }
+        func separable(_ b: (_ cs: Double, _ cd: Double) -> Double) {
+            let blendedAlpha = srcA * dstA
+            outA = srcA + dstA * (1.0 - srcA)
+            outR = srcR * (1.0 - dstA) + dstR * (1.0 - srcA) + blendedAlpha * b(unpremul(srcR, srcA), unpremul(dstR, dstA))
+            outG = srcG * (1.0 - dstA) + dstG * (1.0 - srcA) + blendedAlpha * b(unpremul(srcG, srcA), unpremul(dstG, dstA))
+            outB = srcB * (1.0 - dstA) + dstB * (1.0 - srcA) + blendedAlpha * b(unpremul(srcB, srcA), unpremul(dstB, dstA))
+        }
+        func hardLight(_ cs: Double, _ cd: Double) -> Double {
+            cs <= 0.5 ? 2.0 * cs * cd : 1.0 - 2.0 * (1.0 - cs) * (1.0 - cd)
+        }
+
         switch state.blendMode {
         case .normal:
             outA = srcA + dstA * (1.0 - srcA)
@@ -781,6 +800,54 @@ public final class BitmapRenderer: Renderer, Sendable {
             outR = srcR * dstR + srcR * (1.0 - dstA) + dstR * (1.0 - srcA)
             outG = srcG * dstG + srcG * (1.0 - dstA) + dstG * (1.0 - srcA)
             outB = srcB * dstB + srcB * (1.0 - dstA) + dstB * (1.0 - srcA)
+
+        case .screen:
+            separable { cs, cd in cs + cd - cs * cd }
+
+        case .overlay:
+            // Overlay keys on the backdrop: HardLight with the operands swapped.
+            separable { cs, cd in hardLight(cd, cs) }
+
+        case .darken:
+            separable { cs, cd in min(cs, cd) }
+
+        case .lighten:
+            separable { cs, cd in max(cs, cd) }
+
+        case .colorDodge:
+            separable { cs, cd in cd <= 0 ? 0 : (cs >= 1 ? 1 : min(1.0, cd / (1.0 - cs))) }
+
+        case .colorBurn:
+            separable { cs, cd in cd >= 1 ? 1 : (cs <= 0 ? 0 : 1.0 - min(1.0, (1.0 - cd) / cs)) }
+
+        case .hardLight:
+            separable { cs, cd in hardLight(cs, cd) }
+
+        case .softLight:
+            separable { cs, cd in
+                let d = cd <= 0.25 ? ((16.0 * cd - 12.0) * cd + 4.0) * cd : cd.squareRoot()
+                return cs <= 0.5 ? cd - (1.0 - 2.0 * cs) * cd * (1.0 - cd) : cd + (2.0 * cs - 1.0) * (d - cd)
+            }
+
+        case .difference:
+            separable { cs, cd in abs(cs - cd) }
+
+        case .exclusion:
+            separable { cs, cd in cs + cd - 2.0 * cs * cd }
+
+        case .plusLighter:
+            // Porter-Duff "plus": premultiplied channels add and clamp to 1 (additive glow).
+            outA = min(1.0, srcA + dstA)
+            outR = min(1.0, srcR + dstR)
+            outG = min(1.0, srcG + dstG)
+            outB = min(1.0, srcB + dstB)
+
+        case .plusDarker:
+            // Apple's plus-darker: the inverse-space sum, `1 - ((1-S) + (1-D))`, clamped.
+            outA = min(1.0, srcA + dstA)
+            outR = max(0.0, srcR + dstR - 1.0)
+            outG = max(0.0, srcG + dstG - 1.0)
+            outB = max(0.0, srcB + dstB - 1.0)
 
         case .clear:
             outR = 0
@@ -795,6 +862,10 @@ public final class BitmapRenderer: Renderer, Sendable {
             outA = srcA
 
         default:
+            // The non-separable modes (hue/saturation/color/luminosity) and the remaining
+            // Porter-Duff source/destination compositing operators are not yet implemented
+            // in the software rasterizer; they composite source-over until they are. The
+            // CoreGraphicsRenderer path handles them via the native CGBlendMode.
             outA = srcA + dstA * (1.0 - srcA)
             outR = srcR + dstR * (1.0 - srcA)
             outG = srcG + dstG * (1.0 - srcA)

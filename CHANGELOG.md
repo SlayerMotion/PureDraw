@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-06-14
+
+### Added
+
+- Software blend modes: the `BitmapRenderer` now composites the W3C separable blend
+  modes (`screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`,
+  `hardLight`, `softLight`, `difference`, `exclusion`) and the additive plus modes
+  (`plusLighter`, `plusDarker`), matching the native `CGBlendMode` the
+  `CoreGraphicsRenderer` already maps. Previously only `normal`, `multiply`, `clear`,
+  and `copy` were implemented and every other mode silently composited source-over.
+  This brings the software oracle to parity with the CoreGraphics path for these modes.
+  Supports `CAEmitterLayer.renderMode = .additive` and `CALayer` compositing-filter
+  blends in higher layers. The non-separable modes (hue, saturation, color, luminosity)
+  and the remaining Porter-Duff source/destination operators are not yet in the software
+  path and still composite source-over (the CoreGraphics path handles them); this is
+  documented at the fallback.
+
 ## [0.2.2] - 2026-06-14
 
 ### Added
