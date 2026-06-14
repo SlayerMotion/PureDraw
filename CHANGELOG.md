@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- SVG path-data import: `Path(svgPathData:)` parses an SVG `<path>` `d` string
+  into a `Path`, and `Path.svgPathData` prints the normal form. Parse and print
+  are one invertible description in `Core/SVGPathData.swift`, so the SVG renderer
+  (which now delegates its path printing to it) and the importer cannot drift.
+  This first slice covers the absolute long-form normal form (`M L Q C Z`);
+  relative commands, `H V S T A`, and implicit repeated coordinates parse to
+  `nil` for now and arrive in later slices. Foundation for SVG import (PureSVG).
+
 ## [0.4.0] - 2026-06-14
 
 PureDraw and PureLayer are kept in version lockstep from this release on: they

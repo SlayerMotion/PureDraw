@@ -273,23 +273,11 @@ public struct SVGRenderer: Renderer {
             .replacingOccurrences(of: ">", with: "&gt;")
     }
 
+    /// The path printer is the canonical normal form owned by `SVGPathData`, so
+    /// the SVG renderer and the SVG path importer share one description and cannot
+    /// drift. See `Core/SVGPathData.swift`.
     private func svgPathString(for path: Path) -> String {
-        var d: [String] = []
-        for element in path.elements {
-            switch element {
-            case let .move(to):
-                d.append("M \(to.x) \(to.y)")
-            case let .line(to):
-                d.append("L \(to.x) \(to.y)")
-            case let .quadCurve(to, control):
-                d.append("Q \(control.x) \(control.y) \(to.x) \(to.y)")
-            case let .cubicCurve(to, control1, control2):
-                d.append("C \(control1.x) \(control1.y) \(control2.x) \(control2.y) \(to.x) \(to.y)")
-            case .close:
-                d.append("Z")
-            }
-        }
-        return d.joined(separator: " ")
+        path.svgPathData
     }
 
     private func hexColor(_ color: Color) -> String {
