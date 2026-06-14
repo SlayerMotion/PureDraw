@@ -139,6 +139,21 @@ struct SVGPathDataTests {
         #expect(path?.currentPoint == p(10, 0))
     }
 
+    // MARK: - Regression: a draw command after a close reopens the subpath
+
+    @Test func subpathReopensAfterCloseWithoutExplicitMove() {
+        // A draw command right after `Z` with no explicit moveto implicitly starts
+        // a new subpath at the closed subpath's start. The parser materializes that
+        // move so the tree matches what the printer emits and the round trip holds.
+        // Regression found by full-corpus verification (tabler/number-87-small.svg).
+        let path = Path(svgPathData: "M 0 0 H 1 Z h 1")
+        #expect(path == Path(elements: [
+            .move(to: p(0, 0)), .line(to: p(1, 0)), .close,
+            .move(to: p(0, 0)), .line(to: p(1, 0)),
+        ]))
+        #expect(path.map { Path(svgPathData: $0.svgPathData) } == path) // round-trips
+    }
+
     // MARK: - Rejection (malformed only, never silent corruption)
 
     @Test func rejectsMalformed() {

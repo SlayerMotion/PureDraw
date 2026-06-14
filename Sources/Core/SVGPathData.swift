@@ -36,6 +36,7 @@ public enum SVGPathData {
         var lastQuadControl: Point? // absolute control of the previous Q/T, for T
         var previousCommand: Character = " "
         var hasMoved = false
+        var subpathOpen = false // whether a subpath is open (a move since the last close)
 
         skipSeparators(&s)
         while let lead = s.first {
@@ -56,6 +57,16 @@ public enum SVGPathData {
             let relative = command.isLowercase
             let base = current
 
+            // A draw command that opens a subpath (the first element, or the first
+            // after a close, with no explicit moveto) implicitly begins a new
+            // subpath at the current point. Materialize that move so the parsed
+            // tree matches what the printer emits, keeping the round trip exact.
+            if !"MmZz".contains(command), !subpathOpen {
+                elements.append(.move(to: base))
+                subpathStart = base
+                subpathOpen = true
+            }
+
             switch command {
             case "M", "m":
                 // A leading relative moveto is treated as absolute.
@@ -65,6 +76,7 @@ public enum SVGPathData {
                 current = pt
                 subpathStart = pt
                 hasMoved = true
+                subpathOpen = true
                 // Subsequent implicit pairs are linetos, relative iff the moveto was.
                 previousCommand = (command == "m") ? "l" : "L"
                 lastCubicControl = nil
@@ -151,6 +163,7 @@ public enum SVGPathData {
             case "Z", "z":
                 elements.append(.close)
                 current = subpathStart
+                subpathOpen = false
                 previousCommand = command
                 lastCubicControl = nil
                 lastQuadControl = nil
