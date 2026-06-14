@@ -4,6 +4,8 @@ This directory contains the lesson-by-lesson curriculum for learning 2D vector g
 
 Each lesson details the core concept, the mathematical foundations, a practical code demonstration in Swift, and exercises.
 
+For the engineering provenance — every specification, paper, book, and article that participated in the implementation, mapped to the code it informed — see [../SOURCES.md](../SOURCES.md).
+
 ---
 
 ## Lessons Index
