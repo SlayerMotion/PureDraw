@@ -65,6 +65,17 @@ derivation.
 | **Gelphman & Laden, *Quartz 2D Graphics for Mac OS X Developers*** | Companion treatment of transformations and the imaging model. |
 | **Apple, Core Graphics / Quartz 2D documentation** (`CGPath`, `CGContext`, `CGColorSpace`, `CGAffineTransform`) | API-parity reference: PureDraw's surface mirrors `CGContext` so a caller can move between them. Consulted via the Cupertino documentation tooling. |
 
+### Supplementary (vendor-neutral CG theory)
+
+> **Apple's books are the canon** for how Core Graphics / Core Animation *behave*. These
+> texts are supplements only — for the framework-independent math (homogeneous coordinates,
+> projection, texture mapping, rasterization) behind the engine, never for Apple-specific
+> behaviour or as a comparison stack.
+
+| Source | Informs |
+|---|---|
+| **David J. Eck, *Introduction to Computer Graphics*, v1.4 (2023)** — math.hws.edu/graphicsbook, CC BY-NC-SA | Background on the general-CG math the engine implements: 2D/3D transforms and homogeneous coordinates, projection, the projective/perspective texture-mapping pipeline (complements Heckbert for `ProjectiveTransform`/`ProjectiveImageRasterizer`), and scanline rasterization. Local copy `PureDrawResearch/CG/graphicsbook-linked.pdf`. |
+
 ---
 
 ## How to extend this file
