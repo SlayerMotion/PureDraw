@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-14
+
+PureDraw and PureLayer stay in version lockstep: this bump aligns both at 0.5.0.
+PureDraw adds SVG path-data import; PureLayer 0.5.0 pins this release.
+
 ### Added
 
 - SVG path-data import: `Path(svgPathData:)` parses an SVG `<path>` `d` string
@@ -20,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Validated by a round-trip gate over 180 real `<path d>` strings sampled from an
   openly-licensed SVG corpus (100% parse and round-trip). Foundation for SVG
   import (PureSVG).
+
+### Fixed
+
+- A draw command following a `close` reopens the subpath at the close point,
+  rather than appending to the closed subpath, matching Core Graphics.
 
 ## [0.4.0] - 2026-06-14
 
