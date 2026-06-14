@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-14
+
+PureDraw and PureLayer are kept in version lockstep from this release on: they
+share a single version number so a consumer can pin one and know the other. This
+bump aligns PureDraw with PureLayer 0.4.0 (which adds the emitter parity that the
+0.2.3 blend modes unblocked); PureDraw's own changes here are test and style only.
+
+### Changed
+
+- Expanded the software blend-mode tests to cover all twelve modes shipped in
+  0.2.3 (overlay, hardLight, colorDodge, colorBurn, softLight, plusDarker were
+  previously unverified); the released formulas were all confirmed correct.
+- Repo-wide style sweep removing em dashes from the docs and one doc comment so
+  the whole-tree style gate passes without a bypass.
+
 ## [0.2.3] - 2026-06-14
 
 ### Added
