@@ -1,8 +1,8 @@
-# Lesson 13: Encoding Pixels — PNG Chunks, zlib & DEFLATE
+# Lesson 13: Encoding Pixels, PNG Chunks, zlib & DEFLATE
 
 Once a path is rasterized into a grid of RGBA pixels (Lesson 11), that grid has to leave the
 program as a file someone can open. This lesson covers how `PureDraw` writes a PNG with no
-external library — and why *reading* one back is a strictly harder problem.
+external library, and why *reading* one back is a strictly harder problem.
 
 ---
 
@@ -13,22 +13,22 @@ A PNG file is an 8-byte signature followed by a sequence of **chunks**. Each chu
 length, a 4-letter type, the data, and a CRC-32 checksum. The three that matter for a basic
 image:
 
-* **IHDR** — the header: width, height, bit depth, colour type. `PureDraw` always writes
+* **IHDR**, the header: width, height, bit depth, colour type. `PureDraw` always writes
   8-bit RGBA (colour type 6), the simplest universally-supported format.
-* **IDAT** — the pixel data, compressed as a zlib stream.
-* **IEND** — the end marker.
+* **IDAT**, the pixel data, compressed as a zlib stream.
+* **IEND**, the end marker.
 
 ### Filtering
 Before compression, each scanline is prefixed with a **filter byte** that selects a
 per-row predictor (none / sub / up / average / Paeth). Filtering makes the data more
 compressible by turning pixels into small deltas. `PureDraw` uses filter type 0 ("none")
-on every row — correct and simple, trading file size for clarity.
+on every row, correct and simple, trading file size for clarity.
 
 ### The compression asymmetry
 The pixel bytes go into the IDAT chunk as a **zlib stream**, which wraps **DEFLATE**. Here
 is the key insight of this lesson: DEFLATE's framing lets you emit **stored
 (uncompressed) blocks**. So you can produce a *completely valid* zlib/PNG stream without
-implementing any actual compression — just the framing and checksums. Writing is easy.
+implementing any actual compression, just the framing and checksums. Writing is easy.
 *Reading* is not: a real PNG decoder must implement full DEFLATE **inflate** (Huffman
 decoding + LZ77 back-references), because other encoders *do* compress. This asymmetry is
 why `PureDraw` can encode PNGs today but decoding them is a separate, larger task
@@ -56,7 +56,7 @@ type `00`), then aligns to a byte, then a 16-bit length `LEN`, its one's-complem
 $$\text{block} = [\,\text{BFINAL},\ \text{BTYPE}{=}00\,] \;\Vert\; \texttt{LEN} \;\Vert\; \texttt{NLEN}{=}\sim\!\texttt{LEN} \;\Vert\; \text{raw}_{0\ldots\text{LEN}-1}$$
 
 Because $\text{LEN} \le 65535$, data longer than 64 KB is split across multiple stored
-blocks, the last marked final. No Huffman tables, no back-references — the bytes pass
+blocks, the last marked final. No Huffman tables, no back-references, the bytes pass
 through verbatim, framed.
 
 ### Two checksums, two algorithms
@@ -65,8 +65,8 @@ through verbatim, framed.
 * **CRC-32** (chunk level): a table-driven cyclic redundancy check over the chunk type +
   data, polynomial `0xEDB88320`. Stronger; protects each chunk independently.
 
-The encoder builds both from first principles — a 256-entry CRC table and the Adler running
-sums — so the output validates in any conformant PNG reader.
+The encoder builds both from first principles, a 256-entry CRC table and the Adler running
+sums, so the output validates in any conformant PNG reader.
 
 ---
 
@@ -90,7 +90,7 @@ func encodePNG() throws {
 
     // PNG signature: 137 80 78 71 13 10 26 10
     precondition(Array(png.prefix(8)) == [137, 80, 78, 71, 13, 10, 26, 10])
-    // Bytes 12..16 are the first chunk's type — "IHDR".
+    // Bytes 12..16 are the first chunk's type, "IHDR".
     let ihdrType = String(bytes: png[12 ..< 16], encoding: .ascii)
     print("first chunk:", ihdrType ?? "?")   // IHDR
     print("total bytes:", png.count)

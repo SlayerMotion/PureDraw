@@ -4,7 +4,7 @@ This directory contains the lesson-by-lesson curriculum for learning 2D vector g
 
 Each lesson details the core concept, the mathematical foundations, a practical code demonstration in Swift, and exercises.
 
-For the engineering provenance — every specification, paper, book, and article that participated in the implementation, mapped to the code it informed — see [../SOURCES.md](../SOURCES.md).
+For the engineering provenance, every specification, paper, book, and article that participated in the implementation, mapped to the code it informed, see [../SOURCES.md](../SOURCES.md).
 
 ---
 
@@ -65,12 +65,12 @@ For the engineering provenance — every specification, paper, book, and article
 *   **The Math**: Scanline span detection, analytic horizontal overlap, $C = \min(1, \sum \frac{1}{N}\,\text{overlap})$, premultiplied compositing.
 *   **Code Demo**: Filling a triangle and reading the partial-coverage alpha ramp along a slanted edge.
 
-### 12. [Lesson 12: Continuous Corners — the Squircle](lesson12_squircle.md)
+### 12. [Lesson 12: Continuous Corners, the Squircle](lesson12_squircle.md)
 *   **Concepts**: Curvature continuity, the superellipse myth, circular vs. continuous corners.
 *   **The Math**: The Bézier circle constant $\kappa = \frac{4}{3}(\sqrt{2}-1)$, fixed-ratio cubic corners, edge consumption $\rho = 1.52866$, the capsule limit.
 *   **Code Demo**: Drawing the same rectangle with circular and continuous corners and comparing the outlines.
 
-### 13. [Lesson 13: Encoding Pixels — PNG Chunks, zlib & DEFLATE](lesson13_png_deflate.md)
+### 13. [Lesson 13: Encoding Pixels, PNG Chunks, zlib & DEFLATE](lesson13_png_deflate.md)
 *   **Concepts**: Chunked containers, scanline filtering, the encode/decode compression asymmetry.
 *   **The Math**: The zlib stream framing, stored DEFLATE blocks ($\texttt{LEN}/\sim\!\texttt{LEN}$), Adler-32 and CRC-32 checksums.
 *   **Code Demo**: Encoding a rendered image to PNG bytes and verifying the signature and IHDR chunk.

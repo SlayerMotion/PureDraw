@@ -1,7 +1,7 @@
-# Lesson 12: Continuous Corners — the Squircle (and Why It Is *Not* a Superellipse)
+# Lesson 12: Continuous Corners, the Squircle (and Why It Is *Not* a Superellipse)
 
-Every modern Apple UI surface — the app icon, the button, the sheet, the home-screen
-grid — uses a rounded corner that is subtly *smoother* than a circular arc. It is widely
+Every modern Apple UI surface, the app icon, the button, the sheet, the home-screen
+grid, uses a rounded corner that is subtly *smoother* than a circular arc. It is widely
 called a "superellipse" or "squircle". This lesson builds the real corner `PureDraw` draws,
 and corrects a popular myth: Apple's corner is **not** a superellipse.
 
@@ -54,7 +54,7 @@ fixed ratios of the corner scale $r$, extracted by inverse-mapping `UIBezierPath
 (Liam Rosenfeld, *"My Quest for the Apple Icon Shape"*). Two constants define it:
 
 * **Edge consumption ratio** $\rho = 1.52866498$. The corner eats $\rho \cdot r$ of length
-  along *each* edge — about 53% further than a circular corner ($\rho > 1$), which is why a
+  along *each* edge, about 53% further than a circular corner ($\rho > 1$), which is why a
   squircle looks rounder for the same radius.
 * The interior control points are dimensionless $(u, v)$ pairs (e.g.
   $(1.0884, 0)$, $(0.8684, 0)$, $(0.6315, 0.0749)$, …) applied along the two edge axes.
@@ -75,7 +75,7 @@ $$\text{consumption} = \min\!\big(\rho\, |r|,\; \tfrac{1}{2}\min(w, h)\big)$$
 
 When the radius is large enough that $\rho r$ would exceed half the side, the corner is
 *scaled down to meet its neighbour exactly*, producing a smooth capsule that preserves
-continuous curvature — rather than snapping back to a circular arc. (Apple's exact
+continuous curvature, rather than snapping back to a circular arc. (Apple's exact
 near-capsule corner is proprietary and unspecified; this is a faithful, continuous
 approximation.)
 
@@ -102,7 +102,7 @@ func compareCorners() throws {
     context.setFillColor(Color(r: 0.85, g: 0.3, b: 0.3, a: 1.0))
     context.fill(circular)
 
-    // Apple's continuous corners (the squircle) — three Béziers per corner.
+    // Apple's continuous corners (the squircle), three Béziers per corner.
     var squircle = Path()
     squircle.addContinuousRoundedRect(in: rect.offsetBy(dx: 180, dy: 0), cornerRadius: radius)
     context.setFillColor(Color(r: 0.3, g: 0.5, b: 0.85, a: 1.0))
@@ -114,7 +114,7 @@ func compareCorners() throws {
 ```
 
 Overlay the two and the squircle's outline sits *outside* the circle near the straight
-edges and *inside* it near the diagonal — the signature of continuous curvature.
+edges and *inside* it near the diagonal, the signature of continuous curvature.
 
 ---
 

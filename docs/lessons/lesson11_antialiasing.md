@@ -2,7 +2,7 @@
 
 A vector path is a continuous mathematical shape; a raster image is a finite grid of
 square pixels. Antialiasing is the bridge: instead of asking "is this pixel inside the
-shape — yes or no?", it asks "what *fraction* of this pixel does the shape cover?" and
+shape, yes or no?", it asks "what *fraction* of this pixel does the shape cover?" and
 uses that fraction as the pixel's opacity. This lesson covers how `PureDraw` turns a
 filled path into per-pixel coverage.
 
@@ -11,8 +11,8 @@ filled path into per-pixel coverage.
 ## 1. Core Concepts
 
 ### Aliasing: the staircase
-If you test only the **center** of each pixel — inside the shape paint it fully, outside
-leave it blank — a slanted or curved edge becomes a hard staircase of fully-on and
+If you test only the **center** of each pixel, inside the shape paint it fully, outside
+leave it blank, a slanted or curved edge becomes a hard staircase of fully-on and
 fully-off pixels. This is *aliasing*: the sharp binary decision throws away all the
 sub-pixel detail of where the true edge sits.
 
@@ -29,7 +29,7 @@ the other:
 
 * **Vertically**: each pixel row is split into `subsampleRows = 4` sub-rows. The shape is
   scanned at the center of each sub-row.
-* **Horizontally**: within each sub-row, coverage is computed **analytically** — the exact
+* **Horizontally**: within each sub-row, coverage is computed **analytically**, the exact
   fractional overlap of each inside-span with each pixel column.
 
 Four vertical samples × exact horizontal coverage is far cheaper than a full 4×4 grid and
@@ -69,8 +69,8 @@ near-horizontal edge crosses between sub-rows 2 and 3 gets $C \approx 0.5$.
 ### Compositing the coverage
 Coverage is the **alpha** the fill is blended with. Blending happens in *premultiplied*
 form to stay correct over a transparent background: the source contribution is
-$(\text{color} \times C)$, composited source-over onto the destination. (The aliased path
-— `antialiased = false` — skips all of this and uses the pixel-center rule: column $p$ is
+$(\text{color} \times C)$, composited source-over onto the destination. (The aliased path,
+`antialiased = false`, skips all of this and uses the pixel-center rule: column $p$ is
 on iff $x_0 \le p + 0.5 < x_1$.)
 
 ---
@@ -78,8 +78,8 @@ on iff $x_0 \le p + 0.5 < x_1$.)
 ## 3. Code Demonstration
 
 Fill a triangle and read back the alpha along a slanted edge: interior pixels are fully
-opaque, exterior fully transparent, and the edge carries a ramp of partial-coverage values
-— the antialiasing made visible as numbers.
+opaque, exterior fully transparent, and the edge carries a ramp of partial-coverage values,
+the antialiasing made visible as numbers.
 
 ```swift
 import Core
