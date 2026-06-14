@@ -208,7 +208,7 @@ public struct Path: Equatable, Sendable, Validatable {
     /// the shorter side, the corner is scaled so adjacent corners exactly meet,
     /// preserving the continuous-curvature shape (a smooth capsule) rather than
     /// reverting to a circular arc.
-    public mutating func addContinuousRoundedRect(in rect: Rect, cornerRadius: Double) {
+    public mutating func addContinuousRoundedRect(in rect: Rect, cornerRadius: Double, corners: RectCorner = .all) {
         let minSide = min(rect.width, rect.height)
         guard minSide > 0 else { return }
         // Consumption along each edge is edgeRatio * radius, clamped to half the
@@ -241,22 +241,39 @@ public struct Path: Equatable, Sendable, Validatable {
             addCurve(to: at(0, edgeRatio), control1: at(0, 0.86840694), control2: at(0, 1.08849296))
         }
 
-        move(to: Point(x: rect.minX + p, y: rect.minY))
-        addLine(to: Point(x: rect.maxX - p, y: rect.minY))
-        corner(Point(x: rect.maxX, y: rect.minY), inAxis: Point(x: -1, y: 0), outAxis: Point(x: 0, y: 1))
-        addLine(to: Point(x: rect.maxX, y: rect.maxY - p))
-        corner(Point(x: rect.maxX, y: rect.maxY), inAxis: Point(x: 0, y: -1), outAxis: Point(x: -1, y: 0))
-        addLine(to: Point(x: rect.minX + p, y: rect.maxY))
-        corner(Point(x: rect.minX, y: rect.maxY), inAxis: Point(x: 1, y: 0), outAxis: Point(x: 0, y: -1))
-        addLine(to: Point(x: rect.minX, y: rect.minY + p))
-        corner(Point(x: rect.minX, y: rect.minY), inAxis: Point(x: 0, y: 1), outAxis: Point(x: 1, y: 0))
+        // Per-corner consumption: a rounded corner eats `p` of each adjoining edge; a
+        // square corner eats 0, so the edge runs straight to the vertex and no curve is
+        // drawn there. The edge endpoints below use these offsets so the same code path
+        // serves a fully rounded rect (`corners == .all`) and any subset.
+        let pTL = corners.contains(.minXMinY) ? p : 0
+        let pTR = corners.contains(.maxXMinY) ? p : 0
+        let pBL = corners.contains(.minXMaxY) ? p : 0
+        let pBR = corners.contains(.maxXMaxY) ? p : 0
+
+        move(to: Point(x: rect.minX + pTL, y: rect.minY))
+        addLine(to: Point(x: rect.maxX - pTR, y: rect.minY))
+        if corners.contains(.maxXMinY) {
+            corner(Point(x: rect.maxX, y: rect.minY), inAxis: Point(x: -1, y: 0), outAxis: Point(x: 0, y: 1))
+        }
+        addLine(to: Point(x: rect.maxX, y: rect.maxY - pBR))
+        if corners.contains(.maxXMaxY) {
+            corner(Point(x: rect.maxX, y: rect.maxY), inAxis: Point(x: 0, y: -1), outAxis: Point(x: -1, y: 0))
+        }
+        addLine(to: Point(x: rect.minX + pBL, y: rect.maxY))
+        if corners.contains(.minXMaxY) {
+            corner(Point(x: rect.minX, y: rect.maxY), inAxis: Point(x: 1, y: 0), outAxis: Point(x: 0, y: -1))
+        }
+        addLine(to: Point(x: rect.minX, y: rect.minY + pTL))
+        if corners.contains(.minXMinY) {
+            corner(Point(x: rect.minX, y: rect.minY), inAxis: Point(x: 0, y: 1), outAxis: Point(x: 1, y: 0))
+        }
         closeSubpath()
     }
 
     /// Adds a rounded rectangle with circular corners of the specified
     /// dimensions. For Apple-style continuous corners, use
     /// `addContinuousRoundedRect(in:cornerRadius:)`.
-    public mutating func addRoundedRect(in rect: Rect, cornerWidth: Double, cornerHeight: Double) {
+    public mutating func addRoundedRect(in rect: Rect, cornerWidth: Double, cornerHeight: Double, corners: RectCorner = .all) {
         let rx = min(abs(cornerWidth), rect.width / 2.0)
         let ry = min(abs(cornerHeight), rect.height / 2.0)
 
@@ -271,39 +288,54 @@ public struct Path: Equatable, Sendable, Validatable {
 
         let kappa = 0.5522847498307933
 
-        move(to: Point(x: rect.minX + rx, y: rect.minY))
+        // Per-corner radius offsets: a rounded corner pulls each adjoining edge in by
+        // (rx, ry); a square corner uses 0 so the edge meets the vertex and the corner's
+        // arc is skipped. The same code serves a full rounded rect and any subset.
+        // Each edge in the walk is pulled in by the radius only at a rounded corner; a
+        // square corner uses 0, so the edge meets the vertex and the arc is skipped.
+        let rxTL = corners.contains(.minXMinY) ? rx : 0
+        let ryTL = corners.contains(.minXMinY) ? ry : 0
+        let rxTR = corners.contains(.maxXMinY) ? rx : 0
+        let ryBR = corners.contains(.maxXMaxY) ? ry : 0
+        let rxBL = corners.contains(.minXMaxY) ? rx : 0
 
-        addLine(to: Point(x: rect.maxX - rx, y: rect.minY))
+        move(to: Point(x: rect.minX + rxTL, y: rect.minY))
 
-        addCurve(
-            to: Point(x: rect.maxX, y: rect.minY + ry),
-            control1: Point(x: rect.maxX - rx + rx * kappa, y: rect.minY),
-            control2: Point(x: rect.maxX, y: rect.minY + ry - ry * kappa)
-        )
+        addLine(to: Point(x: rect.maxX - rxTR, y: rect.minY))
+        if corners.contains(.maxXMinY) {
+            addCurve(
+                to: Point(x: rect.maxX, y: rect.minY + ry),
+                control1: Point(x: rect.maxX - rx + rx * kappa, y: rect.minY),
+                control2: Point(x: rect.maxX, y: rect.minY + ry - ry * kappa)
+            )
+        }
 
-        addLine(to: Point(x: rect.maxX, y: rect.maxY - ry))
+        addLine(to: Point(x: rect.maxX, y: rect.maxY - ryBR))
+        if corners.contains(.maxXMaxY) {
+            addCurve(
+                to: Point(x: rect.maxX - rx, y: rect.maxY),
+                control1: Point(x: rect.maxX, y: rect.maxY - ry + ry * kappa),
+                control2: Point(x: rect.maxX - rx + rx * kappa, y: rect.maxY)
+            )
+        }
 
-        addCurve(
-            to: Point(x: rect.maxX - rx, y: rect.maxY),
-            control1: Point(x: rect.maxX, y: rect.maxY - ry + ry * kappa),
-            control2: Point(x: rect.maxX - rx + rx * kappa, y: rect.maxY)
-        )
+        addLine(to: Point(x: rect.minX + rxBL, y: rect.maxY))
+        if corners.contains(.minXMaxY) {
+            addCurve(
+                to: Point(x: rect.minX, y: rect.maxY - ry),
+                control1: Point(x: rect.minX + rx - rx * kappa, y: rect.maxY),
+                control2: Point(x: rect.minX, y: rect.maxY - ry + ry * kappa)
+            )
+        }
 
-        addLine(to: Point(x: rect.minX + rx, y: rect.maxY))
-
-        addCurve(
-            to: Point(x: rect.minX, y: rect.maxY - ry),
-            control1: Point(x: rect.minX + rx - rx * kappa, y: rect.maxY),
-            control2: Point(x: rect.minX, y: rect.maxY - ry + ry * kappa)
-        )
-
-        addLine(to: Point(x: rect.minX, y: rect.minY + ry))
-
-        addCurve(
-            to: Point(x: rect.minX + rx, y: rect.minY),
-            control1: Point(x: rect.minX, y: rect.minY + ry - ry * kappa),
-            control2: Point(x: rect.minX + rx - rx * kappa, y: rect.minY)
-        )
+        addLine(to: Point(x: rect.minX, y: rect.minY + ryTL))
+        if corners.contains(.minXMinY) {
+            addCurve(
+                to: Point(x: rect.minX + rx, y: rect.minY),
+                control1: Point(x: rect.minX, y: rect.minY + ry - ry * kappa),
+                control2: Point(x: rect.minX + rx - rx * kappa, y: rect.minY)
+            )
+        }
 
         closeSubpath()
     }
