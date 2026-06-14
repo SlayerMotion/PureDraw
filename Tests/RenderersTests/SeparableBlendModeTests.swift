@@ -78,4 +78,51 @@ struct SeparableBlendModeTests {
         )
         #expect(near(c.r, 128) && near(c.g, 0) && near(c.b, 128))
     }
+
+    @Test func overlayKeysOnBackdrop() throws {
+        // overlay(s,d) = hardLight(d,s): d<=0.5 ? 2ds : 1-2(1-d)(1-s).
+        // R: 2·0.4·0.5=0.4; G: 1-2·0.4·0.75=0.4; B: 1-2·0.2·1.0=0.6.
+        let c = try overlap(.overlay, backdrop: backdrop, source: source)
+        #expect(near(c.r, 102) && near(c.g, 102) && near(c.b, 153))
+    }
+
+    @Test func hardLightKeysOnSource() throws {
+        // hardLight(s,d): s<=0.5 ? 2sd : 1-2(1-s)(1-d).
+        // R: 2·0.5·0.4=0.4; G: 2·0.25·0.6=0.3; B: 2·0·0.8=0.
+        let c = try overlap(.hardLight, backdrop: backdrop, source: source)
+        #expect(near(c.r, 102) && near(c.g, 77) && near(c.b, 0))
+    }
+
+    @Test func colorDodgeBrightensTowardSource() throws {
+        // colorDodge = min(1, d/(1-s)). R: 0.4/0.5=0.8; G: 0.6/0.75=0.8; B: 0.8/1.0=0.8.
+        let c = try overlap(.colorDodge, backdrop: backdrop, source: source)
+        #expect(near(c.r, 204) && near(c.g, 204) && near(c.b, 204))
+    }
+
+    @Test func colorBurnDarkensTowardSource() throws {
+        // colorBurn = 1 - min(1, (1-d)/s). d=0.9, s=0.6: 1 - 0.1/0.6 = 0.8333 -> 212.
+        let c = try overlap(
+            .colorBurn,
+            backdrop: Color(red: 0.9, green: 0.9, blue: 0.9, alpha: 1),
+            source: Color(red: 0.6, green: 0.6, blue: 0.6, alpha: 1)
+        )
+        #expect(near(c.r, 212) && near(c.g, 212) && near(c.b, 212))
+    }
+
+    @Test func softLightIsAGentleHardLight() throws {
+        // softLight, s<=0.5: d - (1-2s)·d·(1-d).
+        // R(s=0.5): 0.4-0·…=0.4; G(s=0.25): 0.6-0.5·0.6·0.4=0.48; B(s=0): 0.8-1·0.8·0.2=0.64.
+        let c = try overlap(.softLight, backdrop: backdrop, source: source)
+        #expect(near(c.r, 102) && near(c.g, 122) && near(c.b, 163))
+    }
+
+    @Test func plusDarkerSumsInInverseSpace() throws {
+        // plus-darker = max(0, s + d - 1). d=0.9, s=0.8: 0.7 -> 178.
+        let c = try overlap(
+            .plusDarker,
+            backdrop: Color(red: 0.9, green: 0.9, blue: 0.9, alpha: 1),
+            source: Color(red: 0.8, green: 0.8, blue: 0.8, alpha: 1)
+        )
+        #expect(near(c.r, 178) && near(c.g, 178) && near(c.b, 178))
+    }
 }
