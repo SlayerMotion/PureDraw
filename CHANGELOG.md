@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`Path.strokedOutline(lineWidth:lineCap:lineJoin:miterLimit:dashLengths:dashPhase:)`**: the
+  filled outline of a stroked path, mirroring Core Graphics'
+  `CGContextReplacePathWithStrokedPath` and
+  `CGPath.copy(strokingWithWidth:lineCap:lineJoin:miterLimit:transform:)`: fill the result with
+  the nonzero winding rule to paint exactly what stroking the path would. This is now the single
+  source of the stroke geometry (segment quads, joins, caps, dash) that `BitmapRenderer`
+  rasterizes (lifted out of the renderer), so a rasterized stroke and a stroked outline cannot
+  drift. Lets a consumer clip a gradient (or any fill) to a stroke, bit-exactly (downstream:
+  PureLottie #209 gradient stroke).
+
 ## [0.7.0] - 2026-06-15
 
 Version-only bump to stay in lockstep with PureLayer 0.7.0 (which ships the reflection API
