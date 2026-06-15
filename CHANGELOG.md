@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-06-15
+
+Version-only bump to stay in lockstep with PureLayer 0.8.3 (which adds gated wraparound stroke
+trim to `ShapeLayer`, a compositor-side feature). No PureDraw code changes since 0.8.2.
+
 ## [0.8.2] - 2026-06-15
 
 Version-only bump to stay in lockstep with PureLayer 0.8.2 (which adds a focal/highlight radial
