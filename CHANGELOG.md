@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-06-15
+
+Version-only bump to stay in lockstep with PureLayer 0.8.2 (which adds a focal/highlight radial
+gradient to `ShapeLayer`, rendered through the existing focal `CGContextDrawRadialGradient`
+support: distinct start/end centres). No PureDraw code changes since 0.8.1.
+
 ## [0.8.1] - 2026-06-15
 
 ### Fixed
