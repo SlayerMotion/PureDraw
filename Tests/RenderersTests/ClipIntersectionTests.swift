@@ -1,0 +1,75 @@
+//
+//  ClipIntersectionTests.swift
+//  PureDraw
+//
+
+import Core
+import Geometry
+@testable import Renderers
+import Testing
+
+/// `clip` intersects the new path with the current clip (like Core Graphics'
+/// `CGContextClip`), it does not union. A gradient is bounded by the clip alone,
+/// so a clip stacked on an ancestor clip must confine it to the intersection, not
+/// flood the ancestor.
+struct ClipIntersectionTests {
+    private let gradient = Gradient(stops: [
+        GradientStop(color: Color(red: 1, green: 0, blue: 0, alpha: 1), location: 0),
+        GradientStop(color: Color(red: 0, green: 0, blue: 1, alpha: 1), location: 1),
+    ])
+
+    private func paintedPixels(_ image: Image) -> Int {
+        var n = 0
+        for i in stride(from: 3, to: image.data.count, by: 4) where image.data[i] > 0 {
+            n += 1
+        }
+        return n
+    }
+
+    /// A gradient clipped to a small path, under an ancestor clip covering the whole
+    /// canvas, paints only the small path: the stacked clip intersects the ancestor.
+    @Test func gradientUnderAncestorClipIsConfinedToTheInnerPath() throws {
+        var context = GraphicsContext()
+        // Ancestor clip: the whole 40x40 canvas (a masksToBounds-style clip).
+        context.addRect(Rect(x: 0, y: 0, width: 40, height: 40))
+        context.clip()
+        // Inner clip: a 20x20 path.
+        context.addRect(Rect(x: 10, y: 10, width: 20, height: 20))
+        context.clip()
+        context.drawLinearGradient(gradient, start: Point(x: 10, y: 20), end: Point(x: 30, y: 20))
+
+        let image = try BitmapRenderer(width: 40, height: 40).render(context)
+        // Confined to the 20x20 inner path (400 px), not flooding the 40x40 canvas.
+        #expect(paintedPixels(image) == 400)
+        // Inside the inner path is painted; outside it (but inside the ancestor) is not.
+        #expect(image.data[(20 * 40 + 20) * 4 + 3] == 255)
+        #expect(image.data[(5 * 40 + 5) * 4 + 3] == 0)
+    }
+
+    /// Two partially overlapping clips: a gradient paints only their overlap.
+    @Test func gradientPaintsOnlyTheOverlapOfTwoClips() throws {
+        var context = GraphicsContext()
+        context.addRect(Rect(x: 0, y: 0, width: 30, height: 30))
+        context.clip()
+        context.addRect(Rect(x: 15, y: 15, width: 30, height: 30)) // overlaps in [15,30)^2
+        context.clip()
+        context.drawLinearGradient(gradient, start: Point(x: 0, y: 0), end: Point(x: 40, y: 40))
+
+        let image = try BitmapRenderer(width: 40, height: 40).render(context)
+        #expect(paintedPixels(image) == 15 * 15) // only the 15x15 overlap
+        #expect(image.data[(20 * 40 + 20) * 4 + 3] == 255) // in the overlap
+        #expect(image.data[(5 * 40 + 5) * 4 + 3] == 0) // in the first clip only
+        #expect(image.data[(35 * 40 + 35) * 4 + 3] == 0) // in the second clip only
+    }
+
+    /// A single clip still works (the common, cached path): the gradient fills it.
+    @Test func singleClipStillBoundsTheGradient() throws {
+        var context = GraphicsContext()
+        context.addRect(Rect(x: 8, y: 8, width: 16, height: 16))
+        context.clip()
+        context.drawLinearGradient(gradient, start: Point(x: 8, y: 16), end: Point(x: 24, y: 16))
+
+        let image = try BitmapRenderer(width: 40, height: 40).render(context)
+        #expect(paintedPixels(image) == 16 * 16)
+    }
+}

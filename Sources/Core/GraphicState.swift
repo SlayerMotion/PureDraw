@@ -44,8 +44,29 @@ public struct GraphicState: Equatable, Sendable, Validatable {
     /// The blend mode.
     public var blendMode: BlendMode
 
-    /// The current accumulated clipping path.
-    public var clipPath: Path?
+    /// The clip paths in effect, outermost first. Clipping is the intersection of
+    /// them all: Core Graphics' `clip` intersects the new path with the current
+    /// clip, it does not union. Keeping them apart preserves that distinction,
+    /// which a single combined path loses.
+    public var clipPaths: [Path]
+
+    /// The clip as a single path: the clip paths appended in order. Faithful for
+    /// content bounded by its own coverage (a fill, stroke, image, or glyph is the
+    /// intersection with its own shape, so a containing clip is harmless even when
+    /// represented as a union). Gradient rasterization, bounded by the clip alone,
+    /// intersects ``clipPaths`` directly instead, so a clip stacked on an ancestor
+    /// clip does not flood. Setting this replaces the whole stack with one path.
+    public var clipPath: Path? {
+        get {
+            guard !clipPaths.isEmpty else { return nil }
+            var combined = Path()
+            for path in clipPaths {
+                combined.addPath(path)
+            }
+            return combined
+        }
+        set { clipPaths = newValue.map { [$0] } ?? [] }
+    }
 
     /// The shadow properties to apply to drawing operations.
     public var shadow: Shadow?
@@ -142,7 +163,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         self.dashPhase = dashPhase
         self.alpha = alpha
         self.blendMode = blendMode
-        self.clipPath = clipPath
+        clipPaths = clipPath.map { [$0] } ?? []
         self.shadow = shadow
         self.shouldAntialias = shouldAntialias
         self.allowsAntialiasing = allowsAntialiasing

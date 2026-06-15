@@ -14,6 +14,17 @@ task requires.
   target already imports it (renderer outputs, tests).
 - **Cross-platform.** The library builds on macOS, Linux, Windows, and WASM;
   platform-specific code (CoreGraphics) stays behind `#if canImport` gates.
+- **Apple-native faithfulness is gateable, always.** PureDraw mirrors Core
+  Graphics. Every public feature must map to a native Quartz/Core Graphics API
+  (`CGContext...`, `CGPath...`, etc.), documented on the type. A feature with a
+  native equivalent is annotated with the mapping (e.g. `Path.strokedOutline`
+  mirrors `CGContextReplacePathWithStrokedPath`); a feature with no Core Graphics
+  equivalent is a non-faithful extra and MUST be both (a) gated behind an opt-in
+  flag so the default mode is pure Core Graphics and omits it, and (b) marked in
+  code with its category. A caller can therefore always run the engine
+  "Apple-native only" and get exactly Core Graphics, no additions. Verify
+  CG-nativeness against the source (the Quartz 2D books, the CG-reference repo)
+  before deciding, not from memory. Same discipline as PureLayer one layer up.
 
 ## Layout
 

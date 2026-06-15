@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-06-15
+
+### Fixed
+
+- **`clip` now intersects instead of unioning.** `GraphicsContext.clip` pushed the new path onto
+  the current clip by appending it into one nonzero-winding path, which is a union, not the
+  intersection Core Graphics' `CGContextClip` performs. Content bounded by its own coverage (a
+  fill, stroke, image, or glyph) was unaffected, but a gradient, bounded by the clip alone, drew
+  past a clip stacked on an ancestor clip: clipping a gradient to a small path under a
+  whole-canvas clip flooded the canvas. The graphic state now keeps a clip stack (`clipPaths`);
+  `clipPath` stays the combined path for content that intersects with its own shape, and gradient
+  rasterization intersects the stack. (Surfaced downstream: PureLayer `ShapeLayer` gradient paint
+  nested under a `masksToBounds` parent.)
+
 ## [0.8.0] - 2026-06-15
 
 ### Added

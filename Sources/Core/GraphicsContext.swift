@@ -410,13 +410,13 @@ public struct GraphicsContext: Sendable, Validatable {
     /// Intersects the current clipping path with the current path and clears the current path.
     public mutating func clip(using _: FillRule = .winding) {
         guard !currentPath.isEmpty else { return }
-        if let existingClip = currentState.clipPath {
-            var combined = existingClip
-            combined.addPath(currentPath)
-            currentState.clipPath = combined
-        } else {
-            currentState.clipPath = currentPath
-        }
+        // Push the path onto the clip stack rather than appending it into one
+        // combined path. The effective clip is the intersection of the stack;
+        // combining into a single nonzero-winding path would union a stacked clip
+        // with the ancestor clip, which (for a gradient, bounded by the clip
+        // alone) floods past it. Renderers that bound output by their own coverage
+        // read the combined ``GraphicState/clipPath``; gradients intersect the stack.
+        currentState.clipPaths.append(currentPath)
         currentPath = Path()
     }
 

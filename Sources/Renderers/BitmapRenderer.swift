@@ -219,9 +219,58 @@ public final class BitmapRenderer: Renderer, Sendable {
         return coverage
     }
 
+    /// The device-space clip coverage a gradient is bounded by: the intersection
+    /// of every clip path in the state (Core Graphics' clip intersects). A gradient
+    /// is bounded by the clip alone, so it must intersect the stack, not use the
+    /// combined `clipPath` (which unions a stacked clip with its ancestor and would
+    /// flood). `skip` is true when a clip fails to rasterize, so nothing draws.
+    private func gradientClipCoverage(_ state: GraphicState, cache: ClipCache) -> (coverage: CoverageRasterizer.CoverageMap?, skip: Bool) {
+        guard !state.clipPaths.isEmpty else { return (nil, false) }
+        // One clip is the common case (a layer's own clip, or pattern tiles that
+        // share a device-space path): use the shared one-entry cache.
+        if state.clipPaths.count == 1 {
+            guard let coverage = cachedClipCoverage(
+                state.clipPaths[0].applying(state.transform), antialiased: false, cache: cache
+            ) else { return (nil, true) }
+            return (coverage, false)
+        }
+        let rasterizer = CoverageRasterizer(canvasWidth: width, canvasHeight: height)
+        var combined: CoverageRasterizer.CoverageMap?
+        for path in state.clipPaths {
+            guard let coverage = rasterizer.coverage(
+                of: path.applying(state.transform), rule: .winding, antialiased: false
+            ) else { return (nil, true) }
+            combined = combined.map { Self.intersectCoverage($0, coverage) } ?? coverage
+        }
+        return (combined, false)
+    }
+
+    /// The product of two coverage maps over the overlap of their bounds (zero
+    /// elsewhere): the per-pixel AND that intersects two clip regions.
+    private static func intersectCoverage(
+        _ a: CoverageRasterizer.CoverageMap, _ b: CoverageRasterizer.CoverageMap
+    ) -> CoverageRasterizer.CoverageMap {
+        let minX = max(a.minX, b.minX)
+        let minY = max(a.minY, b.minY)
+        let maxX = min(a.minX + a.width, b.minX + b.width)
+        let maxY = min(a.minY + a.height, b.minY + b.height)
+        let w = max(0, maxX - minX)
+        let h = max(0, maxY - minY)
+        var values = [Double](repeating: 0, count: w * h)
+        for ly in 0 ..< h {
+            for lx in 0 ..< w {
+                values[ly * w + lx] = a.value(atX: minX + lx, y: minY + ly) * b.value(atX: minX + lx, y: minY + ly)
+            }
+        }
+        return CoverageRasterizer.CoverageMap(minX: minX, minY: minY, width: w, height: h, values: values)
+    }
+
     private func rasterizeLinearGradient(grad: Gradient, start: Point, end: Point, state: GraphicState, clipCache: ClipCache, buffer: inout [UInt8]) {
-        let clipPath = state.clipPath?.applying(state.transform)
-        let bounds = clipPath?.boundingBox ?? Rect(x: 0, y: 0, width: Double(width), height: Double(height))
+        let (clipCoverage, skip) = gradientClipCoverage(state, cache: clipCache)
+        if skip { return }
+        let bounds = clipCoverage.map {
+            Rect(x: Double($0.minX), y: Double($0.minY), width: Double($0.width), height: Double($0.height))
+        } ?? Rect(x: 0, y: 0, width: Double(width), height: Double(height))
 
         let minX = max(0, Int(floor(bounds.minX)))
         let maxX = min(width - 1, Int(ceil(bounds.maxX)))
@@ -233,9 +282,6 @@ public final class BitmapRenderer: Renderer, Sendable {
         let gradVec = Point(x: end.x - start.x, y: end.y - start.y)
         let gradLenSq = gradVec.x * gradVec.x + gradVec.y * gradVec.y
         guard gradLenSq > 1e-9 else { return }
-
-        let clipCoverage = clipPath.flatMap { cachedClipCoverage($0, antialiased: false, cache: clipCache) }
-        if clipPath != nil, clipCoverage == nil { return }
 
         let invTransform = state.transform.inverted()
 
@@ -269,8 +315,11 @@ public final class BitmapRenderer: Renderer, Sendable {
         clipCache: ClipCache,
         buffer: inout [UInt8]
     ) {
-        let clipPath = state.clipPath?.applying(state.transform)
-        let bounds = clipPath?.boundingBox ?? Rect(x: 0, y: 0, width: Double(width), height: Double(height))
+        let (clipCoverage, skip) = gradientClipCoverage(state, cache: clipCache)
+        if skip { return }
+        let bounds = clipCoverage.map {
+            Rect(x: Double($0.minX), y: Double($0.minY), width: Double($0.width), height: Double($0.height))
+        } ?? Rect(x: 0, y: 0, width: Double(width), height: Double(height))
 
         let minX = max(0, Int(floor(bounds.minX)))
         let maxX = min(width - 1, Int(ceil(bounds.maxX)))
@@ -284,9 +333,6 @@ public final class BitmapRenderer: Renderer, Sendable {
 
         let dcLenSq = diffCenter.x * diffCenter.x + diffCenter.y * diffCenter.y
         let coeffA = dcLenSq - diffRadius * diffRadius
-
-        let clipCoverage = clipPath.flatMap { cachedClipCoverage($0, antialiased: false, cache: clipCache) }
-        if clipPath != nil, clipCoverage == nil { return }
 
         let invTransform = state.transform.inverted()
 
