@@ -471,7 +471,7 @@
                     CGFloat(stop.color.green),
                     CGFloat(stop.color.blue),
                     CGFloat(stop.color.alpha),
-                ]) ?? CGColor.black) as AnyObject
+                ]) ?? CGColor(colorSpace: colorSpace, components: [0, 0, 0, 1])!) as AnyObject
             }
             let locations = gradient.stops.map { CGFloat($0.location) }
             guard let cgGradient = CGGradient(
