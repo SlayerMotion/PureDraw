@@ -465,13 +465,16 @@
 
         private func createCGGradient(from gradient: Gradient) throws -> CGGradient {
             let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+            // Non-failable terminal fallback so no stop can force-unwrap: opaque black in
+            // the gradient's color space, degrading to generic gray-black if even that fails.
+            let fallbackColor = CGColor(colorSpace: colorSpace, components: [0, 0, 0, 1]) ?? CGColor(gray: 0, alpha: 1)
             let cgColors = gradient.stops.map { stop in
                 (CGColor(colorSpace: colorSpace, components: [
                     CGFloat(stop.color.red),
                     CGFloat(stop.color.green),
                     CGFloat(stop.color.blue),
                     CGFloat(stop.color.alpha),
-                ]) ?? CGColor(colorSpace: colorSpace, components: [0, 0, 0, 1])!) as AnyObject
+                ]) ?? fallbackColor) as AnyObject
             }
             let locations = gradient.stops.map { CGFloat($0.location) }
             guard let cgGradient = CGGradient(
