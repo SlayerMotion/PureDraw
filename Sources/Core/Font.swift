@@ -272,6 +272,67 @@ public struct Font: Equatable, Sendable {
         return nil
     }
 
+    /// The color layers for `index`, if the font carries OpenType `COLR`/`CPAL` tables (version 0)
+    /// with a color-glyph definition for it (PureDraw #79). A color glyph is drawn by filling each
+    /// layer's outline (an ordinary glyph, via `outline(forGlyph:)`) with its palette color, in the
+    /// returned back-to-front order. Palette 0 is used. Returns nil for non-color glyphs or when the
+    /// tables are absent or not version 0. The 0xFFFF palette index (the text foreground) resolves to
+    /// opaque black, the conventional default.
+    public func colorLayers(forGlyph index: Int) -> [(glyph: Int, color: Color)]? {
+        guard let colr = tables["COLR"], tables["CPAL"] != nil,
+              Self.u16(data, at: colr.offset) == 0, // COLR version 0
+              let numBase = Self.u16(data, at: colr.offset + 2),
+              let baseOffset = Self.u32(data, at: colr.offset + 4),
+              let layersOffset = Self.u32(data, at: colr.offset + 8),
+              let numLayerRecords = Self.u16(data, at: colr.offset + 12)
+        else { return nil }
+        // Locate the base-glyph record for `index` (records are sorted by glyph id).
+        var span: (first: Int, count: Int)?
+        for record in 0 ..< numBase {
+            let rec = colr.offset + baseOffset + record * 6
+            guard let gid = Self.u16(data, at: rec) else { return nil }
+            if gid == index {
+                guard let first = Self.u16(data, at: rec + 2), let count = Self.u16(data, at: rec + 4) else { return nil }
+                span = (first, count)
+                break
+            }
+        }
+        guard let span else { return nil }
+
+        var layers: [(glyph: Int, color: Color)] = []
+        for offset in 0 ..< span.count {
+            let layerIndex = span.first + offset
+            guard layerIndex < numLayerRecords else { return nil }
+            let rec = colr.offset + layersOffset + layerIndex * 4
+            guard let layerGlyph = Self.u16(data, at: rec),
+                  let paletteIndex = Self.u16(data, at: rec + 2),
+                  let color = paletteColor(paletteIndex: paletteIndex)
+            else { return nil }
+            layers.append((layerGlyph, color))
+        }
+        return layers
+    }
+
+    /// Resolves a CPAL color for `paletteIndex` in palette 0; 0xFFFF is the text foreground (black).
+    private func paletteColor(paletteIndex: Int) -> Color? {
+        if paletteIndex == 0xFFFF { return Color(red: 0, green: 0, blue: 0, alpha: 1) }
+        guard let cpal = tables["CPAL"],
+              let numPaletteEntries = Self.u16(data, at: cpal.offset + 2),
+              paletteIndex < numPaletteEntries,
+              let colorRecordsOffset = Self.u32(data, at: cpal.offset + 8),
+              let firstRecord = Self.u16(data, at: cpal.offset + 12) // colorRecordIndices[0], palette 0
+        else { return nil }
+        let off = cpal.offset + colorRecordsOffset + (firstRecord + paletteIndex) * 4
+        guard off + 4 <= data.count else { return nil }
+        // CPAL color records are stored blue, green, red, alpha.
+        return Color(
+            red: Double(data[off + 2]) / 255,
+            green: Double(data[off + 1]) / 255,
+            blue: Double(data[off]) / 255,
+            alpha: Double(data[off + 3]) / 255
+        )
+    }
+
     private func glyphRange(_ index: Int) -> (offset: Int, length: Int)? {
         guard index >= 0, index < numberOfGlyphs,
               let loca = tables["loca"], let glyf = tables["glyf"]
