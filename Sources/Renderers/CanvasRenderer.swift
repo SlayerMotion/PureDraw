@@ -6,6 +6,7 @@
 import Core
 import Foundation
 import Geometry
+import Validation
 
 /// A renderer that translates a `GraphicsContext` drawing buffer into HTML5 Canvas 2D Context JavaScript code.
 public struct CanvasRenderer: Renderer {
@@ -18,7 +19,28 @@ public struct CanvasRenderer: Renderer {
         self.contextName = contextName
     }
 
+    /// Whether `name` is a valid JavaScript identifier: non-empty, starting with a letter,
+    /// `_`, or `$`, with the remaining characters letters, digits, `_`, or `$`. The context
+    /// name is interpolated directly into the emitted JS (`ctx.save()`, etc.), so a name that
+    /// is empty or contains spaces/punctuation would silently produce broken or unsafe output.
+    static func isValidJSIdentifier(_ name: String) -> Bool {
+        func isStart(_ c: Character) -> Bool {
+            c == "_" || c == "$" || c.isLetter
+        }
+        func isPart(_ c: Character) -> Bool {
+            isStart(c) || c.isNumber
+        }
+        guard let first = name.first, isStart(first) else { return false }
+        return name.dropFirst().allSatisfy(isPart)
+    }
+
     public func draw(_ context: GraphicsContext) throws -> String {
+        guard Self.isValidJSIdentifier(contextName) else {
+            throw ValidationError(
+                reason: "CanvasRenderer contextName must be a valid JavaScript identifier (non-empty, [A-Za-z_$][A-Za-z0-9_$]*)",
+                at: [ValidationCodingKey("contextName")]
+            )
+        }
         var js: [String] = []
 
         // Wrap in save/restore to keep global context clean

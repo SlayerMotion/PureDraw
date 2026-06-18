@@ -85,6 +85,23 @@ struct CanvasRendererTests {
         }
     }
 
+    @Test func invalidContextNameThrows() throws {
+        // The context name is interpolated directly into the emitted JS, so an empty name or
+        // one with spaces/punctuation (which would produce broken or injectable output) must
+        // be rejected at render time rather than emitted silently (#115).
+        for bad in ["", " ", "ctx ", "my ctx", "1ctx", "ctx;evil()", "a-b", "ctx.x", "(", "\n"] {
+            #expect(throws: (any Error).self, "invalid contextName \(bad.debugDescription) must throw") {
+                _ = try CanvasRenderer(contextName: bad).render(GraphicsContext())
+            }
+        }
+        // Valid identifiers must render without throwing.
+        for good in ["ctx", "_ctx", "$c", "context2D", "myCanvas_1"] {
+            #expect(throws: Never.self, "valid contextName \(good) must not throw") {
+                _ = try CanvasRenderer(contextName: good).render(GraphicsContext())
+            }
+        }
+    }
+
     @Test func alphaEmitsGlobalAlpha() throws {
         var c = GraphicsContext()
         c.setAlpha(0.5)
