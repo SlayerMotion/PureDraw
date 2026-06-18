@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-06-18
+
+### Changed
+
+- Vector renderers (SVG, PostScript, Canvas, PDF) now throw a typed
+  `UnsupportedOperationError` when an operation they cannot represent (an explicit
+  drop-shadow or a projective image warp) reaches them, instead of skipping it silently and
+  losing part of the drawing (#114). Callers exporting such content should rasterize or
+  flatten it first (e.g. render through `BitmapRenderer`), or omit it. Handled/expanded
+  operations (layers, text, transparency-layer content) are unaffected.
+- `CanvasRenderer` now rejects a `contextName` that is not a valid JavaScript identifier
+  with a `ValidationError` at render time, instead of emitting broken or injectable
+  JavaScript silently (#115). The initializer stays non-throwing.
+
 ## [1.0.4] - 2026-06-18
 
 ### Fixed
