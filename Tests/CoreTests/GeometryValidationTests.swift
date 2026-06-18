@@ -109,7 +109,7 @@ struct GeometryValidationTests {
             Issue.record("Expected Rect validation to fail due to infinite width")
         } catch let errors as ValidationErrorCollection {
             #expect(errors.values.count == 1)
-            #expect(errors.values[0].description.contains("Rectangle dimensions are finite"))
+            #expect(errors.values[0].description.contains("Rectangle origin and dimensions are finite"))
         } catch {
             Issue.record("Unexpected error: \(error)")
         }
@@ -122,7 +122,7 @@ struct GeometryValidationTests {
             #expect(errors.values.count == 2) // Fails rectHasValidDimensions (nan >= 0 is false) and rectIsFinite
             let descriptions = errors.values.map(\.description)
             #expect(descriptions.contains { $0.contains("Rectangle width and height are non-negative") })
-            #expect(descriptions.contains { $0.contains("Rectangle dimensions are finite") })
+            #expect(descriptions.contains { $0.contains("Rectangle origin and dimensions are finite") })
         } catch {
             Issue.record("Unexpected error: \(error)")
         }

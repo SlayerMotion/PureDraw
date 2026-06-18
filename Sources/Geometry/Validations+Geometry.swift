@@ -62,12 +62,15 @@ public extension Validation {
         )
     }
 
-    /// Validates that a rectangle's dimensions are finite.
+    /// Validates that a rectangle's origin and dimensions are all finite. The origin must
+    /// be checked too: a NaN/Inf `origin.x`/`origin.y` makes every derived coordinate
+    /// (minX, maxX, midX) non-finite, which traps any later `Int(...)` conversion.
     static var rectIsFinite: Validation<Document, Rect> {
         .init(
-            description: "Rectangle dimensions are finite",
+            description: "Rectangle origin and dimensions are finite",
             check: { context in
-                context.subject.width.isFinite && context.subject.height.isFinite
+                let r = context.subject
+                return r.origin.x.isFinite && r.origin.y.isFinite && r.width.isFinite && r.height.isFinite
             }
         )
     }

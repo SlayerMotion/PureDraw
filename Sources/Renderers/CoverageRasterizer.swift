@@ -63,7 +63,8 @@ struct CoverageRasterizer {
             }
         }
 
-        guard !edges.isEmpty, minXD.isFinite, minYD.isFinite else { return nil }
+        // All four bounds must be finite: Int(maxXD.rounded()) below traps on NaN/Inf.
+        guard !edges.isEmpty, minXD.isFinite, minYD.isFinite, maxXD.isFinite, maxYD.isFinite else { return nil }
 
         let minX = max(0, Int(minXD.rounded(.down)))
         let maxX = min(canvasWidth - 1, Int(maxXD.rounded(.up)))

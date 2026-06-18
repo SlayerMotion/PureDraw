@@ -31,7 +31,7 @@ struct ValidationConfigurationTests {
     @Test func rectPinsItsRules() {
         #expect(Rect.defaultValidator.validationDescriptions == [
             "Rectangle width and height are non-negative",
-            "Rectangle dimensions are finite",
+            "Rectangle origin and dimensions are finite",
         ])
     }
 

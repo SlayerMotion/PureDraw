@@ -95,10 +95,12 @@ public struct SVGRenderer: Renderer {
                 }
             }
 
-            viewBoxMinX = (overallMinX == .infinity) ? 0.0 : overallMinX
-            viewBoxMinY = (overallMinY == .infinity) ? 0.0 : overallMinY
-            let maxX = (overallMaxX == -.infinity) ? 100.0 : overallMaxX
-            let maxY = (overallMaxY == -.infinity) ? 100.0 : overallMaxY
+            // isFinite (not == ±infinity) so NaN and the opposite infinity also fall back,
+            // keeping the emitted viewBox/width/height finite instead of "nan"/"inf".
+            viewBoxMinX = overallMinX.isFinite ? overallMinX : 0.0
+            viewBoxMinY = overallMinY.isFinite ? overallMinY : 0.0
+            let maxX = overallMaxX.isFinite ? overallMaxX : 100.0
+            let maxY = overallMaxY.isFinite ? overallMaxY : 100.0
             viewBoxWidth = max(0.0, maxX - viewBoxMinX)
             viewBoxHeight = max(0.0, maxY - viewBoxMinY)
         }

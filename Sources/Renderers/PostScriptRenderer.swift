@@ -81,10 +81,13 @@ public struct PostScriptRenderer: Renderer {
                 }
             }
 
-            minX = (overallMinX == .infinity) ? 0.0 : overallMinX
-            minY = (overallMinY == .infinity) ? 0.0 : overallMinY
-            maxX = (overallMaxX == -.infinity) ? 100.0 : overallMaxX
-            maxY = (overallMaxY == -.infinity) ? 100.0 : overallMaxY
+            // Fall back to a default box when no FINITE content bounds exist (empty input,
+            // or non-finite geometry). isFinite catches NaN and both infinities; the later
+            // Int(floor/ceil(...)) for the %%BoundingBox traps on any non-finite value.
+            minX = overallMinX.isFinite ? overallMinX : 0.0
+            minY = overallMinY.isFinite ? overallMinY : 0.0
+            maxX = overallMaxX.isFinite ? overallMaxX : 100.0
+            maxY = overallMaxY.isFinite ? overallMaxY : 100.0
         }
 
         let viewBoxHeight = max(0.0, maxY - minY)

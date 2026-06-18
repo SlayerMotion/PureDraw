@@ -39,7 +39,9 @@ public enum PNGEncoder {
 
         let width = first.width
         let height = first.height
-        let delayNumerator = UInt16(min(65535, max(0, Int((frameDelay * 1000).rounded()))))
+        // Sanitize the delay: Int(non-finite) traps, and a negative delay is meaningless.
+        let safeDelayMs = frameDelay.isFinite ? max(0, frameDelay * 1000) : 0
+        let delayNumerator = UInt16(min(65535, max(0, Int(safeDelayMs.rounded()))))
         let delayDenominator: UInt16 = 1000
 
         var png: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]

@@ -176,6 +176,36 @@ struct RendererTests {
         #expect(svg.contains("clip-path=\"url(#clip-0)\""), "element must reference the final clip stack id")
     }
 
+    @Test func nonFiniteGeometryDoesNotTrap() {
+        // NaN/Inf coordinates must not trap any renderer. The bounds-to-Int conversions
+        // (BoundingBox, viewBox, coverage extents) trap on non-finite input; the renderers
+        // now fall back to safe finite bounds / skip the degenerate edge instead.
+        var context = GraphicsContext()
+        context.setFillColor(.white)
+        context.move(to: Point(x: .infinity, y: 0))
+        context.addLine(to: Point(x: 50, y: .nan))
+        context.addLine(to: Point(x: 20, y: 20))
+        context.closeSubpath()
+        context.fillPath()
+
+        // Each renderer must either reject the input (throw validation) or fall back to
+        // finite bounds, never TRAP on Int(non-finite). Reaching the end proves no trap;
+        // a thrown validation error is an acceptable fail-fast outcome, so it is swallowed.
+        _ = try? BitmapRenderer(width: 64, height: 64).render(context) // CoverageRasterizer extents
+        _ = try? SVGRenderer().render(context) // viewBox
+        _ = try? PostScriptRenderer().render(context) // %%BoundingBox Int conversion
+        _ = try? PDFRenderer(width: 64, height: 64).render(context)
+    }
+
+    @Test func pngEncoderToleratesNonFiniteFrameDelay() throws {
+        // Int((frameDelay * 1000).rounded()) traps on NaN/Inf; the encoder sanitizes it.
+        let frame = try BitmapRenderer(width: 2, height: 2).render(GraphicsContext())
+        for delay in [Double.nan, .infinity, -.infinity, -5.0] {
+            let png = PNGEncoder.encodeAnimated([frame, frame], frameDelay: delay)
+            #expect(!png.isEmpty, "encodeAnimated must produce bytes for frameDelay \(delay)")
+        }
+    }
+
     @Test func pdfRendererOutputStructure() throws {
         var context = GraphicsContext()
         context.setFillColor(Color(red: 1.0, green: 0.0, blue: 0.0)) // Red

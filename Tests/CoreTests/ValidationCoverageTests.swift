@@ -42,7 +42,7 @@ struct ValidationCoverageTests {
         "Color components are within 0.0 and 1.0",
         "Point coordinates are finite (not NaN or Infinity)",
         "Rectangle width and height are non-negative",
-        "Rectangle dimensions are finite",
+        "Rectangle origin and dimensions are finite",
         "Transform matrix determinant is non-zero (matrix is invertible)",
         "Transform matrix components are finite",
         "Projective transform matrix determinant is non-zero (matrix is invertible)",
