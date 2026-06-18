@@ -160,6 +160,15 @@ public struct CanvasRenderer: Renderer {
                     js.append("\(contextName).fillStyle = \(gradVarName);")
                     fillContextArea(using: op.state.clipPath, to: &js)
 
+                case let .drawConicGradient(grad, center, startAngle, _):
+                    let gradVarName = "conicGrad_\(opIndex)"
+                    js.append("const \(gradVarName) = \(contextName).createConicGradient(\(startAngle), \(center.x), \(center.y));")
+                    for stop in grad.stops {
+                        js.append("\(gradVarName).addColorStop(\(stop.location), '\(rgbaColor(stop.color))');")
+                    }
+                    js.append("\(contextName).fillStyle = \(gradVarName);")
+                    fillContextArea(using: op.state.clipPath, to: &js)
+
                 case .beginTransparencyLayer, .endTransparencyLayer:
                     break
 

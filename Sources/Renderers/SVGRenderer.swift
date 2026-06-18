@@ -61,13 +61,7 @@ public struct SVGRenderer: Renderer {
                     path = p
                 case let .stroke(p):
                     path = p
-                case .drawLinearGradient:
-                    if let clip = op.state.clipPath {
-                        path = clip
-                    } else {
-                        continue
-                    }
-                case .drawRadialGradient:
+                case .drawLinearGradient, .drawRadialGradient, .drawConicGradient:
                     if let clip = op.state.clipPath {
                         path = clip
                     } else {
@@ -185,6 +179,10 @@ public struct SVGRenderer: Renderer {
                     let attrsStr = attrs.joined(separator: " ")
                     elements.append("  <rect \(attrsStr) />")
                 }
+            case .drawConicGradient:
+                // SVG has no broadly-supported conic/angular gradient; fail loud rather than
+                // drop it. The raster (BitmapRenderer) and Canvas paths render it.
+                throw UnsupportedOperationError(operation: "drawConicGradient", renderer: "SVGRenderer")
             case let .drawImage(image, rect):
                 let bmpData = createBMPData(from: image)
                 let base64String = bmpData.base64EncodedString()

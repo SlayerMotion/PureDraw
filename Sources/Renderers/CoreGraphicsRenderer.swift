@@ -168,6 +168,11 @@
                             options: cgOptions
                         )
 
+                    case .drawConicGradient:
+                        // CoreGraphics has no conic (angular) gradient; fail loud rather than
+                        // drop it. The raster (BitmapRenderer) and Canvas paths render it.
+                        throw UnsupportedOperationError(operation: "drawConicGradient", renderer: "CoreGraphicsRenderer")
+
                     case let .drawImage(image, rect):
                         if let cgImage = createCGImage(from: image) {
                             targetContext.saveGState()

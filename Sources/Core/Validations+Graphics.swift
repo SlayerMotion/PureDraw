@@ -200,7 +200,7 @@ public extension Validation {
                             at: context.codingPath + [ValidationCodingKey("kind")]
                         )]
                     }
-                case .drawLinearGradient, .drawRadialGradient, .beginTransparencyLayer, .endTransparencyLayer,
+                case .drawLinearGradient, .drawRadialGradient, .drawConicGradient, .beginTransparencyLayer, .endTransparencyLayer,
                      .drawImage, .drawImageProjective, .dropShadow, .drawLayer, .showText:
                     // An empty shadow path simply casts no shadow, like an empty fill.
                     break

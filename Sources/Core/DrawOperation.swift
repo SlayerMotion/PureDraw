@@ -13,6 +13,11 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
         case stroke(Path)
         case drawLinearGradient(Gradient, start: Point, end: Point, options: GradientDrawingOptions)
         case drawRadialGradient(Gradient, startCenter: Point, startRadius: Double, endCenter: Point, endRadius: Double, options: GradientDrawingOptions)
+        /// An angular (conic / sweep) gradient: the stops sweep around `center` starting from
+        /// `startAngle` (radians, clockwise from the positive x-axis) through a full turn, the
+        /// angle mapped to the gradient's `[0, 1]` location. Mirrors CSS `conic-gradient` and
+        /// `CanvasRenderingContext2D.createConicGradient`.
+        case drawConicGradient(Gradient, center: Point, startAngle: Double, options: GradientDrawingOptions)
         case beginTransparencyLayer
         case endTransparencyLayer
         case drawImage(Image, rect: Rect)

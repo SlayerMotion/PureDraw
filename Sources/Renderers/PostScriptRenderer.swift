@@ -47,13 +47,7 @@ public struct PostScriptRenderer: Renderer {
                     path = p
                 case let .stroke(p):
                     path = p
-                case .drawLinearGradient:
-                    if let clip = op.state.clipPath {
-                        path = clip
-                    } else {
-                        continue
-                    }
-                case .drawRadialGradient:
+                case .drawLinearGradient, .drawRadialGradient, .drawConicGradient:
                     if let clip = op.state.clipPath {
                         path = clip
                     } else {
@@ -209,6 +203,9 @@ public struct PostScriptRenderer: Renderer {
                 >> shfill
 
                 """
+            case .drawConicGradient:
+                // PostScript shading has no conic/angular type; fail loud rather than drop it.
+                throw UnsupportedOperationError(operation: "drawConicGradient", renderer: "PostScriptRenderer")
             case let .drawImage(image, rect):
                 var hexString = ""
                 hexString.reserveCapacity(image.width * image.height * 6)

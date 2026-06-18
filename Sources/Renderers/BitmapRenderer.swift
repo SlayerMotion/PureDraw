@@ -89,6 +89,9 @@ public final class BitmapRenderer: Renderer, Sendable {
                     buffer: &currentBuffer
                 )
 
+            case let .drawConicGradient(grad, center, startAngle, _):
+                rasterizeConicGradient(grad: grad, center: center, startAngle: startAngle, state: op.state, clipCache: clipCache, buffer: &currentBuffer)
+
             case let .drawImage(image, rect):
                 rasterizeImage(image, in: rect, state: op.state, clipCache: clipCache, buffer: &currentBuffer)
 
@@ -312,6 +315,47 @@ public final class BitmapRenderer: Renderer, Sendable {
                 paramT = min(1.0, max(0.0, paramT))
 
                 let color = interpolateGradient(grad, at: paramT)
+                blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
+            }
+        }
+    }
+
+    private func rasterizeConicGradient(
+        grad: Gradient,
+        center: Point,
+        startAngle: Double,
+        state: GraphicState,
+        clipCache: ClipCache,
+        buffer: inout [UInt8]
+    ) {
+        let (clipCoverage, skip) = gradientClipCoverage(state, cache: clipCache)
+        if skip { return }
+        let bounds = clipCoverage.map {
+            Rect(x: Double($0.minX), y: Double($0.minY), width: Double($0.width), height: Double($0.height))
+        } ?? Rect(x: 0, y: 0, width: Double(width), height: Double(height))
+
+        let minX = max(0, Int(floor(bounds.minX)))
+        let maxX = min(width - 1, Int(ceil(bounds.maxX)))
+        let minY = max(0, Int(floor(bounds.minY)))
+        let maxY = min(height - 1, Int(ceil(bounds.maxY)))
+        guard minX <= maxX, minY <= maxY else { return }
+
+        let invTransform = state.transform.inverted()
+        let twoPi = 2.0 * Double.pi
+
+        for y in minY ... maxY {
+            for x in minX ... maxX {
+                if let clipCoverage {
+                    guard clipCoverage.value(atX: x, y: y) > 0 else { continue }
+                }
+                let pt = Point(x: Double(x) + 0.5, y: Double(y) + 0.5)
+                let userPt = pt.applying(invTransform)
+                // Angle clockwise from the positive x-axis (device y is down), offset by
+                // startAngle and normalized to [0, 1) around the full turn.
+                var angle = atan2(userPt.y - center.y, userPt.x - center.x) - startAngle
+                angle = angle.truncatingRemainder(dividingBy: twoPi)
+                if angle < 0 { angle += twoPi }
+                let color = interpolateGradient(grad, at: angle / twoPi)
                 blendPixel(x: x, y: y, color: color, state: state, buffer: &buffer)
             }
         }

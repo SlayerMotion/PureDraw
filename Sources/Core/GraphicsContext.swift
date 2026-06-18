@@ -319,6 +319,25 @@ public struct GraphicsContext: Sendable, Validatable {
         )
     }
 
+    /// Draws an angular (conic / sweep) gradient: the stops sweep around `center` from
+    /// `startAngle` (radians, clockwise from the positive x-axis) through a full turn. Mirrors
+    /// CSS `conic-gradient` and `createConicGradient`. The raster renderer paints it per pixel;
+    /// the Canvas renderer maps it to `createConicGradient`; vector exporters that cannot
+    /// represent it (PDF, PostScript, SVG, CoreGraphics) report it as unsupported.
+    public mutating func drawConicGradient(
+        _ gradient: Gradient,
+        center: Point,
+        startAngle: Double = 0,
+        options: GradientDrawingOptions = []
+    ) {
+        commands.append(
+            DrawOperation(
+                kind: .drawConicGradient(gradient, center: center, startAngle: startAngle, options: options),
+                state: currentState
+            )
+        )
+    }
+
     /// Records a stroke command in the buffer using the current state and clears the current path.
     public mutating func strokePath() {
         guard !currentPath.isEmpty else { return }

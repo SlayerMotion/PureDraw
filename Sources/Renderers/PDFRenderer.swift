@@ -243,8 +243,8 @@ public struct PDFRenderer: Renderer {
                         contentStream += pathStr
                         contentStream += "f\n"
                     }
-                case .beginTransparencyLayer, .endTransparencyLayer, .drawImage, .drawLayer, .drawImageProjective, .dropShadow, .showText:
-                    break
+                case .drawConicGradient, .beginTransparencyLayer, .endTransparencyLayer, .drawImage, .drawLayer, .drawImageProjective, .dropShadow, .showText:
+                    break // conic is unsupported and fails loud in the draw switch below
                 }
                 contentStream += "Q\n"
             }
@@ -305,6 +305,10 @@ public struct PDFRenderer: Renderer {
                     shadings[shadingDict] = shName
                 }
                 contentStream += "/\(shName) sh\n"
+            case .drawConicGradient:
+                // PDF shading has no conic/angular type (only axial 2 / radial 3); fail loud
+                // rather than drop it. The raster (BitmapRenderer) and Canvas paths render it.
+                throw UnsupportedOperationError(operation: "drawConicGradient", renderer: "PDFRenderer")
             case let .drawImage(image, rect):
                 var rgbData = Data()
                 var alphaData = Data()
