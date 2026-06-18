@@ -137,11 +137,10 @@ public final class BitmapRenderer: Renderer, Sendable {
         let rasterizer = CoverageRasterizer(canvasWidth: width, canvasHeight: height)
         guard let pathCoverage = rasterizer.coverage(of: transformedPath, rule: rule, antialiased: state.shouldAntialias) else { return }
 
-        var clipCoverage: CoverageRasterizer.CoverageMap?
-        if let clip = state.clipPath?.applying(state.transform) {
-            guard let coverage = cachedClipCoverage(clip, antialiased: state.shouldAntialias, cache: clipCache) else { return }
-            clipCoverage = coverage
-        }
+        // Intersect the full clip stack (not the unioned `clipPath`), so nested clips
+        // mask to their overlap. `skip` means a clip failed to rasterize → draw nothing.
+        let (clipCoverage, clipSkip) = intersectedClipCoverage(state, antialiased: state.shouldAntialias, cache: clipCache)
+        if clipSkip { return }
 
         for y in pathCoverage.minY ..< pathCoverage.minY + pathCoverage.height {
             for x in pathCoverage.minX ..< pathCoverage.minX + pathCoverage.width {
@@ -188,7 +187,9 @@ public final class BitmapRenderer: Renderer, Sendable {
         // pre-transformed clip together.
         var strokeState = state
         strokeState.transform = .identity
-        strokeState.clipPath = state.clipPath?.applying(state.transform)
+        // Carry the whole clip STACK pre-transformed (not the unioned `clipPath`), so
+        // rasterizeFill intersects nested clips for the stroke too.
+        strokeState.clipPaths = state.clipPaths.map { $0.applying(state.transform) }
         rasterizeFill(path: strokeShape, state: strokeState, color: color, rule: .winding, clipCache: clipCache, buffer: &buffer)
     }
 
@@ -219,18 +220,23 @@ public final class BitmapRenderer: Renderer, Sendable {
         return coverage
     }
 
-    /// The device-space clip coverage a gradient is bounded by: the intersection
-    /// of every clip path in the state (Core Graphics' clip intersects). A gradient
-    /// is bounded by the clip alone, so it must intersect the stack, not use the
-    /// combined `clipPath` (which unions a stacked clip with its ancestor and would
-    /// flood). `skip` is true when a clip fails to rasterize, so nothing draws.
-    private func gradientClipCoverage(_ state: GraphicState, cache: ClipCache) -> (coverage: CoverageRasterizer.CoverageMap?, skip: Bool) {
+    /// The device-space clip coverage every drawing op is bounded by: the INTERSECTION
+    /// of all clip paths in the state. Core Graphics' `clip` intersects the new path with
+    /// the current clip; it does not union. So this intersects ``GraphicState/clipPaths``
+    /// rather than rasterizing the combined ``GraphicState/clipPath`` (which unions a
+    /// stacked clip with its ancestor and would let content inside one clip but outside
+    /// the intersection flood through). `skip` is true when a clip fails to rasterize, so
+    /// nothing should draw. `antialiased` controls the clip edge: fills/strokes soften it
+    /// with the content's antialiasing; gradients/images use the aliased pixel-centre rule.
+    private func intersectedClipCoverage(
+        _ state: GraphicState, antialiased: Bool, cache: ClipCache
+    ) -> (coverage: CoverageRasterizer.CoverageMap?, skip: Bool) {
         guard !state.clipPaths.isEmpty else { return (nil, false) }
         // One clip is the common case (a layer's own clip, or pattern tiles that
         // share a device-space path): use the shared one-entry cache.
         if state.clipPaths.count == 1 {
             guard let coverage = cachedClipCoverage(
-                state.clipPaths[0].applying(state.transform), antialiased: false, cache: cache
+                state.clipPaths[0].applying(state.transform), antialiased: antialiased, cache: cache
             ) else { return (nil, true) }
             return (coverage, false)
         }
@@ -238,11 +244,16 @@ public final class BitmapRenderer: Renderer, Sendable {
         var combined: CoverageRasterizer.CoverageMap?
         for path in state.clipPaths {
             guard let coverage = rasterizer.coverage(
-                of: path.applying(state.transform), rule: .winding, antialiased: false
+                of: path.applying(state.transform), rule: .winding, antialiased: antialiased
             ) else { return (nil, true) }
             combined = combined.map { Self.intersectCoverage($0, coverage) } ?? coverage
         }
         return (combined, false)
+    }
+
+    /// A gradient is bounded by the clip alone (aliased pixel-centre rule).
+    private func gradientClipCoverage(_ state: GraphicState, cache: ClipCache) -> (coverage: CoverageRasterizer.CoverageMap?, skip: Bool) {
+        intersectedClipCoverage(state, antialiased: false, cache: cache)
     }
 
     /// The product of two coverage maps over the overlap of their bounds (zero
@@ -653,11 +664,10 @@ public final class BitmapRenderer: Renderer, Sendable {
             image, in: rect, transform: transform, width: width, height: height,
             quality: state.interpolationQuality, antialiased: state.shouldAntialias
         ) else { return }
-        // The clip path is honored here so the bitmap path matches CoreGraphics,
-        // which clips this op through the native gstate.
-        let clipPath = state.clipPath?.applying(state.transform)
-        let clipCoverage = clipPath.flatMap { cachedClipCoverage($0, antialiased: false, cache: clipCache) }
-        if clipPath != nil, clipCoverage == nil { return }
+        // The clip stack is honored here so the bitmap path matches CoreGraphics, which
+        // clips this op through the native gstate (intersecting nested clips).
+        let (clipCoverage, clipSkip) = intersectedClipCoverage(state, antialiased: false, cache: clipCache)
+        if clipSkip { return }
         for y in 0 ..< height {
             for x in 0 ..< width {
                 let index = (y * width + x) * 4
@@ -696,9 +706,9 @@ public final class BitmapRenderer: Renderer, Sendable {
         guard minX <= maxX, minY <= maxY else { return }
 
         let invTransform = state.transform.inverted()
-        let clipPath = state.clipPath?.applying(state.transform)
-        let clipCoverage = clipPath.flatMap { cachedClipCoverage($0, antialiased: false, cache: clipCache) }
-        if clipPath != nil, clipCoverage == nil { return }
+        // Intersect the clip stack (not the unioned `clipPath`) so nested clips mask correctly.
+        let (clipCoverage, clipSkip) = intersectedClipCoverage(state, antialiased: false, cache: clipCache)
+        if clipSkip { return }
 
         /// `interpolationQuality` controls how the *source* is sampled (nearest vs
         /// bilinear); `shouldAntialias` controls *destination-edge coverage*. A pixel
