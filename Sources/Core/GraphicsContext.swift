@@ -326,6 +326,25 @@ public struct GraphicsContext: Sendable, Validatable {
         currentPath = Path()
     }
 
+    /// Replaces the current path with the outline of its stroke, using the current line width,
+    /// cap, join, miter limit, and dash. Mirrors `CGContextReplacePathWithStrokedPath`: after
+    /// this, the current path is the fillable region the stroke covers, so a subsequent
+    /// `fillPath`, `clip`, or gradient fill paints or clips to the stroke shape. This is what
+    /// lets a stroke be painted with a gradient (stroke -> outline -> clip -> drawGradient),
+    /// since the gradient fills a clip region rather than following a stroke.
+    public mutating func replacePathWithStrokedPath() {
+        guard !currentPath.isEmpty else { return }
+        let dash = currentState.dashPattern.contains { $0 > 0 } ? currentState.dashPattern : []
+        currentPath = currentPath.strokedOutline(
+            lineWidth: currentState.lineWidth,
+            lineCap: currentState.lineCap,
+            lineJoin: currentState.lineJoin,
+            miterLimit: currentState.miterLimit,
+            dashLengths: dash,
+            dashPhase: currentState.dashPhase
+        )
+    }
+
     /// Draws a sequence of unconnected line segments.
     ///
     /// For every pair of points (2i, 2i+1), a line segment is drawn.
