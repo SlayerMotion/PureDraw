@@ -107,4 +107,10 @@ struct ValidationConfigurationTests {
             "Text-show operation parameters are valid",
         ])
     }
+
+    @Test func patternPinsItsRules() {
+        #expect(Pattern.defaultValidator.validationDescriptions == [
+            "Pattern bounds are finite with positive size and tiling steps",
+        ])
+    }
 }

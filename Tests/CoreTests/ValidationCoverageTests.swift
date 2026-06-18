@@ -28,6 +28,7 @@ struct ValidationCoverageTests {
             Shadow.defaultValidator.validationDescriptions,
             Image.defaultValidator.validationDescriptions,
             Path.defaultValidator.validationDescriptions,
+            Pattern.defaultValidator.validationDescriptions,
             GraphicState.defaultValidator.validationDescriptions,
             GraphicsContext.defaultValidator.validationDescriptions,
             DrawOperation.defaultValidator.validationDescriptions,
@@ -61,6 +62,7 @@ struct ValidationCoverageTests {
         "Layer stamp has positive dimensions",
         "Text-show operation parameters are valid",
         "CrumpleDeformer center, radius, and strengths are finite",
+        "Pattern bounds are finite with positive size and tiling steps",
     ]
 
     @Test func everyDefaultFindingIsRegistered() {

@@ -13,11 +13,29 @@ public extension Validation {
             description: "Color components are within 0.0 and 1.0",
             check: { context in
                 for comp in context.subject.components {
-                    if !(0.0 ... 1.0).contains(comp) {
+                    // Reject NaN/Inf explicitly (a range check alone relies on the
+                    // incidental fact that `contains(NaN)` is false).
+                    if !comp.isFinite || !(0.0 ... 1.0).contains(comp) {
                         return false
                     }
                 }
                 return true
+            }
+        )
+    }
+
+    /// Validates that a pattern's cell bounds and tiling steps are finite and positive.
+    /// A zero/negative/non-finite step (the default is `bounds.width`/`height`, so an
+    /// invalid `bounds` propagates) tiles degenerately or risks divide-by-zero downstream.
+    static var patternIsValid: Validation<Document, Pattern> {
+        .init(
+            description: "Pattern bounds are finite with positive size and tiling steps",
+            check: { context in
+                let p = context.subject
+                return p.bounds.origin.x.isFinite && p.bounds.origin.y.isFinite
+                    && p.bounds.width.isFinite && p.bounds.height.isFinite
+                    && p.bounds.width > 0 && p.bounds.height > 0
+                    && p.xStep.isFinite && p.yStep.isFinite && p.xStep > 0 && p.yStep > 0
             }
         )
     }
@@ -143,7 +161,8 @@ public extension Validation {
         .init(
             description: "Gradient stop location is between 0.0 and 1.0",
             check: { context in
-                (0.0 ... 1.0).contains(context.subject.location)
+                // Explicit finite check (a range check alone relies on contains(NaN)==false).
+                context.subject.location.isFinite && (0.0 ... 1.0).contains(context.subject.location)
             }
         )
     }

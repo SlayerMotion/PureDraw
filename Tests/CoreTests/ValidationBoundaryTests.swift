@@ -45,6 +45,14 @@ struct ValidationBoundaryTests {
     @Test func rectFiniteBoundary() {
         #expect(passes(.rectIsFinite, Rect(x: 0, y: 0, width: 1, height: 1)))
         #expect(fails(.rectIsFinite, Rect(x: 0, y: 0, width: .nan, height: 1)))
+        // The origin must be checked too: a non-finite origin makes derived coords trap.
+        #expect(fails(.rectIsFinite, Rect(x: .infinity, y: 0, width: 1, height: 1)))
+    }
+
+    @Test func patternBoundary() {
+        #expect(passes(.patternIsValid, Pattern(bounds: Rect(x: 0, y: 0, width: 10, height: 10))))
+        // Zero-width bounds → the default xStep is also zero (degenerate tiling).
+        #expect(fails(.patternIsValid, Pattern(bounds: Rect(x: 0, y: 0, width: 0, height: 10))))
     }
 
     @Test func affineReversibleBoundary() {

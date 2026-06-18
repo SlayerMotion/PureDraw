@@ -4,6 +4,7 @@
 //
 
 import Geometry
+import Validation
 
 /// A tiling cell painted repeatedly to fill a region, the `CGPattern`
 /// equivalent. Record the cell into `context`; the cell repeats every
@@ -39,6 +40,12 @@ public final class Pattern: @unchecked Sendable, Equatable {
 
     public static func == (lhs: Pattern, rhs: Pattern) -> Bool {
         lhs === rhs
+    }
+}
+
+extension Pattern: Validatable {
+    public static var defaultValidator: Validator<Pattern> {
+        Validator().validating(.patternIsValid)
     }
 }
 
