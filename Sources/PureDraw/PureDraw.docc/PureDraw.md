@@ -35,6 +35,13 @@ Core → Renderers**, re-exported together as the `PureDraw` umbrella.
 - <doc:ChoosingARenderer>
 - <doc:DecodingImagesAndFonts>
 
+### Internals (how the codecs work)
+
+- <doc:InflateAlgorithm>
+- <doc:ImageAndFontContainers>
+- <doc:Type2Charstrings>
+- <doc:VariableFontInterpolation>
+
 ### Drawing
 
 - ``GraphicsContext``

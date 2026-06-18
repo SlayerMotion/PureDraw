@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | draft |
+| **Status** | accepted (semantics frozen at 1.0, see §11) |
 | **Tracking issue** | [#123](https://github.com/SlayerMotion/PureDraw/issues/123) |
 | **Program** | [docs/knuth-program.md](../knuth-program.md), epic [#127](https://github.com/SlayerMotion/PureDraw/issues/127) |
 
@@ -132,10 +132,12 @@ sequences; rests on `Double.description` being the shortest round-trippable form
 The full SVG grammar (relative, `H`/`V`, `S`/`T`, arcs) is accepted by lowering it
 into the normal form; that lowering is deliberately one-way.
 
-## 11. Versioning and freeze (proposal)
+## 11. Versioning and freeze
 
-Proposed for owner ratification: at 1.0, the semantics in §§2-10 are **frozen**.
-After the freeze, changes to defined behavior are bug fixes only (the behavior was
+**Ratified.** At 1.0, the semantics in §§2-10 are **frozen**. After the freeze, a
+change to defined behavior is admissible only as a bug fix (the behavior was
 already wrong against this document); new capabilities go to a clearly numbered
 next line and extend, never redefine, the frozen semantics. The conformance corpus
-is versioned against this document.
+is versioned against this document. The prose may still be clarified, but a
+clarification MUST NOT change behavior; if a clarification would, it is a bug
+report against this document, not an edit to it.

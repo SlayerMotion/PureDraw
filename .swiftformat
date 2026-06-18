@@ -19,5 +19,6 @@
 --wrapcollections before-first
 --self remove
 
-# Never scan build products; Xcode mutates these mid-run.
---exclude DerivedData,.build
+# Never scan build products; Xcode mutates these mid-run. Snippets are illustrative
+# top-level code with DocC `// snippet.show` markers the formatter must not rewrite.
+--exclude DerivedData,.build,Snippets
