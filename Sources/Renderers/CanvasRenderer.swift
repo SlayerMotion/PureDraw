@@ -163,8 +163,13 @@ public struct CanvasRenderer: Renderer {
                 case .beginTransparencyLayer, .endTransparencyLayer:
                     break
 
-                case .drawLayer, .drawImageProjective, .dropShadow, .showText:
-                    break // expanded by flattenedCommands / textLoweredCommands
+                case .drawLayer, .showText:
+                    break // layers expanded, text lowered to outlines by flattenedCommands
+                case .drawImageProjective:
+                    throw UnsupportedOperationError(operation: "drawImageProjective", renderer: "CanvasRenderer")
+
+                case .dropShadow:
+                    throw UnsupportedOperationError(operation: "dropShadow", renderer: "CanvasRenderer")
 
                 case let .drawImage(image, rect):
                     let canvasVar = "imgCanvas_\(opIndex)"

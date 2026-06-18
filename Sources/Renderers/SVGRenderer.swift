@@ -212,8 +212,12 @@ public struct SVGRenderer: Renderer {
                 ) {
                     elements.append(element)
                 }
-            case .drawLayer, .drawImageProjective, .dropShadow:
+            case .drawLayer:
                 break // expanded by layerFlattenedCommands
+            case .drawImageProjective:
+                throw UnsupportedOperationError(operation: "drawImageProjective", renderer: "SVGRenderer")
+            case .dropShadow:
+                throw UnsupportedOperationError(operation: "dropShadow", renderer: "SVGRenderer")
             }
         }
 

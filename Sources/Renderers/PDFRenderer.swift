@@ -414,10 +414,14 @@ public struct PDFRenderer: Renderer {
                     contentStream += "<\(hex)> Tj\n"
                     contentStream += "ET\n"
                 }
-            case .beginTransparencyLayer, .endTransparencyLayer, .drawImageProjective, .dropShadow:
-                break
+            case .beginTransparencyLayer, .endTransparencyLayer:
+                break // transparency group flattened
             case .drawLayer:
                 break // expanded by layerFlattenedCommands
+            case .drawImageProjective:
+                throw UnsupportedOperationError(operation: "drawImageProjective", renderer: "PDFRenderer")
+            case .dropShadow:
+                throw UnsupportedOperationError(operation: "dropShadow", renderer: "PDFRenderer")
             }
 
             contentStream += "Q\n"

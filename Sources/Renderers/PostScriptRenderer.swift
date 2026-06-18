@@ -262,8 +262,12 @@ public struct PostScriptRenderer: Renderer {
                 grestore
 
                 """
-            case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer, .drawImageProjective, .dropShadow, .showText:
-                break
+            case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer, .showText:
+                break // layers expanded, text lowered to outlines, transparency group flattened
+            case .drawImageProjective:
+                throw UnsupportedOperationError(operation: "drawImageProjective", renderer: "PostScriptRenderer")
+            case .dropShadow:
+                throw UnsupportedOperationError(operation: "dropShadow", renderer: "PostScriptRenderer")
             }
 
             ps += "grestore\n"
