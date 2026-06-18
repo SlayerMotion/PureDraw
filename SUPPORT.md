@@ -2,8 +2,8 @@
 
 Need help with PureDraw? Here is where to go.
 
-- **Questions and ideas**: open a [Discussion](https://github.com/mihaelamj/PureDraw/discussions).
-- **Bug reports**: open an [issue](https://github.com/mihaelamj/PureDraw/issues/new/choose)
+- **Questions and ideas**: open a [Discussion](https://github.com/SlayerMotion/PureDraw/discussions).
+- **Bug reports**: open an [issue](https://github.com/SlayerMotion/PureDraw/issues/new/choose)
   using the bug form.
 - **Feature requests**: open an issue using the feature form.
 - **Security issues**: do not open a public issue. See [SECURITY.md](SECURITY.md).

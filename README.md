@@ -6,11 +6,11 @@
 
 <p align="center"><em>Everything above is rendered entirely by PureDraw to a vector PDF: a bezier-path character with a squircle head, gradients, blending, translucent shadows, the crumple deformer, a 3D cube with a projective grid texture, and an Apple-color scarf.</em></p>
 
-[![Style and namespacing](https://github.com/mihaelamj/PureDraw/actions/workflows/style.yml/badge.svg)](https://github.com/mihaelamj/PureDraw/actions/workflows/style.yml)
-[![Swift macOS](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-macos.yml/badge.svg)](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-macos.yml)
-[![Swift Linux](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-linux.yml/badge.svg)](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-linux.yml)
-[![Swift Windows](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-windows.yml/badge.svg)](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-windows.yml)
-[![Swift WASM](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-wasm.yml/badge.svg)](https://github.com/mihaelamj/PureDraw/actions/workflows/swift-wasm.yml)
+[![Style and namespacing](https://github.com/SlayerMotion/PureDraw/actions/workflows/style.yml/badge.svg)](https://github.com/SlayerMotion/PureDraw/actions/workflows/style.yml)
+[![Swift macOS](https://github.com/SlayerMotion/PureDraw/actions/workflows/swift-macos.yml/badge.svg)](https://github.com/SlayerMotion/PureDraw/actions/workflows/swift-macos.yml)
+[![Swift Linux](https://github.com/SlayerMotion/PureDraw/actions/workflows/swift-linux.yml/badge.svg)](https://github.com/SlayerMotion/PureDraw/actions/workflows/swift-linux.yml)
+[![Swift Windows](https://github.com/SlayerMotion/PureDraw/actions/workflows/swift-windows.yml/badge.svg)](https://github.com/SlayerMotion/PureDraw/actions/workflows/swift-windows.yml)
+[![Swift WASM](https://github.com/SlayerMotion/PureDraw/actions/workflows/swift-wasm.yml/badge.svg)](https://github.com/SlayerMotion/PureDraw/actions/workflows/swift-wasm.yml)
 [![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
 ![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)
 ![SwiftPM](https://img.shields.io/badge/SwiftPM-compatible-brightgreen.svg)
@@ -150,28 +150,28 @@ flowchart TB
 
     E0["E0 (#1): Math Primitives"]:::done --> E1["E1 (#2): Path Construction"]:::done --> E2["E2 (#3): Graphic State"]:::done --> E3["E3 (#4): Rendering Bridge"]:::done --> TL["Transparency Layers"]:::done --> CS["CMYK & Gray Color Spaces"]:::done --> P1_1["#27: GState Settings"]:::done --> P1_2["#28: Path Hit-Testing"]:::done --> Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> Epic39["Epic #39: Image Model Hardening"]:::done --> Epic38["Epic #38: Rasterizer Quality"]:::done --> Epic13["Epic #13: Masking, Caching & Streams"]:::done --> Epic40["Epic #40: PNG Export & Golden Tests"]:::done --> Epic18["Epic #18: Typography & Text Layout"]:::done --> Epic22["Epic #22: Advanced PDF Systems"]:::done --> Epic53["Epic #53: Validation Completeness"]:::done --> Epic58["Epic #58: Performance"]:::done --> Epic59["Epic #59: API Documentation"]:::next --> Epic60["Epic #60: CFF Outlines"]:::done --> Epic61["Epic #61: Selectable Native Text"]:::done --> I83["#83: Continuous Corners"]:::done --> I84["#84: Apple Exact Corner"]:::done --> I85["#85: PDF Font Embedding Fix"]:::done --> Epic74["Epic #74: Extended Font Formats"]:::todo
 
-    click E0 href "https://github.com/mihaelamj/PureDraw/issues/1" "E0"
-    click E1 href "https://github.com/mihaelamj/PureDraw/issues/2" "E1"
-    click E2 href "https://github.com/mihaelamj/PureDraw/issues/3" "E2"
-    click E3 href "https://github.com/mihaelamj/PureDraw/issues/4" "E3"
-    click P1_1 href "https://github.com/mihaelamj/PureDraw/issues/27" "Issue #27"
-    click P1_2 href "https://github.com/mihaelamj/PureDraw/issues/28" "Issue #28"
-    click Epic9 href "https://github.com/mihaelamj/PureDraw/issues/9" "Epic #9"
-    click Epic39 href "https://github.com/mihaelamj/PureDraw/issues/39" "Epic #39"
-    click Epic38 href "https://github.com/mihaelamj/PureDraw/issues/38" "Epic #38"
-    click Epic13 href "https://github.com/mihaelamj/PureDraw/issues/13" "Epic #13"
-    click Epic40 href "https://github.com/mihaelamj/PureDraw/issues/40" "Epic #40"
-    click Epic18 href "https://github.com/mihaelamj/PureDraw/issues/18" "Epic #18"
-    click Epic22 href "https://github.com/mihaelamj/PureDraw/issues/22" "Epic #22"
-    click Epic53 href "https://github.com/mihaelamj/PureDraw/issues/53" "Epic #53"
-    click Epic58 href "https://github.com/mihaelamj/PureDraw/issues/58" "Epic #58"
-    click Epic59 href "https://github.com/mihaelamj/PureDraw/issues/59" "Epic #59"
-    click Epic60 href "https://github.com/mihaelamj/PureDraw/issues/60" "Epic #60"
-    click Epic61 href "https://github.com/mihaelamj/PureDraw/issues/61" "Epic #61"
-    click I83 href "https://github.com/mihaelamj/PureDraw/issues/83" "Issue #83"
-    click I84 href "https://github.com/mihaelamj/PureDraw/issues/84" "Issue #84"
-    click I85 href "https://github.com/mihaelamj/PureDraw/issues/85" "Issue #85"
-    click Epic74 href "https://github.com/mihaelamj/PureDraw/issues/74" "Epic #74"
+    click E0 href "https://github.com/SlayerMotion/PureDraw/issues/1" "E0"
+    click E1 href "https://github.com/SlayerMotion/PureDraw/issues/2" "E1"
+    click E2 href "https://github.com/SlayerMotion/PureDraw/issues/3" "E2"
+    click E3 href "https://github.com/SlayerMotion/PureDraw/issues/4" "E3"
+    click P1_1 href "https://github.com/SlayerMotion/PureDraw/issues/27" "Issue #27"
+    click P1_2 href "https://github.com/SlayerMotion/PureDraw/issues/28" "Issue #28"
+    click Epic9 href "https://github.com/SlayerMotion/PureDraw/issues/9" "Epic #9"
+    click Epic39 href "https://github.com/SlayerMotion/PureDraw/issues/39" "Epic #39"
+    click Epic38 href "https://github.com/SlayerMotion/PureDraw/issues/38" "Epic #38"
+    click Epic13 href "https://github.com/SlayerMotion/PureDraw/issues/13" "Epic #13"
+    click Epic40 href "https://github.com/SlayerMotion/PureDraw/issues/40" "Epic #40"
+    click Epic18 href "https://github.com/SlayerMotion/PureDraw/issues/18" "Epic #18"
+    click Epic22 href "https://github.com/SlayerMotion/PureDraw/issues/22" "Epic #22"
+    click Epic53 href "https://github.com/SlayerMotion/PureDraw/issues/53" "Epic #53"
+    click Epic58 href "https://github.com/SlayerMotion/PureDraw/issues/58" "Epic #58"
+    click Epic59 href "https://github.com/SlayerMotion/PureDraw/issues/59" "Epic #59"
+    click Epic60 href "https://github.com/SlayerMotion/PureDraw/issues/60" "Epic #60"
+    click Epic61 href "https://github.com/SlayerMotion/PureDraw/issues/61" "Epic #61"
+    click I83 href "https://github.com/SlayerMotion/PureDraw/issues/83" "Issue #83"
+    click I84 href "https://github.com/SlayerMotion/PureDraw/issues/84" "Issue #84"
+    click I85 href "https://github.com/SlayerMotion/PureDraw/issues/85" "Issue #85"
+    click Epic74 href "https://github.com/SlayerMotion/PureDraw/issues/74" "Epic #74"
 ```
 
 ### Status Legend
@@ -204,10 +204,10 @@ flowchart TB
 
     Epic9["Epic #9: Bitmap Images & Rasterization"]:::done --> I10["#10: Raw Pixel Buffer Structure"]:::done --> I11["#11: Bitmap Context Renderer"]:::done --> I12["#12: Image Drawing on Context"]:::done
 
-    click Epic9 href "https://github.com/mihaelamj/PureDraw/issues/9" "Epic #9"
-    click I10 href "https://github.com/mihaelamj/PureDraw/issues/10" "Issue #10"
-    click I11 href "https://github.com/mihaelamj/PureDraw/issues/11" "Issue #11"
-    click I12 href "https://github.com/mihaelamj/PureDraw/issues/12" "Issue #12"
+    click Epic9 href "https://github.com/SlayerMotion/PureDraw/issues/9" "Epic #9"
+    click I10 href "https://github.com/SlayerMotion/PureDraw/issues/10" "Issue #10"
+    click I11 href "https://github.com/SlayerMotion/PureDraw/issues/11" "Issue #11"
+    click I12 href "https://github.com/SlayerMotion/PureDraw/issues/12" "Issue #12"
 ```
 
 ### Epic #39: Image Model Hardening
@@ -222,10 +222,10 @@ flowchart TB
 
     Epic39["Epic #39: Image Model Hardening"]:::done --> I45["#45: Throwing Image.init"]:::done --> I46["#46: 8-Bit Component Rule"]:::done --> I47["#47: DeviceGray Mask Cache"]:::done
 
-    click Epic39 href "https://github.com/mihaelamj/PureDraw/issues/39" "Epic #39"
-    click I45 href "https://github.com/mihaelamj/PureDraw/issues/45" "Issue #45"
-    click I46 href "https://github.com/mihaelamj/PureDraw/issues/46" "Issue #46"
-    click I47 href "https://github.com/mihaelamj/PureDraw/issues/47" "Issue #47"
+    click Epic39 href "https://github.com/SlayerMotion/PureDraw/issues/39" "Epic #39"
+    click I45 href "https://github.com/SlayerMotion/PureDraw/issues/45" "Issue #45"
+    click I46 href "https://github.com/SlayerMotion/PureDraw/issues/46" "Issue #46"
+    click I47 href "https://github.com/SlayerMotion/PureDraw/issues/47" "Issue #47"
 ```
 
 ### Epic #38: Rasterizer Quality & Correctness
@@ -240,12 +240,12 @@ flowchart TB
 
     Epic38["Epic #38: Rasterizer Quality"]:::done --> I41["#41: Stroke Clip-Space Fix"]:::done --> I42["#42: Scanline AA Fill"]:::done --> I43["#43: Miter & Bevel Joins"]:::done --> I44["#44: Bilinear Sampling"]:::done --> I51["#51: Phantom Closing Segment"]:::done
 
-    click Epic38 href "https://github.com/mihaelamj/PureDraw/issues/38" "Epic #38"
-    click I41 href "https://github.com/mihaelamj/PureDraw/issues/41" "Issue #41"
-    click I42 href "https://github.com/mihaelamj/PureDraw/issues/42" "Issue #42"
-    click I43 href "https://github.com/mihaelamj/PureDraw/issues/43" "Issue #43"
-    click I44 href "https://github.com/mihaelamj/PureDraw/issues/44" "Issue #44"
-    click I51 href "https://github.com/mihaelamj/PureDraw/issues/51" "Issue #51"
+    click Epic38 href "https://github.com/SlayerMotion/PureDraw/issues/38" "Epic #38"
+    click I41 href "https://github.com/SlayerMotion/PureDraw/issues/41" "Issue #41"
+    click I42 href "https://github.com/SlayerMotion/PureDraw/issues/42" "Issue #42"
+    click I43 href "https://github.com/SlayerMotion/PureDraw/issues/43" "Issue #43"
+    click I44 href "https://github.com/SlayerMotion/PureDraw/issues/44" "Issue #44"
+    click I51 href "https://github.com/SlayerMotion/PureDraw/issues/51" "Issue #51"
 ```
 
 ### Epic #13: Image Masking, Caching & Data Streams
@@ -260,11 +260,11 @@ flowchart TB
 
     Epic13["Epic #13: Masking, Caching & Streams"]:::done --> I16["#16: Data Providers & Consumers"]:::done --> I17["#17: Image I/O Metadata"]:::done --> I14["#14: Stencil & Chroma Masking"]:::done --> I15["#15: CGLayer Caching"]:::done
 
-    click Epic13 href "https://github.com/mihaelamj/PureDraw/issues/13" "Epic #13"
-    click I14 href "https://github.com/mihaelamj/PureDraw/issues/14" "Issue #14"
-    click I15 href "https://github.com/mihaelamj/PureDraw/issues/15" "Issue #15"
-    click I16 href "https://github.com/mihaelamj/PureDraw/issues/16" "Issue #16"
-    click I17 href "https://github.com/mihaelamj/PureDraw/issues/17" "Issue #17"
+    click Epic13 href "https://github.com/SlayerMotion/PureDraw/issues/13" "Epic #13"
+    click I14 href "https://github.com/SlayerMotion/PureDraw/issues/14" "Issue #14"
+    click I15 href "https://github.com/SlayerMotion/PureDraw/issues/15" "Issue #15"
+    click I16 href "https://github.com/SlayerMotion/PureDraw/issues/16" "Issue #16"
+    click I17 href "https://github.com/SlayerMotion/PureDraw/issues/17" "Issue #17"
 ```
 
 ### Epic #40: PNG Export & Golden-Image Tests
@@ -279,9 +279,9 @@ flowchart TB
 
     Epic40["Epic #40: PNG Export & Golden Tests"]:::done --> I48["#48: PNG Encoder"]:::done --> I49["#49: Golden-Image CI Suite"]:::done
 
-    click Epic40 href "https://github.com/mihaelamj/PureDraw/issues/40" "Epic #40"
-    click I48 href "https://github.com/mihaelamj/PureDraw/issues/48" "Issue #48"
-    click I49 href "https://github.com/mihaelamj/PureDraw/issues/49" "Issue #49"
+    click Epic40 href "https://github.com/SlayerMotion/PureDraw/issues/40" "Epic #40"
+    click I48 href "https://github.com/SlayerMotion/PureDraw/issues/48" "Issue #48"
+    click I49 href "https://github.com/SlayerMotion/PureDraw/issues/49" "Issue #49"
 ```
 
 ### Epic #18: Typography and Text Layout Engine
@@ -296,10 +296,10 @@ flowchart TB
 
     Epic18["Epic #18: Typography & Text Layout"]:::done --> I19["#19: Font File Parser & Glyphs"]:::done --> I20["#20: Text State Stack & Matrix"]:::done --> I21["#21: Text Showing Context Operations"]:::done
 
-    click Epic18 href "https://github.com/mihaelamj/PureDraw/issues/18" "Epic #18"
-    click I19 href "https://github.com/mihaelamj/PureDraw/issues/19" "Issue #19"
-    click I20 href "https://github.com/mihaelamj/PureDraw/issues/20" "Issue #20"
-    click I21 href "https://github.com/mihaelamj/PureDraw/issues/21" "Issue #21"
+    click Epic18 href "https://github.com/SlayerMotion/PureDraw/issues/18" "Epic #18"
+    click I19 href "https://github.com/SlayerMotion/PureDraw/issues/19" "Issue #19"
+    click I20 href "https://github.com/SlayerMotion/PureDraw/issues/20" "Issue #20"
+    click I21 href "https://github.com/SlayerMotion/PureDraw/issues/21" "Issue #21"
 ```
 
 ### Epic #22: Advanced PDF Systems
@@ -314,11 +314,11 @@ flowchart TB
 
     Epic22["Epic #22: Advanced PDF Systems"]:::done --> I23["#23: PDF Outlines & Hyperlinks"]:::done --> I24["#24: PDF Page Boxes & Transforms"]:::done --> I25["#25: Low-Level PDF Scanning"]:::done --> I26["#26: PDF Encryption & Permissions"]:::done
 
-    click Epic22 href "https://github.com/mihaelamj/PureDraw/issues/22" "Epic #22"
-    click I23 href "https://github.com/mihaelamj/PureDraw/issues/23" "Issue #23"
-    click I24 href "https://github.com/mihaelamj/PureDraw/issues/24" "Issue #24"
-    click I25 href "https://github.com/mihaelamj/PureDraw/issues/25" "Issue #25"
-    click I26 href "https://github.com/mihaelamj/PureDraw/issues/26" "Issue #26"
+    click Epic22 href "https://github.com/SlayerMotion/PureDraw/issues/22" "Epic #22"
+    click I23 href "https://github.com/SlayerMotion/PureDraw/issues/23" "Issue #23"
+    click I24 href "https://github.com/SlayerMotion/PureDraw/issues/24" "Issue #24"
+    click I25 href "https://github.com/SlayerMotion/PureDraw/issues/25" "Issue #25"
+    click I26 href "https://github.com/SlayerMotion/PureDraw/issues/26" "Issue #26"
 ```
 
 ---

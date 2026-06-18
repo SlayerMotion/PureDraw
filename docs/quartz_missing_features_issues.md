@@ -22,10 +22,10 @@ flowchart TB
 
     Epic9["Epic #9: Bitmap Images & Rasterization"]:::next --> I10["#10: Raw Pixel Buffer Structure"]:::todo --> I11["#11: Bitmap Context Renderer"]:::todo --> I12["#12: Image Drawing on Context"]:::todo
 
-    click Epic9 href "https://github.com/mihaelamj/PureDraw/issues/9" "Epic #9"
-    click I10 href "https://github.com/mihaelamj/PureDraw/issues/10" "Issue #10"
-    click I11 href "https://github.com/mihaelamj/PureDraw/issues/11" "Issue #11"
-    click I12 href "https://github.com/mihaelamj/PureDraw/issues/12" "Issue #12"
+    click Epic9 href "https://github.com/SlayerMotion/PureDraw/issues/9" "Epic #9"
+    click I10 href "https://github.com/SlayerMotion/PureDraw/issues/10" "Issue #10"
+    click I11 href "https://github.com/SlayerMotion/PureDraw/issues/11" "Issue #11"
+    click I12 href "https://github.com/SlayerMotion/PureDraw/issues/12" "Issue #12"
 ```
 
 ### Child Issues
@@ -64,11 +64,11 @@ flowchart TB
 
     Epic13["Epic #13: Masking, Caching & Streams"]:::todo --> I16["#16: Data Providers & Consumers"]:::todo --> I17["#17: Image I/O Metadata"]:::todo --> I14["#14: Stencil & Chroma Masking"]:::todo --> I15["#15: CGLayer Caching"]:::todo
 
-    click Epic13 href "https://github.com/mihaelamj/PureDraw/issues/13" "Epic #13"
-    click I14 href "https://github.com/mihaelamj/PureDraw/issues/14" "Issue #14"
-    click I15 href "https://github.com/mihaelamj/PureDraw/issues/15" "Issue #15"
-    click I16 href "https://github.com/mihaelamj/PureDraw/issues/16" "Issue #16"
-    click I17 href "https://github.com/mihaelamj/PureDraw/issues/17" "Issue #17"
+    click Epic13 href "https://github.com/SlayerMotion/PureDraw/issues/13" "Epic #13"
+    click I14 href "https://github.com/SlayerMotion/PureDraw/issues/14" "Issue #14"
+    click I15 href "https://github.com/SlayerMotion/PureDraw/issues/15" "Issue #15"
+    click I16 href "https://github.com/SlayerMotion/PureDraw/issues/16" "Issue #16"
+    click I17 href "https://github.com/SlayerMotion/PureDraw/issues/17" "Issue #17"
 ```
 
 ### Child Issues
@@ -111,10 +111,10 @@ flowchart TB
 
     Epic18["Epic #18: Typography & Text Layout"]:::todo --> I19["#19: Font File Parser & Glyphs"]:::todo --> I20["#20: Text State Stack & Matrix"]:::todo --> I21["#21: Text Showing Context Operations"]:::todo
 
-    click Epic18 href "https://github.com/mihaelamj/PureDraw/issues/18" "Epic #18"
-    click I19 href "https://github.com/mihaelamj/PureDraw/issues/19" "Issue #19"
-    click I20 href "https://github.com/mihaelamj/PureDraw/issues/20" "Issue #20"
-    click I21 href "https://github.com/mihaelamj/PureDraw/issues/21" "Issue #21"
+    click Epic18 href "https://github.com/SlayerMotion/PureDraw/issues/18" "Epic #18"
+    click I19 href "https://github.com/SlayerMotion/PureDraw/issues/19" "Issue #19"
+    click I20 href "https://github.com/SlayerMotion/PureDraw/issues/20" "Issue #20"
+    click I21 href "https://github.com/SlayerMotion/PureDraw/issues/21" "Issue #21"
 ```
 
 ### Child Issues
@@ -153,11 +153,11 @@ flowchart TB
 
     Epic22["Epic #22: Advanced PDF Systems"]:::todo --> I23["#23: PDF Outlines & Hyperlinks"]:::todo --> I24["#24: PDF Page Boxes & Transforms"]:::todo --> I25["#25: Low-Level PDF Scanning"]:::todo --> I26["#26: PDF Encryption & Permissions"]:::todo
 
-    click Epic22 href "https://github.com/mihaelamj/PureDraw/issues/22" "Epic #22"
-    click I23 href "https://github.com/mihaelamj/PureDraw/issues/23" "Issue #23"
-    click I24 href "https://github.com/mihaelamj/PureDraw/issues/24" "Issue #24"
-    click I25 href "https://github.com/mihaelamj/PureDraw/issues/25" "Issue #25"
-    click I26 href "https://github.com/mihaelamj/PureDraw/issues/26" "Issue #26"
+    click Epic22 href "https://github.com/SlayerMotion/PureDraw/issues/22" "Epic #22"
+    click I23 href "https://github.com/SlayerMotion/PureDraw/issues/23" "Issue #23"
+    click I24 href "https://github.com/SlayerMotion/PureDraw/issues/24" "Issue #24"
+    click I25 href "https://github.com/SlayerMotion/PureDraw/issues/25" "Issue #25"
+    click I26 href "https://github.com/SlayerMotion/PureDraw/issues/26" "Issue #26"
 ```
 
 ### Child Issues
