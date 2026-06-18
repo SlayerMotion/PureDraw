@@ -139,5 +139,141 @@ struct VariableFontTests {
             let bytes = [UInt8(code >> 24 & 0xFF), UInt8(code >> 16 & 0xFF), UInt8(code >> 8 & 0xFF), UInt8(code & 0xFF)]
             return String(decoding: bytes, as: UTF8.self)
         }
+
+        /// Interpolates real glyph outlines along the weight axis and checks each against CoreText's
+        /// own instanced path (CTFontCreatePathForGlyph). Glyphs that vary in CoreText but not in the
+        /// parser are composites, which are not yet varied, and are skipped; the test requires that at
+        /// least two simple glyphs were actually compared so it cannot pass vacuously.
+        @Test func gvarOutlineMatchesCoreText() throws {
+            let path = "/System/Library/Fonts/NewYork.ttf"
+            guard let data = FileManager.default.contents(atPath: path) else { return }
+            let font = try Font(data: [UInt8](data))
+            guard let weight = font.variationAxes.first(where: { $0.tag == "wght" }),
+                  let provider = CGDataProvider(data: data as CFData), let cgFont = CGFont(provider)
+            else { return }
+
+            let upm = Double(font.unitsPerEm)
+            let target = (weight.defaultValue + weight.maxValue) / 2
+            let variations = ["wght": target]
+            let axisID = fourCharInt("wght")
+            let tolerance = 3.0 // font units; correct interpolation differs only by fixed-point rounding
+
+            var compared = 0
+            for scalar in "HILTEFowlmnu1470".unicodeScalars {
+                guard let glyph = font.glyphIndex(for: scalar),
+                      let mineInstance = font.outline(forGlyph: glyph, variations: variations),
+                      let mineDefault = font.outline(forGlyph: glyph),
+                      let ctInstance = ctGlyphPath(cgFont, glyph: glyph, size: upm, axis: axisID, value: target),
+                      let ctDefault = ctGlyphPath(cgFont, glyph: glyph, size: upm, axis: axisID, value: weight.defaultValue)
+                else { continue }
+
+                let ctVaried = boxDistance(ctInstance.boundingBoxOfPath, ctDefault.boundingBoxOfPath) > tolerance
+                let myVaried = hausdorff(pathPoints(mineInstance), pathPoints(mineDefault)) > tolerance
+                guard ctVaried else { continue } // glyph is invariant under weight: nothing to check
+                if !myVaried { continue } // composite (not yet varied) or no simple-glyph deltas: skip
+
+                let myPoints = pathPoints(mineInstance)
+                let ctPoints = cgPathPoints(ctInstance)
+                #expect(hausdorff(myPoints, ctPoints) < tolerance, "glyph \(glyph): outline diverges from CoreText")
+                #expect(hausdorff(ctPoints, myPoints) < tolerance, "glyph \(glyph): CoreText has points the outline misses")
+
+                let myBox = boundingBox(myPoints)
+                let ctBox = ctInstance.boundingBoxOfPath
+                #expect(boxDistance(myBox, ctBox) < tolerance, "glyph \(glyph): bounds diverge from CoreText")
+
+                // At the default instance the interpolation must be a no-op for a simple glyph.
+                #expect(font.outline(forGlyph: glyph, variations: [:]) == mineDefault, "default instance must equal the static outline")
+                compared += 1
+            }
+            #expect(compared >= 2, "expected to compare at least two simple varied glyphs against CoreText")
+        }
+
+        private func ctGlyphPath(_ cgFont: CGFont, glyph: Int, size: Double, axis: Int, value: Double) -> CGPath? {
+            let attributes = [kCTFontVariationAttribute: [axis: value]] as CFDictionary
+            let descriptor = CTFontDescriptorCreateWithAttributes(attributes)
+            let ctFont = CTFontCreateWithGraphicsFont(cgFont, CGFloat(size), nil, descriptor)
+            return CTFontCreatePathForGlyph(ctFont, CGGlyph(glyph), nil)
+        }
+
+        private func fourCharInt(_ tag: String) -> Int {
+            tag.utf8.reduce(0) { ($0 << 8) | Int($1) }
+        }
+
+        private func pathPoints(_ path: Path) -> [CGPoint] {
+            var points: [CGPoint] = []
+            for element in path.elements {
+                switch element {
+                case let .move(to), let .line(to):
+                    points.append(CGPoint(x: to.x, y: to.y))
+                case let .quadCurve(to, control):
+                    points.append(CGPoint(x: to.x, y: to.y))
+                    points.append(CGPoint(x: control.x, y: control.y))
+                case let .cubicCurve(to, control1, control2):
+                    points.append(CGPoint(x: to.x, y: to.y))
+                    points.append(CGPoint(x: control1.x, y: control1.y))
+                    points.append(CGPoint(x: control2.x, y: control2.y))
+                case .close:
+                    break
+                }
+            }
+            return points
+        }
+
+        private func cgPathPoints(_ path: CGPath) -> [CGPoint] {
+            var points: [CGPoint] = []
+            path.applyWithBlock { elementPointer in
+                let element = elementPointer.pointee
+                switch element.type {
+                case .moveToPoint, .addLineToPoint:
+                    points.append(element.points[0])
+                case .addQuadCurveToPoint:
+                    points.append(element.points[0])
+                    points.append(element.points[1])
+                case .addCurveToPoint:
+                    points.append(element.points[0])
+                    points.append(element.points[1])
+                    points.append(element.points[2])
+                case .closeSubpath:
+                    break
+                @unknown default:
+                    break
+                }
+            }
+            return points
+        }
+
+        /// The largest distance from any point in `a` to its nearest neighbor in `b` (a directed
+        /// Hausdorff distance), which is insensitive to point order and contour start.
+        private func hausdorff(_ a: [CGPoint], _ b: [CGPoint]) -> Double {
+            guard !b.isEmpty else { return .greatestFiniteMagnitude }
+            var worst = 0.0
+            for p in a {
+                var nearest = Double.greatestFiniteMagnitude
+                for q in b {
+                    nearest = min(nearest, hypot(Double(p.x - q.x), Double(p.y - q.y)))
+                }
+                worst = max(worst, nearest)
+            }
+            return worst
+        }
+
+        private func boundingBox(_ points: [CGPoint]) -> CGRect {
+            guard let first = points.first else { return .zero }
+            var minX = first.x, minY = first.y, maxX = first.x, maxY = first.y
+            for p in points {
+                minX = min(minX, p.x)
+                minY = min(minY, p.y)
+                maxX = max(maxX, p.x)
+                maxY = max(maxY, p.y)
+            }
+            return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        }
+
+        private func boxDistance(_ a: CGRect, _ b: CGRect) -> Double {
+            max(
+                max(abs(Double(a.minX - b.minX)), abs(Double(a.minY - b.minY))),
+                max(abs(Double(a.maxX - b.maxX)), abs(Double(a.maxY - b.maxY)))
+            )
+        }
     }
 #endif

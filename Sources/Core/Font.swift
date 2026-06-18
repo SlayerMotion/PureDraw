@@ -393,6 +393,352 @@ public struct Font: Equatable, Sendable {
         return instances
     }
 
+    /// The outline of `index` interpolated to a variation instance, mapping axis tag to a
+    /// user-space coordinate (axes you omit stay at their default value) (PureDraw #77). It applies
+    /// `gvar` deltas to the simple-glyph points, with coordinate normalization honoring `avar` when
+    /// present, so the result matches the platform shaper. Falls back to the default outline when
+    /// the font is static, the glyph is composite, or the glyph carries no variation data. Composite
+    /// glyphs are not yet varied (their component offsets render at the default instance).
+    public func outline(forGlyph index: Int, variations: [String: Double]) -> Path? {
+        guard tables["gvar"] != nil,
+              let normalized = normalizedVariationCoordinates(variations),
+              let range = glyphRange(index),
+              let contourCount = Self.i16(data, at: range.offset), contourCount >= 0,
+              let glyph = simpleGlyphPoints(at: range.offset, contourCount: contourCount),
+              let deltas = gvarDeltas(glyph: index, xs: glyph.xs, ys: glyph.ys, endPoints: glyph.endPoints, normalized: normalized)
+        else { return outline(forGlyph: index) }
+        let xs = zip(glyph.xs, deltas.dx).map(+)
+        let ys = zip(glyph.ys, deltas.dy).map(+)
+        return buildSimplePath(xs: xs, ys: ys, flags: glyph.flags, endPoints: glyph.endPoints)
+    }
+
+    /// Normalizes user-space variation values to the [-1, 1] axis space, applying `avar` if present.
+    /// Returns nil when the font is static.
+    private func normalizedVariationCoordinates(_ variations: [String: Double]) -> [Double]? {
+        let axes = variationAxes
+        guard !axes.isEmpty else { return nil }
+        let coords = axes.map { axis -> Double in
+            let value = min(max(variations[axis.tag] ?? axis.defaultValue, axis.minValue), axis.maxValue)
+            if value < axis.defaultValue {
+                return axis.defaultValue > axis.minValue ? -(axis.defaultValue - value) / (axis.defaultValue - axis.minValue) : 0
+            } else if value > axis.defaultValue {
+                return axis.maxValue > axis.defaultValue ? (value - axis.defaultValue) / (axis.maxValue - axis.defaultValue) : 0
+            }
+            return 0
+        }
+        return applyAvar(coords)
+    }
+
+    /// Remaps normalized coordinates through the `avar` segment maps, leaving them unchanged when the
+    /// table is absent or its axis count disagrees.
+    private func applyAvar(_ coords: [Double]) -> [Double] {
+        guard let avar = tables["avar"],
+              let axisCount = Self.u16(data, at: avar.offset + 6), axisCount == coords.count
+        else { return coords }
+        var cursor = avar.offset + 8
+        var result = coords
+        for axis in 0 ..< axisCount {
+            guard let mapCount = Self.u16(data, at: cursor) else { return coords }
+            cursor += 2
+            var pairs: [(from: Double, to: Double)] = []
+            for _ in 0 ..< mapCount {
+                guard let from = Self.f2dot14(data, at: cursor), let to = Self.f2dot14(data, at: cursor + 2) else { return coords }
+                pairs.append((from, to))
+                cursor += 4
+            }
+            result[axis] = remapAvar(result[axis], pairs: pairs)
+        }
+        return result
+    }
+
+    private func remapAvar(_ value: Double, pairs: [(from: Double, to: Double)]) -> Double {
+        guard pairs.count >= 2, let first = pairs.first, let last = pairs.last else { return value }
+        if value <= first.from { return first.to }
+        if value >= last.from { return last.to }
+        for index in 1 ..< pairs.count {
+            let lo = pairs[index - 1], hi = pairs[index]
+            if value >= lo.from, value <= hi.from {
+                guard hi.from > lo.from else { return lo.to }
+                return lo.to + (value - lo.from) / (hi.from - lo.from) * (hi.to - lo.to)
+            }
+        }
+        return value
+    }
+
+    /// Accumulates the `gvar` deltas for one glyph at `normalized`, returning per-point x/y offsets in
+    /// font units. Returns nil when the glyph has no variation data (render it at the default).
+    private func gvarDeltas(glyph: Int, xs: [Double], ys: [Double], endPoints: [Int], normalized: [Double]) -> (dx: [Double], dy: [Double])? {
+        let pointCount = xs.count
+        guard let gvar = tables["gvar"],
+              let axisCount = Self.u16(data, at: gvar.offset + 4), axisCount == normalized.count,
+              let sharedTupleCount = Self.u16(data, at: gvar.offset + 6),
+              let sharedTuplesOffset = Self.u32(data, at: gvar.offset + 8),
+              let glyphCount = Self.u16(data, at: gvar.offset + 12),
+              let flags = Self.u16(data, at: gvar.offset + 14),
+              let dataArrayOffset = Self.u32(data, at: gvar.offset + 16),
+              glyph < glyphCount
+        else { return nil }
+
+        let longOffsets = flags & 0x0001 != 0
+        let offsetsBase = gvar.offset + 20
+        let dataStartRel: Int
+        let dataEndRel: Int
+        if longOffsets {
+            guard let start = Self.u32(data, at: offsetsBase + glyph * 4),
+                  let end = Self.u32(data, at: offsetsBase + (glyph + 1) * 4) else { return nil }
+            (dataStartRel, dataEndRel) = (start, end)
+        } else {
+            guard let start = Self.u16(data, at: offsetsBase + glyph * 2),
+                  let end = Self.u16(data, at: offsetsBase + (glyph + 1) * 2) else { return nil }
+            (dataStartRel, dataEndRel) = (start * 2, end * 2)
+        }
+        guard dataEndRel > dataStartRel else { return nil } // no deltas for this glyph
+        let glyphDataStart = gvar.offset + dataArrayOffset + dataStartRel
+
+        guard let tupleCountRaw = Self.u16(data, at: glyphDataStart),
+              let serializedOffset = Self.u16(data, at: glyphDataStart + 2) else { return nil }
+        let tupleCount = tupleCountRaw & 0x0FFF
+        let totalPoints = pointCount + 4 // 4 trailing phantom points
+        var serializedCursor = glyphDataStart + serializedOffset
+
+        var sharedPoints: [Int]?
+        if tupleCountRaw & 0x8000 != 0 { // SHARED_POINT_NUMBERS
+            guard let (points, consumed) = readPackedPointNumbers(at: serializedCursor, totalPoints: totalPoints) else { return nil }
+            sharedPoints = points
+            serializedCursor += consumed
+        }
+
+        var accDx = [Double](repeating: 0, count: pointCount)
+        var accDy = [Double](repeating: 0, count: pointCount)
+        var headerCursor = glyphDataStart + 4
+
+        for _ in 0 ..< tupleCount {
+            guard let variationDataSize = Self.u16(data, at: headerCursor),
+                  let tupleIndex = Self.u16(data, at: headerCursor + 2) else { return nil }
+            headerCursor += 4
+
+            var peak = [Double](repeating: 0, count: axisCount)
+            if tupleIndex & 0x8000 != 0 { // EMBEDDED_PEAK_TUPLE
+                for axis in 0 ..< axisCount {
+                    guard let value = Self.f2dot14(data, at: headerCursor) else { return nil }
+                    peak[axis] = value
+                    headerCursor += 2
+                }
+            } else {
+                let sharedIndex = tupleIndex & 0x0FFF
+                guard sharedIndex < sharedTupleCount else { return nil }
+                let base = gvar.offset + sharedTuplesOffset + sharedIndex * axisCount * 2
+                for axis in 0 ..< axisCount {
+                    guard let value = Self.f2dot14(data, at: base + axis * 2) else { return nil }
+                    peak[axis] = value
+                }
+            }
+
+            var intermediateStart: [Double]?
+            var intermediateEnd: [Double]?
+            if tupleIndex & 0x4000 != 0 { // INTERMEDIATE_REGION
+                var lower = [Double](repeating: 0, count: axisCount)
+                var upper = [Double](repeating: 0, count: axisCount)
+                for axis in 0 ..< axisCount {
+                    guard let value = Self.f2dot14(data, at: headerCursor) else { return nil }
+                    lower[axis] = value
+                    headerCursor += 2
+                }
+                for axis in 0 ..< axisCount {
+                    guard let value = Self.f2dot14(data, at: headerCursor) else { return nil }
+                    upper[axis] = value
+                    headerCursor += 2
+                }
+                intermediateStart = lower
+                intermediateEnd = upper
+            }
+
+            let blockStart = serializedCursor
+            serializedCursor += variationDataSize
+            let scalar = tupleScalar(peak: peak, start: intermediateStart, end: intermediateEnd, normalized: normalized)
+            if scalar == 0 { continue }
+
+            var dataCursor = blockStart
+            let pointSet: [Int]
+            if tupleIndex & 0x2000 != 0 { // PRIVATE_POINT_NUMBERS
+                guard let (points, consumed) = readPackedPointNumbers(at: dataCursor, totalPoints: totalPoints) else { return nil }
+                pointSet = points
+                dataCursor += consumed
+            } else if let sharedPoints {
+                pointSet = sharedPoints
+            } else {
+                pointSet = Array(0 ..< totalPoints)
+            }
+
+            guard let (dxDeltas, dxConsumed) = readPackedDeltas(at: dataCursor, count: pointSet.count) else { return nil }
+            dataCursor += dxConsumed
+            guard let (dyDeltas, _) = readPackedDeltas(at: dataCursor, count: pointSet.count) else { return nil }
+
+            accumulateTupleDeltas(
+                pointSet: pointSet, dx: dxDeltas, dy: dyDeltas, scalar: scalar,
+                xs: xs, ys: ys, endPoints: endPoints, accDx: &accDx, accDy: &accDy
+            )
+        }
+        return (accDx, accDy)
+    }
+
+    /// The interpolation scalar for one tuple at `normalized` (the canonical per-axis tent product:
+    /// a peak of 0 leaves an axis out, a current coordinate of 0 against a nonzero peak zeroes the
+    /// tuple, and intermediate regions use their explicit start/end bounds).
+    private func tupleScalar(peak: [Double], start: [Double]?, end: [Double]?, normalized: [Double]) -> Double {
+        var scalar = 1.0
+        for axis in 0 ..< peak.count {
+            let peakValue = peak[axis]
+            let coordinate = normalized[axis]
+            if peakValue == 0 { continue }
+            if coordinate == 0 { return 0 }
+            if coordinate == peakValue { continue }
+            if let start, let end {
+                let lower = start[axis], upper = end[axis]
+                if coordinate < lower || coordinate > upper { return 0 }
+                if coordinate < peakValue {
+                    if peakValue != lower { scalar *= (coordinate - lower) / (peakValue - lower) }
+                } else if upper != peakValue {
+                    scalar *= (upper - coordinate) / (upper - peakValue)
+                }
+            } else {
+                if coordinate < min(0, peakValue) || coordinate > max(0, peakValue) { return 0 }
+                scalar *= coordinate / peakValue
+            }
+        }
+        return scalar
+    }
+
+    /// Reads a packed point-number list (gvar/cvar). A leading count of 0 means "all points".
+    private func readPackedPointNumbers(at offset: Int, totalPoints: Int) -> (points: [Int], consumed: Int)? {
+        guard let first = Self.u8(data, at: offset) else { return nil }
+        var cursor = offset + 1
+        let count: Int
+        if first & 0x80 != 0 {
+            guard let second = Self.u8(data, at: cursor) else { return nil }
+            count = ((first & 0x7F) << 8) | second
+            cursor += 1
+        } else {
+            count = first
+        }
+        if count == 0 { return (Array(0 ..< totalPoints), cursor - offset) }
+
+        var points: [Int] = []
+        var value = 0
+        while points.count < count {
+            guard let control = Self.u8(data, at: cursor) else { return nil }
+            cursor += 1
+            let runCount = (control & 0x7F) + 1
+            let wordSized = control & 0x80 != 0
+            for _ in 0 ..< runCount where points.count < count {
+                if wordSized {
+                    guard let delta = Self.u16(data, at: cursor) else { return nil }
+                    cursor += 2
+                    value += delta
+                } else {
+                    guard let delta = Self.u8(data, at: cursor) else { return nil }
+                    cursor += 1
+                    value += delta
+                }
+                points.append(value)
+            }
+        }
+        return (points, cursor - offset)
+    }
+
+    /// Reads a run-length-packed delta array of `count` signed values (gvar X then Y blocks).
+    private func readPackedDeltas(at offset: Int, count: Int) -> (deltas: [Int], consumed: Int)? {
+        var deltas: [Int] = []
+        var cursor = offset
+        while deltas.count < count {
+            guard let control = Self.u8(data, at: cursor) else { return nil }
+            cursor += 1
+            let runCount = (control & 0x3F) + 1
+            if control & 0x80 != 0 { // DELTAS_ARE_ZERO
+                for _ in 0 ..< runCount where deltas.count < count {
+                    deltas.append(0)
+                }
+            } else if control & 0x40 != 0 { // DELTAS_ARE_WORDS
+                for _ in 0 ..< runCount where deltas.count < count {
+                    guard let delta = Self.i16(data, at: cursor) else { return nil }
+                    cursor += 2
+                    deltas.append(delta)
+                }
+            } else {
+                for _ in 0 ..< runCount where deltas.count < count {
+                    guard let delta = Self.i8(data, at: cursor) else { return nil }
+                    cursor += 1
+                    deltas.append(delta)
+                }
+            }
+        }
+        return (deltas, cursor - offset)
+    }
+
+    /// Applies one tuple's deltas to the accumulators: explicit deltas on the touched points (phantom
+    /// points, index >= pointCount, are dropped), then IUP-interpolated deltas on the untouched ones.
+    private func accumulateTupleDeltas(
+        pointSet: [Int], dx: [Int], dy: [Int], scalar: Double,
+        xs: [Double], ys: [Double], endPoints: [Int],
+        accDx: inout [Double], accDy: inout [Double]
+    ) {
+        let pointCount = xs.count
+        var touched = [Bool](repeating: false, count: pointCount)
+        var tdx = [Double](repeating: 0, count: pointCount)
+        var tdy = [Double](repeating: 0, count: pointCount)
+        for (index, point) in pointSet.enumerated() where point < pointCount && index < dx.count && index < dy.count {
+            touched[point] = true
+            tdx[point] = Double(dx[index])
+            tdy[point] = Double(dy[index])
+        }
+        if touched.contains(false) {
+            var start = 0
+            for end in endPoints {
+                if end >= start, end < pointCount {
+                    let range = Array(start ... end)
+                    iupContour(range: range, coords: xs, touched: touched, deltas: &tdx)
+                    iupContour(range: range, coords: ys, touched: touched, deltas: &tdy)
+                }
+                start = end + 1
+            }
+        }
+        for index in 0 ..< pointCount {
+            accDx[index] += scalar * tdx[index]
+            accDy[index] += scalar * tdy[index]
+        }
+    }
+
+    /// Interpolates one contour's untouched-point deltas (IUP) for a single coordinate axis, using the
+    /// touched points on either side along the contour as references.
+    private func iupContour(range: [Int], coords: [Double], touched: [Bool], deltas: inout [Double]) {
+        let count = range.count
+        let touchedLocal = (0 ..< count).filter { touched[range[$0]] }
+        guard !touchedLocal.isEmpty else { return } // no references: leave deltas at 0
+        for slot in 0 ..< touchedLocal.count {
+            let firstTouched = touchedLocal[slot]
+            let nextTouched = touchedLocal[(slot + 1) % touchedLocal.count]
+            var local = (firstTouched + 1) % count
+            while local != nextTouched {
+                let point = range[local]
+                deltas[point] = iupValue(
+                    coords[point],
+                    reference1: coords[range[firstTouched]], delta1: deltas[range[firstTouched]],
+                    reference2: coords[range[nextTouched]], delta2: deltas[range[nextTouched]]
+                )
+                local = (local + 1) % count
+            }
+        }
+    }
+
+    private func iupValue(_ coordinate: Double, reference1: Double, delta1: Double, reference2: Double, delta2: Double) -> Double {
+        if reference1 == reference2 { return delta1 == delta2 ? delta1 : 0 }
+        let lower = reference1 < reference2 ? (reference1, delta1) : (reference2, delta2)
+        let upper = reference1 < reference2 ? (reference2, delta2) : (reference1, delta1)
+        if coordinate <= lower.0 { return lower.1 }
+        if coordinate >= upper.0 { return upper.1 }
+        return lower.1 + (coordinate - lower.0) / (upper.0 - lower.0) * (upper.1 - lower.1)
+    }
+
     private func glyphRange(_ index: Int) -> (offset: Int, length: Int)? {
         guard index >= 0, index < numberOfGlyphs,
               let loca = tables["loca"], let glyf = tables["glyf"]
@@ -429,6 +775,13 @@ public struct Font: Equatable, Sendable {
     }
 
     private func simpleOutline(at glyphOffset: Int, contourCount: Int) -> Path? {
+        guard let glyph = simpleGlyphPoints(at: glyphOffset, contourCount: contourCount) else { return nil }
+        return buildSimplePath(xs: glyph.xs, ys: glyph.ys, flags: glyph.flags, endPoints: glyph.endPoints)
+    }
+
+    /// Decodes the raw on/off-curve points of a simple glyph (the form `gvar` deltas apply to,
+    /// before the contour is reconstructed). `xs`/`ys` are in font units; `flags` bit 0 is on-curve.
+    private func simpleGlyphPoints(at glyphOffset: Int, contourCount: Int) -> (xs: [Double], ys: [Double], flags: [Int], endPoints: [Int])? {
         var cursor = glyphOffset + 10
         var endPoints: [Int] = []
         for _ in 0 ..< contourCount {
@@ -485,7 +838,11 @@ public struct Font: Equatable, Sendable {
             }
             ys.append(Double(y))
         }
+        return (xs, ys, flags, endPoints)
+    }
 
+    private func buildSimplePath(xs: [Double], ys: [Double], flags: [Int], endPoints: [Int]) -> Path? {
+        let pointCount = xs.count
         var path = Path()
         var contourStart = 0
         for contourEnd in endPoints {
@@ -611,6 +968,11 @@ public struct Font: Equatable, Sendable {
     private static func u8(_ bytes: [UInt8], at offset: Int) -> Int? {
         guard offset >= 0, offset < bytes.count else { return nil }
         return Int(bytes[offset])
+    }
+
+    private static func i8(_ bytes: [UInt8], at offset: Int) -> Int? {
+        guard let raw = u8(bytes, at: offset) else { return nil }
+        return raw > 0x7F ? raw - 0x100 : raw
     }
 
     private static func u16(_ bytes: [UInt8], at offset: Int) -> Int? {
