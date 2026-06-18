@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-06-18
+
+### Fixed
+
+- Nested clips now intersect (not union) across every renderer. `71349c0` fixed gradients
+  in `BitmapRenderer`; this completes it for fills/strokes/images there and extends the same
+  correction to `CoreGraphicsRenderer`, `PDFRenderer`, `CanvasRenderer`, `PostScriptRenderer`,
+  and `SVGRenderer`, all of which clipped to the unioned `GraphicState.clipPath`. Content
+  inside one clip but outside the intersection of a nested clip stack no longer floods
+  through, restoring the Bitmap == CoreGraphics invariant on nested clips. Adds a
+  cross-renderer parity test (`nestedClipsIntersectAcrossRenderers`) and an SVG nesting test.
+- Removed a force-unwrap in the CoreGraphics gradient fallback.
+
 ## [0.8.3] - 2026-06-15
 
 Version-only bump to stay in lockstep with PureLayer 0.8.3 (which adds gated wraparound stroke
