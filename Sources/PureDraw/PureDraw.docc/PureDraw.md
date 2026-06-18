@@ -29,6 +29,12 @@ Core → Renderers**, re-exported together as the `PureDraw` umbrella.
 
 ## Topics
 
+### Essentials
+
+- <doc:GettingStarted>
+- <doc:ChoosingARenderer>
+- <doc:DecodingImagesAndFonts>
+
 ### Drawing
 
 - ``GraphicsContext``
