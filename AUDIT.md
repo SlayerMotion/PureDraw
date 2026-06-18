@@ -82,3 +82,20 @@ Decision pending from user: file these vs fix in code.
 
 ---
 Filed as GitHub issues #111-#117 on 2026-06-16.
+
+## Resolution (2026-06-18, shipped in PureDraw 1.0.2)
+
+Crash-class + clear-win findings fixed: #6 (SVG viewBox isFinite), #8 (PNGEncoder
+frameDelay sanitized), #10 (Pattern validator), #12/#13 (explicit NaN in color/gradient-stop
+validators), #14 (rectIsFinite checks origin), #16 (CoverageRasterizer all extents finite),
+#17 (PostScript bounding-box isFinite). The separately-discovered nested-clip union bug
+across all renderers shipped in 1.0.1.
+
+Deferred (genuine owner decisions, not yet done):
+- #2 / #9: dimension validation in SVG/Canvas/PostScript/PDF renderers. The non-finite
+  CRASH is already prevented (above); making the renderers REJECT zero/negative/non-finite
+  dimensions is a behavior change (throwing where they currently emit degenerate-but-valid
+  output) that could break existing callers, so it needs a deliberate call.
+- #11: ImageMetadata GPS lat/long range validation. ImageMetadata is not part of the
+  validated document tree (the walker never reaches it), so a validator there adds little
+  until metadata validation is wired in; low impact (cosmetic metadata).
