@@ -9,6 +9,7 @@ import Geometry
 /// point on the page. The rect is in user space (top-left origin) and is
 /// converted to PDF coordinates on write.
 public struct PDFLink: Equatable, Sendable {
+    /// Where the link leads: an external URI, or an internal jump to a point on the page.
     public enum Target: Equatable, Sendable {
         case url(String)
         case destination(Point)

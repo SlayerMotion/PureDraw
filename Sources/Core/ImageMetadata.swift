@@ -8,6 +8,7 @@
 /// text chunks. Parsing is tolerant: unknown chunks, markers, and tags are
 /// skipped, and malformed structures yield `nil` rather than trapping.
 public struct ImageMetadata: Equatable, Sendable {
+    /// The image container the metadata was read from.
     public enum Format: String, Equatable, Sendable {
         case png
         case jpeg

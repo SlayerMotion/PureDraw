@@ -8,6 +8,7 @@
 /// and `data:` URIs wrapping a base64 PNG. JPEG and uncommon PNG variants (16-bit, interlaced)
 /// are reported as unsupported rather than guessed, so a caller knows decoding did not happen.
 public enum ImageDecoder {
+    /// Why decoding failed: an unhandled format, or recognized bytes that are malformed.
     public enum Error: Swift.Error, Equatable {
         /// The bytes are not a format this decoder handles (e.g. JPEG).
         case unsupportedFormat(String)

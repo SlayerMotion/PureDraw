@@ -8,6 +8,7 @@ import Validation
 
 /// Represents an immutable, recorded drawing command that binds geometry with its drawing state.
 public struct DrawOperation: Equatable, Sendable, Validatable {
+    /// The specific drawing command this operation records, together with its geometry.
     public enum Kind: Equatable, Sendable {
         case fill(Path, rule: FillRule)
         case stroke(Path)

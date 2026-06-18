@@ -9,6 +9,7 @@
 /// directory; decoding is the inverse of that wrapping. The metadata and private blocks are
 /// ignored. WOFF2 (Brotli + a transformed glyf/loca) is a separate format and not handled here.
 public enum WOFFDecoder {
+    /// Why decoding failed: the input is not a WOFF, or it is malformed or truncated.
     public enum Error: Swift.Error, Equatable {
         case notWOFF
         case malformed(String)
