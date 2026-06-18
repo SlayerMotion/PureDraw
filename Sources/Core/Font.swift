@@ -395,21 +395,48 @@ public struct Font: Equatable, Sendable {
 
     /// The outline of `index` interpolated to a variation instance, mapping axis tag to a
     /// user-space coordinate (axes you omit stay at their default value) (PureDraw #77). It applies
-    /// `gvar` deltas to the simple-glyph points, with coordinate normalization honoring `avar` when
-    /// present, so the result matches the platform shaper. Falls back to the default outline when
-    /// the font is static, the glyph is composite, or the glyph carries no variation data. Composite
-    /// glyphs are not yet varied (their component offsets render at the default instance).
+    /// `gvar` deltas to simple-glyph points and to composite-glyph component offsets, with coordinate
+    /// normalization honoring `avar` when present, so the result matches the platform shaper. Falls
+    /// back to the default outline when the font is static or the glyph carries no variation data.
     public func outline(forGlyph index: Int, variations: [String: Double]) -> Path? {
-        guard tables["gvar"] != nil,
-              let normalized = normalizedVariationCoordinates(variations),
-              let range = glyphRange(index),
-              let contourCount = Self.i16(data, at: range.offset), contourCount >= 0,
-              let glyph = simpleGlyphPoints(at: range.offset, contourCount: contourCount),
-              let deltas = gvarDeltas(glyph: index, xs: glyph.xs, ys: glyph.ys, endPoints: glyph.endPoints, normalized: normalized)
-        else { return outline(forGlyph: index) }
-        let xs = zip(glyph.xs, deltas.dx).map(+)
-        let ys = zip(glyph.ys, deltas.dy).map(+)
-        return buildSimplePath(xs: xs, ys: ys, flags: glyph.flags, endPoints: glyph.endPoints)
+        guard tables["gvar"] != nil, let normalized = normalizedVariationCoordinates(variations) else {
+            return outline(forGlyph: index)
+        }
+        return variedOutline(forGlyph: index, normalized: normalized, depth: 0) ?? outline(forGlyph: index)
+    }
+
+    private func variedOutline(forGlyph index: Int, normalized: [Double], depth: Int) -> Path? {
+        guard depth < 6, let range = glyphRange(index), let contourCount = Self.i16(data, at: range.offset) else { return nil }
+        if contourCount >= 0 {
+            guard let glyph = simpleGlyphPoints(at: range.offset, contourCount: contourCount) else { return nil }
+            guard let deltas = gvarDeltas(glyph: index, xs: glyph.xs, ys: glyph.ys, endPoints: glyph.endPoints, normalized: normalized) else {
+                return buildSimplePath(xs: glyph.xs, ys: glyph.ys, flags: glyph.flags, endPoints: glyph.endPoints)
+            }
+            let xs = zip(glyph.xs, deltas.dx).map(+)
+            let ys = zip(glyph.ys, deltas.dy).map(+)
+            return buildSimplePath(xs: xs, ys: ys, flags: glyph.flags, endPoints: glyph.endPoints)
+        }
+        return variedCompositeOutline(at: range.offset, glyph: index, normalized: normalized, depth: depth)
+    }
+
+    /// A composite glyph at a variation instance: `gvar` supplies one delta per component that shifts
+    /// its x/y offset (there is no contour interpolation for composites), and each component is itself
+    /// interpolated. Point-matched components (not offset-based) cannot have their anchors varied, so
+    /// such a glyph falls back to its default composite outline.
+    private func variedCompositeOutline(at glyphOffset: Int, glyph index: Int, normalized: [Double], depth: Int) -> Path? {
+        guard let components = compositeComponents(at: glyphOffset) else { return nil }
+        guard components.allSatisfy(\.argsAreXY) else { return compositeOutline(at: glyphOffset, depth: depth) }
+        let placeholder = [Double](repeating: 0, count: components.count)
+        let deltas = gvarDeltas(glyph: index, xs: placeholder, ys: placeholder, endPoints: [], normalized: normalized) ?? (dx: placeholder, dy: placeholder)
+        var path = Path()
+        for (componentIndex, component) in components.enumerated() {
+            guard let sub = variedOutline(forGlyph: component.glyphIndex, normalized: normalized, depth: depth + 1) else { continue }
+            let ddx = componentIndex < deltas.dx.count ? deltas.dx[componentIndex] : 0
+            let ddy = componentIndex < deltas.dy.count ? deltas.dy[componentIndex] : 0
+            let transform = component.scale.concatenating(.translation(x: component.dx + ddx, y: component.dy + ddy))
+            path.addPath(sub.applying(transform))
+        }
+        return path
     }
 
     /// Normalizes user-space variation values to the [-1, 1] axis space, applying `avar` if present.
@@ -903,9 +930,23 @@ public struct Font: Equatable, Sendable {
     }
 
     private func compositeOutline(at glyphOffset: Int, depth: Int) -> Path? {
-        var cursor = glyphOffset + 10
+        guard let components = compositeComponents(at: glyphOffset) else { return nil }
         var path = Path()
+        for component in components {
+            if let sub = outline(forGlyph: component.glyphIndex, depth: depth + 1) {
+                let transform = component.scale.concatenating(.translation(x: component.dx, y: component.dy))
+                path.addPath(sub.applying(transform))
+            }
+        }
+        return path
+    }
 
+    /// Parses a composite glyph's component records: the referenced glyph, its 2x2 scale/transform,
+    /// and (for offset-based components) the x/y placement. `argsAreXY` is false for point-matched
+    /// components, whose anchors cannot be varied.
+    private func compositeComponents(at glyphOffset: Int) -> [(glyphIndex: Int, dx: Double, dy: Double, scale: AffineTransform, argsAreXY: Bool)]? {
+        var cursor = glyphOffset + 10
+        var components: [(glyphIndex: Int, dx: Double, dy: Double, scale: AffineTransform, argsAreXY: Bool)] = []
         while true {
             guard let flags = Self.u16(data, at: cursor),
                   let componentIndex = Self.u16(data, at: cursor + 2)
@@ -932,35 +973,31 @@ public struct Font: Equatable, Sendable {
                 }
             }
 
-            var transform = AffineTransform.identity
+            var scale = AffineTransform.identity
             if flags & 0x0008 != 0 { // WE_HAVE_A_SCALE
-                guard let scale = Self.f2dot14(data, at: cursor) else { return nil }
+                guard let value = Self.f2dot14(data, at: cursor) else { return nil }
                 cursor += 2
-                transform = AffineTransform(a: scale, b: 0, c: 0, d: scale, tx: 0, ty: 0)
+                scale = AffineTransform(a: value, b: 0, c: 0, d: value, tx: 0, ty: 0)
             } else if flags & 0x0040 != 0 { // X_AND_Y_SCALE
                 guard let scaleX = Self.f2dot14(data, at: cursor),
                       let scaleY = Self.f2dot14(data, at: cursor + 2) else { return nil }
                 cursor += 4
-                transform = AffineTransform(a: scaleX, b: 0, c: 0, d: scaleY, tx: 0, ty: 0)
+                scale = AffineTransform(a: scaleX, b: 0, c: 0, d: scaleY, tx: 0, ty: 0)
             } else if flags & 0x0080 != 0 { // TWO_BY_TWO
                 guard let a = Self.f2dot14(data, at: cursor),
                       let b = Self.f2dot14(data, at: cursor + 2),
                       let c = Self.f2dot14(data, at: cursor + 4),
                       let d = Self.f2dot14(data, at: cursor + 6) else { return nil }
                 cursor += 8
-                transform = AffineTransform(a: a, b: b, c: c, d: d, tx: 0, ty: 0)
-            }
-            transform = transform.concatenating(.translation(x: dx, y: dy))
-
-            if let component = outline(forGlyph: componentIndex, depth: depth + 1) {
-                path.addPath(component.applying(transform))
+                scale = AffineTransform(a: a, b: b, c: c, d: d, tx: 0, ty: 0)
             }
 
+            components.append((componentIndex, dx, dy, scale, argsAreXY))
             if flags & 0x0020 == 0 { // no MORE_COMPONENTS
                 break
             }
         }
-        return path
+        return components
     }
 
     // MARK: - Byte Reading

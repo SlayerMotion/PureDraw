@@ -140,10 +140,10 @@ struct VariableFontTests {
             return String(decoding: bytes, as: UTF8.self)
         }
 
-        /// Interpolates real glyph outlines along the weight axis and checks each against CoreText's
-        /// own instanced path (CTFontCreatePathForGlyph). Glyphs that vary in CoreText but not in the
-        /// parser are composites, which are not yet varied, and are skipped; the test requires that at
-        /// least two simple glyphs were actually compared so it cannot pass vacuously.
+        /// Interpolates real glyph outlines (both simple and composite) along the weight axis and
+        /// checks each against CoreText's own instanced path (CTFontCreatePathForGlyph). The test
+        /// requires several glyphs to be compared so it cannot pass vacuously, and asserts that almost
+        /// no glyph CoreText varies is left flat by the parser (which would signal broken variation).
         @Test func gvarOutlineMatchesCoreText() throws {
             let path = "/System/Library/Fonts/NewYork.ttf"
             guard let data = FileManager.default.contents(atPath: path) else { return }
@@ -158,8 +158,11 @@ struct VariableFontTests {
             let axisID = fourCharInt("wght")
             let tolerance = 3.0 // font units; correct interpolation differs only by fixed-point rounding
 
+            // A mix of simple glyphs and accented letters (built as composites in this font), so both
+            // the simple-contour and composite-offset variation paths are exercised against CoreText.
             var compared = 0
-            for scalar in "HILTEFowlmnu1470".unicodeScalars {
+            var coreTextVariedButFlat = 0 // CoreText varies it but the parser does not (should be rare)
+            for scalar in "HILTEFowlmnu1470áàâäéèêëíîïóôöúûüñç".unicodeScalars {
                 guard let glyph = font.glyphIndex(for: scalar),
                       let mineInstance = font.outline(forGlyph: glyph, variations: variations),
                       let mineDefault = font.outline(forGlyph: glyph),
@@ -170,7 +173,9 @@ struct VariableFontTests {
                 let ctVaried = boxDistance(ctInstance.boundingBoxOfPath, ctDefault.boundingBoxOfPath) > tolerance
                 let myVaried = hausdorff(pathPoints(mineInstance), pathPoints(mineDefault)) > tolerance
                 guard ctVaried else { continue } // glyph is invariant under weight: nothing to check
-                if !myVaried { continue } // composite (not yet varied) or no simple-glyph deltas: skip
+                if !myVaried { coreTextVariedButFlat += 1
+                    continue
+                } // only point-matched composites should land here
 
                 let myPoints = pathPoints(mineInstance)
                 let ctPoints = cgPathPoints(ctInstance)
@@ -181,11 +186,12 @@ struct VariableFontTests {
                 let ctBox = ctInstance.boundingBoxOfPath
                 #expect(boxDistance(myBox, ctBox) < tolerance, "glyph \(glyph): bounds diverge from CoreText")
 
-                // At the default instance the interpolation must be a no-op for a simple glyph.
+                // At the default instance the interpolation must be a no-op.
                 #expect(font.outline(forGlyph: glyph, variations: [:]) == mineDefault, "default instance must equal the static outline")
                 compared += 1
             }
-            #expect(compared >= 2, "expected to compare at least two simple varied glyphs against CoreText")
+            #expect(compared >= 4, "expected to compare several varied glyphs against CoreText")
+            #expect(coreTextVariedButFlat <= 1, "CoreText varies glyphs the parser leaves flat: composite variation may be broken")
         }
 
         private func ctGlyphPath(_ cgFont: CGFont, glyph: Int, size: Double, axis: Int, value: Double) -> CGPath? {
