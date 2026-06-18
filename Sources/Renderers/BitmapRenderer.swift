@@ -613,6 +613,17 @@ public final class BitmapRenderer: Renderer, Sendable {
             outB = srcB * (1.0 - dstA) + dstB * (1.0 - srcA) + blendedAlpha * m.b
         }
 
+        /// Porter-Duff source/destination compositing operators (Compositing and Blending
+        /// Level 1, §5.1). Each is `co = Fa·cs + Fb·cd`, `αo = Fa·αs + Fb·αd`, on the
+        /// premultiplied operands (so cs/cd already carry their alpha), with the coverage
+        /// coefficients (Fa, Fb) per operator. source-over/clear/copy are handled explicitly.
+        func porterDuff(_ fa: Double, _ fb: Double) {
+            outA = fa * srcA + fb * dstA
+            outR = fa * srcR + fb * dstR
+            outG = fa * srcG + fb * dstG
+            outB = fa * srcB + fb * dstB
+        }
+
         switch state.blendMode {
         case .normal:
             outA = srcA + dstA * (1.0 - srcA)
@@ -698,11 +709,33 @@ public final class BitmapRenderer: Renderer, Sendable {
         case .luminosity:
             nonSeparable { cs, cb in setLum(cb, lum(cs)) }
 
+        case .sourceIn:
+            porterDuff(dstA, 0) // source where destination is opaque
+
+        case .sourceOut:
+            porterDuff(1.0 - dstA, 0) // source where destination is transparent
+
+        case .sourceAtop:
+            porterDuff(dstA, 1.0 - srcA) // source over destination, clipped to destination
+
+        case .destinationOver:
+            porterDuff(1.0 - dstA, 1.0) // destination over source
+
+        case .destinationIn:
+            porterDuff(0, srcA) // destination where source is opaque
+
+        case .destinationOut:
+            porterDuff(0, 1.0 - srcA) // destination where source is transparent
+
+        case .destinationAtop:
+            porterDuff(1.0 - dstA, srcA) // destination over source, clipped to source
+
+        case .xor:
+            porterDuff(1.0 - dstA, 1.0 - srcA) // source and destination where the other is absent
+
         default:
-            // The remaining Porter-Duff source/destination compositing operators
-            // (source-in/out/atop, destination-*, xor) are not yet implemented in the
-            // software rasterizer; they composite source-over until they are. The
-            // CoreGraphicsRenderer path handles them via the native CGBlendMode.
+            // Defensive fallback for any future BlendMode case: composite source-over.
+            // All modes the enum currently defines are handled above.
             outA = srcA + dstA * (1.0 - srcA)
             outR = srcR + dstR * (1.0 - srcA)
             outG = srcG + dstG * (1.0 - srcA)

@@ -141,4 +141,20 @@ struct CrossRendererConsistencyTests {
             try expectConsistent(c, tolerance: 18, "non-separable blend \(mode)")
         }
     }
+
+    @Test func porterDuffBlendConsistent() throws {
+        // The Porter-Duff source/destination compositing operators (#111) are implemented in
+        // BitmapRenderer; cross-check against CoreGraphics's native CGBlendMode. A partially
+        // overlapping, partially transparent foreground exercises the alpha coverage terms.
+        let modes: [BlendMode] = [.sourceIn, .sourceOut, .sourceAtop, .destinationOver, .destinationIn, .destinationOut, .destinationAtop, .xor]
+        for mode in modes {
+            var c = GraphicsContext()
+            c.setFillColor(Color(red: 0.2, green: 0.6, blue: 0.9, alpha: 0.85)) // destination
+            c.fill(Rect(x: 8, y: 8, width: 44, height: 44))
+            c.setBlendMode(mode)
+            c.setFillColor(Color(red: 0.95, green: 0.4, blue: 0.15, alpha: 0.8)) // source, overlapping
+            c.fill(Rect(x: 28, y: 28, width: 44, height: 44))
+            try expectConsistent(c, tolerance: 14, "Porter-Duff \(mode)")
+        }
+    }
 }
