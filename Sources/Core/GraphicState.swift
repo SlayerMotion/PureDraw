@@ -50,12 +50,16 @@ public struct GraphicState: Equatable, Sendable, Validatable {
     /// which a single combined path loses.
     public var clipPaths: [Path]
 
-    /// The clip as a single path: the clip paths appended in order. Faithful for
-    /// content bounded by its own coverage (a fill, stroke, image, or glyph is the
-    /// intersection with its own shape, so a containing clip is harmless even when
-    /// represented as a union). Gradient rasterization, bounded by the clip alone,
-    /// intersects ``clipPaths`` directly instead, so a clip stacked on an ancestor
-    /// clip does not flood. Setting this replaces the whole stack with one path.
+    /// The clip stack appended into a single path: a UNION, not the intersection that
+    /// nested clipping actually means. This is retained only for renderers that emit
+    /// clips through their own machinery (CoreGraphics/PDF/SVG/Canvas/PostScript clip a
+    /// path per op) and for `Layer`/`Pattern` inheritance. `BitmapRenderer` does NOT use
+    /// it: it intersects ``clipPaths`` directly for gradients AND for fills/strokes/images
+    /// (the latter via `intersectedClipCoverage`), because the once-assumed "self-bounded
+    /// content is unaffected by the union" is false for nested clips: a fill inside an
+    /// inner clip but outside an outer one floods through the union. WARNING: any consumer
+    /// that rasterizes against this union inherits that nested-clip flood; intersect
+    /// ``clipPaths`` instead. Setting this replaces the whole stack with one path.
     public var clipPath: Path? {
         get {
             guard !clipPaths.isEmpty else { return nil }
