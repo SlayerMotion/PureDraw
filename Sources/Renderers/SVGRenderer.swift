@@ -17,11 +17,14 @@ public struct SVGRenderer: Renderer {
     /// The explicit height of the generated SVG. If nil, it is calculated from the bounds of the drawing.
     public let height: Double?
 
+    /// Creates an SVG renderer; an explicit width and height set the document's viewport, and a nil
+    /// value lets it derive from the drawing's bounds.
     public init(width: Double? = nil, height: Double? = nil) {
         self.width = width
         self.height = height
     }
 
+    /// Emits an SVG document reproducing the context's recorded operations.
     public func draw(_ context: GraphicsContext) throws -> String {
         // 1. Gather all unique clip paths and shadows
         var uniqueClipPaths: [[Path]] = [] // each entry is a clip STACK, intersected

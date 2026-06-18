@@ -30,6 +30,8 @@ public final class Pattern: @unchecked Sendable, Equatable {
     /// The cell's drawing surface; record commands into it.
     public var context: GraphicsContext
 
+    /// Creates a tiling pattern: a cell of size `bounds` repeated every `xStep`/`yStep` (defaulting to
+    /// the cell size). A colored pattern carries its own colors; an uncolored one is tinted at use.
     public init(bounds: Rect, xStep: Double? = nil, yStep: Double? = nil, isColored: Bool = true) {
         self.bounds = bounds
         self.xStep = xStep ?? bounds.width
@@ -38,12 +40,14 @@ public final class Pattern: @unchecked Sendable, Equatable {
         context = GraphicsContext()
     }
 
+    /// Patterns have reference identity; two are equal only when they are the same instance.
     public static func == (lhs: Pattern, rhs: Pattern) -> Bool {
         lhs === rhs
     }
 }
 
 extension Pattern: Validatable {
+    /// Validates that the cell bounds and tiling steps are finite and positive.
     public static var defaultValidator: Validator<Pattern> {
         Validator().validating(.patternIsValid)
     }

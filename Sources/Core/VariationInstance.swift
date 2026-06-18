@@ -14,6 +14,8 @@ public struct VariationInstance: Equatable, Sendable {
     /// The `name` table ID of the instance's PostScript name, when the font supplies one.
     public let postScriptNameID: Int?
 
+    /// Creates a named instance from its subfamily name ID, per-axis coordinates, and optional
+    /// PostScript name ID.
     public init(subfamilyNameID: Int, coordinates: [Double], postScriptNameID: Int?) {
         self.subfamilyNameID = subfamilyNameID
         self.coordinates = coordinates

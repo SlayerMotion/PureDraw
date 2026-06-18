@@ -18,6 +18,7 @@ public enum PNGEncoder {
         consumer.write(encode(image))
     }
 
+    /// Encodes an RGBA ``Image`` as the bytes of a PNG file.
     public static func encode(_ image: Image) -> [UInt8] {
         var png: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
         appendChunk(type: "IHDR", data: ihdr(width: image.width, height: image.height), to: &png)

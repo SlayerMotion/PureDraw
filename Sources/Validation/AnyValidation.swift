@@ -8,8 +8,10 @@
 /// It filters out subjects that do not match the expected runtime type.
 public struct AnyValidation<Document: Sendable>: Sendable {
     private let _apply: @Sendable (Any, [CodingKey], Document) -> [ValidationError]
+    /// A human-readable description of the wrapped validation rule.
     public let description: String
 
+    /// Type-erases a typed validation so it can be stored alongside rules for other subject types.
     public init<Subject>(_ validation: Validation<Document, Subject>) {
         description = validation.description
         _apply = { subject, codingPath, document in
@@ -21,6 +23,7 @@ public struct AnyValidation<Document: Sendable>: Sendable {
         }
     }
 
+    /// Applies the wrapped rule to `subject` if its runtime type matches, returning any failures.
     public func apply(to subject: Any, at codingPath: [CodingKey], in document: Document) -> [ValidationError] {
         _apply(subject, codingPath, document)
     }

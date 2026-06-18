@@ -7,12 +7,15 @@ import Validation
 
 /// Represents a linear or radial color gradient.
 public struct Gradient: Equatable, Sendable, Validatable {
+    /// The color stops, in ascending location order, that define the gradient.
     public var stops: [GradientStop]
 
+    /// Creates a gradient from its color stops.
     public init(stops: [GradientStop]) {
         self.stops = stops
     }
 
+    /// Validates that the stops are well formed and their locations are in range.
     public static var defaultValidator: Validator<Gradient> {
         Validator().validating(.gradientIsValid)
     }

@@ -7,6 +7,7 @@
 public struct Validator<Document: Sendable>: Sendable {
     private var validations: [AnyValidation<Document>]
 
+    /// Creates a validator holding the given rules (empty by default; add rules with `validating`).
     public init(validations: [AnyValidation<Document>] = []) {
         self.validations = validations
     }

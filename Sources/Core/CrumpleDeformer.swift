@@ -92,6 +92,7 @@ public extension Validation {
 }
 
 extension CrumpleDeformer: Validatable {
+    /// Validates that the center, radius, and strengths are finite and the radius is positive.
     public static var defaultValidator: Validator<CrumpleDeformer> {
         Validator().validating(.crumpleDeformerValuesAreFinite)
     }

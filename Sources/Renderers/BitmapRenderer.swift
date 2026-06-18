@@ -12,13 +12,17 @@ import Validation
 public final class BitmapRenderer: Renderer, Sendable {
     public typealias Output = Image
 
+    /// The output width in pixels.
     public let width: Int
+    /// The output height in pixels.
     public let height: Int
+    /// The color space the output pixels are produced in.
     public let colorSpace: ColorSpace
 
     /// Guards against unbounded recursion through self-referential layers.
     private let layerDepth: Int
 
+    /// Creates a rasterizer that renders into a `width` by `height` buffer.
     public init(width: Int, height: Int, colorSpace: ColorSpace = .deviceRGB) {
         self.width = width
         self.height = height
@@ -33,6 +37,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         self.layerDepth = layerDepth
     }
 
+    /// Rasterizes the context's recorded operations into an RGBA ``Image``.
     public func draw(_ context: GraphicsContext) throws -> Image {
         guard width > 0, height > 0 else {
             throw ValidationError(

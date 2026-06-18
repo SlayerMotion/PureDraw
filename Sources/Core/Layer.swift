@@ -17,17 +17,21 @@ import Geometry
 /// Layers compare by identity, like `CGLayer`. Finish recording before
 /// rendering; the class is not synchronized for concurrent mutation.
 public final class Layer: @unchecked Sendable, Equatable {
+    /// The layer's width in points.
     public let width: Double
+    /// The layer's height in points.
     public let height: Double
     /// The layer's own drawing surface; record commands into it.
     public var context: GraphicsContext
 
+    /// Creates an empty layer of the given size with its own graphics context.
     public init(width: Double, height: Double) {
         self.width = width
         self.height = height
         context = GraphicsContext()
     }
 
+    /// Layers have reference identity; two layers are equal only when they are the same instance.
     public static func == (lhs: Layer, rhs: Layer) -> Bool {
         lhs === rhs
     }

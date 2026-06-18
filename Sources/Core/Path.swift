@@ -38,6 +38,7 @@ public struct Path: Equatable, Sendable, Validatable {
         addRoundedRect(in: rect, cornerWidth: cornerWidth, cornerHeight: cornerHeight)
     }
 
+    /// Validates that the element sequence is well formed (each subpath opens with a move).
     public static var defaultValidator: Validator<Path> {
         Validator().validating(.pathStructureIsValid)
     }

@@ -15,6 +15,8 @@ public struct CanvasRenderer: Renderer {
     /// The name of the HTML5 Canvas 2D context variable in the generated JavaScript code (default: "ctx").
     public let contextName: String
 
+    /// Creates a renderer that emits drawing calls against a 2D canvas context variable of the
+    /// given name.
     public init(contextName: String = "ctx") {
         self.contextName = contextName
     }
@@ -34,6 +36,7 @@ public struct CanvasRenderer: Renderer {
         return name.dropFirst().allSatisfy(isPart)
     }
 
+    /// Emits a script that reproduces the picture through the 2D canvas drawing API.
     public func draw(_ context: GraphicsContext) throws -> String {
         guard Self.isValidJSIdentifier(contextName) else {
             throw ValidationError(

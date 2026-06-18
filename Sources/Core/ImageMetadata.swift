@@ -15,8 +15,11 @@ public struct ImageMetadata: Equatable, Sendable {
         case tiff
     }
 
+    /// The container the metadata was read from.
     public let format: Format
+    /// The image width in pixels, when the container declares it.
     public let pixelWidth: Int?
+    /// The image height in pixels, when the container declares it.
     public let pixelHeight: Int?
     /// EXIF orientation (tag 0x0112), 1 through 8.
     public let orientation: Int?

@@ -11,15 +11,19 @@ import Geometry
 public struct PDFRenderer: Renderer {
     public typealias Output = Data
 
+    /// The page width in points.
     public let width: Double
+    /// The page height in points.
     public let height: Double
 
-    /// Optional page boundary boxes, in user space (top-left origin); they
-    /// convert to PDF coordinates on write. The media box is always the full
-    /// page.
+    /// The crop box: the visible page region. Optional page boundary boxes are in user space
+    /// (top-left origin) and convert to PDF coordinates on write; the media box is the full page.
     public let cropBox: Rect?
+    /// The bleed box: the region clipped when producing the page in a production environment.
     public let bleedBox: Rect?
+    /// The trim box: the intended finished page dimensions.
     public let trimBox: Rect?
+    /// The art box: the extent of the page's meaningful content.
     public let artBox: Rect?
 
     /// Hot-spot link annotations placed on the page.
@@ -31,6 +35,8 @@ public struct PDFRenderer: Renderer {
     /// Standard-security-handler encryption; nil writes an open document.
     public let encryption: PDFEncryption?
 
+    /// Creates a PDF renderer for a page of the given size, with optional boundary boxes, link
+    /// annotations, outline bookmarks, and encryption.
     public init(
         width: Double = 500,
         height: Double = 500,
@@ -85,6 +91,7 @@ public struct PDFRenderer: Renderer {
             .translatedBy(x: rect.minX + rect.width / 2, y: rect.minY + rect.height / 2)
     }
 
+    /// Emits a single-page PDF document (as `Data`) reproducing the context's recorded operations.
     public func draw(_ context: GraphicsContext) throws -> Data {
         let writer = PDFWriter()
 

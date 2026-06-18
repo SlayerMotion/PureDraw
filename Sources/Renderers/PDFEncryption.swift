@@ -11,16 +11,23 @@
 public struct PDFEncryption: Equatable, Sendable {
     /// User-permission flags carried in the document's /P entry.
     public struct Permissions: OptionSet, Equatable, Sendable {
+        /// The PDF /P permission bit mask.
         public let rawValue: UInt32
 
+        /// Creates a permission set from its raw bit mask.
         public init(rawValue: UInt32) {
             self.rawValue = rawValue
         }
 
+        /// Allows printing the document.
         public static let printing = Permissions(rawValue: 1 << 2)
+        /// Allows modifying the document's contents.
         public static let modifying = Permissions(rawValue: 1 << 3)
+        /// Allows copying text and graphics out of the document.
         public static let copying = Permissions(rawValue: 1 << 4)
+        /// Allows adding or modifying annotations and form fields.
         public static let annotating = Permissions(rawValue: 1 << 5)
+        /// All of the above permissions.
         public static let all: Permissions = [.printing, .modifying, .copying, .annotating]
     }
 
@@ -28,8 +35,10 @@ public struct PDFEncryption: Equatable, Sendable {
     public let userPassword: String
     /// The owner password; defaults to the user password.
     public let ownerPassword: String
+    /// The operations a viewer is permitted to perform.
     public let permissions: Permissions
 
+    /// Creates an encryption configuration from the user and owner passwords and the permissions.
     public init(userPassword: String = "", ownerPassword: String? = nil, permissions: Permissions = .all) {
         self.userPassword = userPassword
         self.ownerPassword = ownerPassword ?? userPassword

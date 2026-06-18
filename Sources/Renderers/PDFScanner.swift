@@ -35,6 +35,7 @@ public struct PDFScanner {
 
     private var handlers: [String: Handler] = [:]
 
+    /// Creates a scanner with no registered operator handlers.
     public init() {}
 
     /// Registers a callback for a content-stream operator such as `m`, `re`,
@@ -43,6 +44,7 @@ public struct PDFScanner {
         handlers[name] = handler
     }
 
+    /// Scans a PDF content stream, invoking the registered handler for each operator encountered.
     public func scan(_ content: String) {
         scan(Array(content.utf8))
     }

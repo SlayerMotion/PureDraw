@@ -36,14 +36,18 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
         case showText(glyphs: [Int], text: String?, font: Font, fontSize: Double, drawingMode: TextDrawingMode, textMatrix: AffineTransform, position: Point)
     }
 
+    /// The drawing command and its geometry.
     public let kind: Kind
+    /// The graphics state in effect when the operation was recorded.
     public let state: GraphicState
 
+    /// Creates a draw operation from a command kind and the graphics state to draw it with.
     public init(kind: Kind, state: GraphicState) {
         self.kind = kind
         self.state = state
     }
 
+    /// Validates the operation's geometry and graphics state.
     public static var defaultValidator: Validator<DrawOperation> {
         Validator()
             .validating(.drawOperationPathIsNotEmpty)

@@ -16,6 +16,7 @@ public struct ValidationContext<Document: Sendable, Subject: Sendable>: Sendable
     /// The path from the document root to this subject.
     public let codingPath: [CodingKey]
 
+    /// Creates a context from the document root, the value under validation, and its path.
     public init(document: Document, subject: Subject, codingPath: [CodingKey]) {
         self.document = document
         self.subject = subject

@@ -37,6 +37,7 @@ public struct GraphicsContext: Sendable, Validatable {
     /// A stack of transparency layer states.
     private var layerStateStack: [LayerState] = []
 
+    /// Creates an empty context with the default graphics state and no recorded commands.
     public init() {}
 
     // MARK: - State Management
@@ -618,6 +619,7 @@ public struct GraphicsContext: Sendable, Validatable {
         commands.append(DrawOperation(kind: .drawImageProjective(image, rect: rect, transform: transform), state: currentState))
     }
 
+    /// Validates the recorded operations and the current graphics state.
     public static var defaultValidator: Validator<GraphicsContext> {
         Validator().validating(.transparencyLayersAreBalanced)
     }

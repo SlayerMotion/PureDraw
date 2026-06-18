@@ -19,6 +19,7 @@
         /// Guards against unbounded recursion through self-referential layers.
         private let layerDepth: Int
 
+        /// Creates a renderer that replays drawing into the given CoreGraphics context.
         public init(context: CGContext) {
             targetContext = context
             layerDepth = 0
@@ -29,6 +30,7 @@
             self.layerDepth = layerDepth
         }
 
+        /// Replays the context's recorded operations into the target CoreGraphics context.
         public func draw(_ context: GraphicsContext) throws {
             // DeviceGray mask conversion is O(width * height); reuse converted
             // masks across operations within this render pass.

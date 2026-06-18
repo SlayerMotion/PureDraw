@@ -7,14 +7,23 @@ import Validation
 
 /// Represents a raw bitmap image buffer with layout configuration.
 public struct Image: Sendable, Equatable {
+    /// The width in pixels.
     public let width: Int
+    /// The height in pixels.
     public let height: Int
+    /// The number of bits per color component.
     public let bitsPerComponent: Int
+    /// The number of bits per pixel (all components plus any alpha).
     public let bitsPerPixel: Int
+    /// The number of bytes per row of pixels, including any row padding.
     public let bytesPerRow: Int
+    /// The color space the pixel components are interpreted in.
     public let colorSpace: ColorSpace
+    /// How the alpha channel is stored and whether it is premultiplied.
     public let alphaInfo: AlphaInfo
+    /// Optional color or color-range to treat as transparent (chroma key), if any.
     public let maskingColors: [Double]?
+    /// The raw pixel bytes, laid out per the other fields.
     public let data: [UInt8]
 
     /// Creates an image over the given pixel buffer.
@@ -54,6 +63,7 @@ public struct Image: Sendable, Equatable {
 }
 
 extension Image: Validatable {
+    /// Validates that the dimensions and layout are positive and consistent with the buffer size.
     public static var defaultValidator: Validator<Image> {
         Validator()
             .validating(.imageIsValid)

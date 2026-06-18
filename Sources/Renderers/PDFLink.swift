@@ -15,9 +15,12 @@ public struct PDFLink: Equatable, Sendable {
         case destination(Point)
     }
 
+    /// The clickable area in user space (top-left origin).
     public let rect: Rect
+    /// Where the link leads.
     public let target: Target
 
+    /// Creates a link annotation over `rect` that leads to `target`.
     public init(rect: Rect, target: Target) {
         self.rect = rect
         self.target = target

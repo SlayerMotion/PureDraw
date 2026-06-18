@@ -17,11 +17,14 @@ public struct PostScriptRenderer: Renderer {
     /// The explicit height of the generated EPS. If nil, calculated from content bounds.
     public let height: Double?
 
+    /// Creates a PostScript renderer; an explicit width and height set the page bounding box, and a
+    /// nil value lets it derive from the drawing's bounds.
     public init(width: Double? = nil, height: Double? = nil) {
         self.width = width
         self.height = height
     }
 
+    /// Emits a PostScript program reproducing the context's recorded operations.
     public func draw(_ context: GraphicsContext) throws -> String {
         // 1. Calculate Bounding Box
         let minX: Double

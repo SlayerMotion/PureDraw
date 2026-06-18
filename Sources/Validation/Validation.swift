@@ -7,6 +7,7 @@
 /// Validations are declarative and composable. The description states the *correct* state,
 /// not the failure state.
 public struct Validation<Document: Sendable, Subject: Sendable>: Sendable {
+    /// A description of the correct state the rule asserts (not the failure state).
     public let description: String
     private let check: @Sendable (ValidationContext<Document, Subject>) -> [ValidationError]
     private let predicate: @Sendable (ValidationContext<Document, Subject>) -> Bool

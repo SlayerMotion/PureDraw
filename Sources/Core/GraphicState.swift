@@ -123,6 +123,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
     /// The transform matrix at the time the mask was set.
     public var maskTransform: Geometry.AffineTransform?
 
+    /// Creates a graphics state; every parameter defaults to the value a fresh context starts with.
     public init(
         transform: Geometry.AffineTransform = .identity,
         strokeColor: Color = .black,
@@ -187,6 +188,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         self.maskTransform = maskTransform
     }
 
+    /// Validates the state's transform, colors, line parameters, and any shadow.
     public static var defaultValidator: Validator<GraphicState> {
         Validator().validating(.graphicStateIsValid)
     }

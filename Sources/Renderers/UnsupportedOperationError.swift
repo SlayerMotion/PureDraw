@@ -17,11 +17,13 @@ public struct UnsupportedOperationError: Error, Equatable, CustomStringConvertib
     /// The renderer that cannot represent it, e.g. `"SVGRenderer"`.
     public let renderer: String
 
+    /// Creates the error from the operation name and the renderer that cannot represent it.
     public init(operation: String, renderer: String) {
         self.operation = operation
         self.renderer = renderer
     }
 
+    /// A message naming the operation and renderer, and how to avoid dropping the content.
     public var description: String {
         "\(renderer) cannot represent the \(operation) operation; rasterize or flatten it before exporting rather than dropping it silently."
     }
