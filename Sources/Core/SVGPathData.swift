@@ -178,6 +178,111 @@ public enum SVGPathData {
         return elements
     }
 
+    // MARK: - Canonical grammar (the single, invertible definition)
+
+    /// One command of the canonical (printable, absolute) SVG path form. Both `print(_:)` and the
+    /// strict `parseCanonical(_:)` are derived from the single `canonicalCommands` table, so over a
+    /// well-formed element sequence they are inverse *by construction* (PureDraw #110/#125): each
+    /// command's `build` and `match` are mutual inverses, and a sequence round trip is the
+    /// concatenation of per-command round trips.
+    struct CanonicalCommand {
+        /// The command letter (`M`, `L`, `Q`, `C`, `Z`).
+        let letter: Character
+        /// How many points the command carries on the wire.
+        let pointCount: Int
+        /// Builds the element from its absolute wire points (in wire order).
+        let build: ([Point]) -> PathElement
+        /// The element's absolute wire points in wire order, or nil if it is a different command.
+        let match: (PathElement) -> [Point]?
+    }
+
+    /// The five canonical commands, in 1:1 correspondence with the five `PathElement` cases.
+    static let canonicalCommands: [CanonicalCommand] = [
+        CanonicalCommand(
+            letter: "M",
+            pointCount: 1,
+            build: { .move(to: $0[0]) },
+            match: { if case let .move(to) = $0 { return [to] }
+                return nil
+            }
+        ),
+        CanonicalCommand(
+            letter: "L",
+            pointCount: 1,
+            build: { .line(to: $0[0]) },
+            match: { if case let .line(to) = $0 { return [to] }
+                return nil
+            }
+        ),
+        CanonicalCommand(
+            letter: "Q",
+            pointCount: 2,
+            build: { .quadCurve(to: $0[1], control: $0[0]) },
+            match: { if case let .quadCurve(to, control) = $0 { return [control, to] }
+                return nil
+            }
+        ),
+        CanonicalCommand(
+            letter: "C",
+            pointCount: 3,
+            build: { .cubicCurve(to: $0[2], control1: $0[0], control2: $0[1]) },
+            match: { if case let .cubicCurve(to, control1, control2) = $0 { return [control1, control2, to] }
+                return nil
+            }
+        ),
+        CanonicalCommand(
+            letter: "Z",
+            pointCount: 0,
+            build: { _ in .close },
+            match: { if case .close = $0 { return [] }
+                return nil
+            }
+        ),
+    ]
+
+    /// The canonical command for an element. Total: every `PathElement` case matches exactly one.
+    static func canonicalCommand(for element: PathElement) -> CanonicalCommand? {
+        canonicalCommands.first { $0.match(element) != nil }
+    }
+
+    /// The canonical token for one element: its letter followed by its absolute coordinates.
+    private static func canonicalToken(for element: PathElement) -> String? {
+        guard let command = canonicalCommand(for: element), let points = command.match(element) else { return nil }
+        return ([String(command.letter)] + points.flatMap { [number($0.x), number($0.y)] }).joined(separator: " ")
+    }
+
+    /// Strictly parses the canonical, absolute form that `print(_:)` emits: a command letter
+    /// followed by exactly its coordinates, repeated. It rejects relative commands, the `H`/`V`/`S`/`T`
+    /// shorthand, implicit coordinate repeats, and arcs (use `parse(_:)` for the full grammar). This is
+    /// the manifest inverse of the printer over well-formed sequences.
+    ///
+    /// Round-trip theorem: for any well-formed element sequence (one whose subpaths open with a
+    /// `.move`), `parseCanonical(print(elements)) == elements`. Proof by induction on the sequence.
+    /// Well-formedness means `print` inserts no implicit move, so the output is the concatenation of
+    /// one token per element. For a single element the token is `letter` then `number(p.x) number(p.y)`
+    /// for each wire point `p` of `canonicalCommand(for:).match`; `parseCanonical` reads the same
+    /// letter and the same `pointCount` points, and because `Double.description` is the shortest
+    /// round-trippable form, `readNumber(number(d)) == d` for every finite `d`, so the recovered points
+    /// equal the emitted points; then `build(match(e)) == e` per command (the base lemma) recovers the
+    /// element exactly. Concatenation preserves this element by element. QED.
+    static func parseCanonical(_ string: String) -> [PathElement]? {
+        var s = Substring(string)
+        var elements: [PathElement] = []
+        skipSeparators(&s)
+        while let lead = s.first {
+            guard let command = canonicalCommands.first(where: { $0.letter == lead }) else { return nil }
+            s.removeFirst()
+            var points: [Point] = []
+            for _ in 0 ..< command.pointCount {
+                guard let point = readPoint(&s, base: .zero, relative: false) else { return nil }
+                points.append(point)
+            }
+            elements.append(command.build(points))
+            skipSeparators(&s)
+        }
+        return elements
+    }
+
     // MARK: - Print (total, normal form, the inverse on the normal-form core)
 
     /// Renders a path's elements to SVG path data in **normal form**: absolute
@@ -193,9 +298,14 @@ public enum SVGPathData {
         var subpathStart = Point.zero
         var subpathOpen = false
 
+        /// Every token is sourced from `canonicalCommands`, the same table `parseCanonical` reads,
+        /// so the printer and the strict parser cannot drift.
+        func emit(_ element: PathElement) {
+            if let token = canonicalToken(for: element) { tokens.append(token) }
+        }
         func openSubpathIfNeeded() {
             guard !subpathOpen else { return }
-            tokens.append("M \(number(current.x)) \(number(current.y))")
+            emit(.move(to: current))
             subpathStart = current
             subpathOpen = true
         }
@@ -203,29 +313,25 @@ public enum SVGPathData {
         for element in elements {
             switch element {
             case let .move(to):
-                tokens.append("M \(number(to.x)) \(number(to.y))")
+                emit(element)
                 current = to
                 subpathStart = to
                 subpathOpen = true
             case let .line(to):
                 openSubpathIfNeeded()
-                tokens.append("L \(number(to.x)) \(number(to.y))")
+                emit(element)
                 current = to
-            case let .quadCurve(to, control):
+            case let .quadCurve(to, _):
                 openSubpathIfNeeded()
-                tokens.append("Q \(number(control.x)) \(number(control.y)) \(number(to.x)) \(number(to.y))")
+                emit(element)
                 current = to
-            case let .cubicCurve(to, control1, control2):
+            case let .cubicCurve(to, _, _):
                 openSubpathIfNeeded()
-                tokens.append(
-                    "C \(number(control1.x)) \(number(control1.y)) "
-                        + "\(number(control2.x)) \(number(control2.y)) "
-                        + "\(number(to.x)) \(number(to.y))"
-                )
+                emit(element)
                 current = to
             case .close:
                 openSubpathIfNeeded()
-                tokens.append("Z")
+                emit(element)
                 current = subpathStart
                 subpathOpen = false
             }
