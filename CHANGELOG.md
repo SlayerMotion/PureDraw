@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-06-18
+
+### Fixed
+
+- Curve flattening no longer traps on non-finite control points. `Path.toPolylines` sized
+  its quad/cubic subdivision with `Int(ceil(curveLength / 2))`, and a NaN/Inf control point
+  makes the length non-finite, trapping the `Int` conversion (a straight-line path never
+  flattens, so this only affected curves, e.g. the arcs of a rounded rect with a non-finite
+  frame). A non-finite curve now degrades to a single step (its endpoint). Completes the
+  render trap-safety so a non-finite animation time cannot crash the full compositor +
+  rasterizer pipeline.
+
 ## [1.0.3] - 2026-06-18
 
 ### Fixed

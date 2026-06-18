@@ -756,7 +756,9 @@ public struct Path: Equatable, Sendable, Validatable {
                 let dx2 = to.x - control.x
                 let dy2 = to.y - control.y
                 let approxLength = sqrt(dx1 * dx1 + dy1 * dy1) + sqrt(dx2 * dx2 + dy2 * dy2)
-                let steps = max(4, Int(ceil(approxLength / 2.0)))
+                // A non-finite curve length (NaN/Inf control points) traps Int(ceil(...));
+                // fall back to a single step, degrading the degenerate curve to its endpoint.
+                let steps = approxLength.isFinite ? max(4, Int(ceil(approxLength / 2.0))) : 1
                 for i in 1 ... steps {
                     let t = Double(i) / Double(steps)
                     let mt = 1.0 - t
@@ -777,7 +779,9 @@ public struct Path: Equatable, Sendable, Validatable {
                 let dx3 = to.x - control2.x
                 let dy3 = to.y - control2.y
                 let approxLength = sqrt(dx1 * dx1 + dy1 * dy1) + sqrt(dx2 * dx2 + dy2 * dy2) + sqrt(dx3 * dx3 + dy3 * dy3)
-                let steps = max(4, Int(ceil(approxLength / 2.0)))
+                // A non-finite curve length (NaN/Inf control points) traps Int(ceil(...));
+                // fall back to a single step, degrading the degenerate curve to its endpoint.
+                let steps = approxLength.isFinite ? max(4, Int(ceil(approxLength / 2.0))) : 1
                 for i in 1 ... steps {
                     let t = Double(i) / Double(steps)
                     let mt = 1.0 - t

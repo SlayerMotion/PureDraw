@@ -197,6 +197,30 @@ struct RendererTests {
         _ = try? PDFRenderer(width: 64, height: 64).render(context)
     }
 
+    @Test func nonFiniteCurveFlatteningDoesNotTrap() {
+        // Curve flattening (Path.toPolylines) sizes its subdivision via Int(ceil(curveLength));
+        // a non-finite control point makes the length non-finite and traps. A straight-line
+        // path (above) never flattens, so this case is distinct: it exercises the quad/cubic
+        // curve subdivision and the rounded-rect arcs specifically.
+        for bad in [Double.nan, .infinity, -.infinity] {
+            var curve = GraphicsContext()
+            curve.setFillColor(.white)
+            curve.move(to: Point(x: 10, y: 10))
+            curve.addCurve(to: Point(x: 40, y: bad), control1: Point(x: bad, y: 20), control2: Point(x: 30, y: bad))
+            curve.addQuadCurve(to: Point(x: 10, y: 40), control: Point(x: bad, y: bad))
+            curve.closeSubpath()
+            curve.fillPath()
+            _ = try? BitmapRenderer(width: 64, height: 64).render(curve)
+
+            // Rounded rect with a non-finite frame: arcs become non-finite cubic curves.
+            var rounded = GraphicsContext()
+            rounded.setFillColor(.white)
+            rounded.addRoundedRect(in: Rect(x: 10, y: bad, width: 40, height: 30), cornerWidth: 8, cornerHeight: 8)
+            rounded.fillPath()
+            _ = try? BitmapRenderer(width: 64, height: 64).render(rounded)
+        } // must not trap
+    }
+
     @Test func nonFiniteImageAndShadowDoNotTrap() throws {
         // Image device-bounds (BitmapRenderer.rasterizeImage) and the shadow blur/offset
         // (ShadowRasterizer) convert geometry to Int; a non-finite destination rect,
