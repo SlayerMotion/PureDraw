@@ -71,6 +71,44 @@ struct CrossRendererConsistencyTests {
         private func expectConsistent(_: GraphicsContext, tolerance _: Double, _: String) throws {}
     #endif
 
+    @Test func tripInteractionStaysConsistent() throws {
+        // The individually-consistent operations, combined in one scene, must still agree across
+        // renderers: this catches interaction regressions the per-operation tests cannot. The
+        // tolerance is the loosest of the combined operations (a dashed stroke). PureDraw #124.
+        var c = GraphicsContext()
+        c.saveGState()
+        c.translate(by: 4, 4)
+        c.rotate(by: 0.15)
+        c.setFillColor(Color(red: 0.3, green: 0.5, blue: 0.7))
+        c.fill(Rect(x: 0, y: 0, width: 28, height: 28))
+        c.restoreGState()
+
+        c.setFillColor(Color(red: 0.85, green: 0.2, blue: 0.2, alpha: 0.6))
+        c.move(to: Point(x: 40, y: 10))
+        c.addLine(to: Point(x: 70, y: 10))
+        c.addLine(to: Point(x: 55, y: 40))
+        c.closeSubpath()
+        c.fillPath(using: .evenOdd)
+
+        c.setBlendMode(.multiply)
+        c.setFillColor(Color(red: 0.2, green: 0.7, blue: 0.4, alpha: 0.7))
+        c.fillEllipse(in: Rect(x: 30, y: 25, width: 36, height: 36))
+        c.setBlendMode(.normal)
+
+        c.saveGState()
+        c.addRect(Rect(x: 6, y: 45, width: 60, height: 30))
+        c.clip()
+        c.setStrokeColor(.black)
+        c.setLineWidth(2)
+        c.setLineDash(phase: 0, lengths: [5, 3])
+        c.move(to: Point(x: 8, y: 50))
+        c.addLine(to: Point(x: 64, y: 70))
+        c.strokePath()
+        c.restoreGState()
+
+        try expectConsistent(c, tolerance: 22, "trip interaction")
+    }
+
     @Test func solidFillConsistent() throws {
         var c = GraphicsContext()
         c.setFillColor(Color(red: 0.2, green: 0.6, blue: 0.9, alpha: 1))
