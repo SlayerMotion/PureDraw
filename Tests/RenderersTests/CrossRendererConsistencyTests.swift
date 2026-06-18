@@ -142,6 +142,20 @@ struct CrossRendererConsistencyTests {
         }
     }
 
+    @Test func dashedStrokeConsistent() throws {
+        // Both renderers apply the line dash (#120): BitmapRenderer via strokedOutline's dash,
+        // CoreGraphics via setLineDash. A dashed polyline must produce the same gaps in both.
+        var c = GraphicsContext()
+        c.setStrokeColor(Color(red: 0.1, green: 0.2, blue: 0.9, alpha: 1))
+        c.setLineWidth(4)
+        c.setLineDash(phase: 0, lengths: [8, 6])
+        c.move(to: Point(x: 8, y: 16))
+        c.addLine(to: Point(x: 72, y: 16))
+        c.addLine(to: Point(x: 72, y: 64))
+        c.strokePath()
+        try expectConsistent(c, tolerance: 20, "dashed stroke")
+    }
+
     @Test func porterDuffBlendConsistent() throws {
         // The Porter-Duff source/destination compositing operators (#111) are implemented in
         // BitmapRenderer; cross-check against CoreGraphics's native CGBlendMode. A partially
