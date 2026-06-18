@@ -333,6 +333,66 @@ public struct Font: Equatable, Sendable {
         )
     }
 
+    // MARK: - Variable Fonts
+
+    /// Whether the font carries an `fvar` table, that is, whether it is an OpenType variable font.
+    public var isVariable: Bool {
+        tables["fvar"] != nil
+    }
+
+    /// The variation axes of a variable font, in `fvar` order (PureDraw #77). Empty for a static
+    /// font or a malformed `fvar` table. Reading the axes does not change which instance the glyph
+    /// outlines render at; outline interpolation (`gvar`) is a separate capability.
+    public var variationAxes: [VariationAxis] {
+        guard let fvar = tables["fvar"],
+              let axesOffset = Self.u16(data, at: fvar.offset + 4),
+              let axisCount = Self.u16(data, at: fvar.offset + 8),
+              let axisSize = Self.u16(data, at: fvar.offset + 10), axisSize >= 20
+        else { return [] }
+        var axes: [VariationAxis] = []
+        for index in 0 ..< axisCount {
+            let record = fvar.offset + axesOffset + index * axisSize
+            guard let tag = Self.tag(data, at: record),
+                  let minValue = Self.fixed16(data, at: record + 4),
+                  let defaultValue = Self.fixed16(data, at: record + 8),
+                  let maxValue = Self.fixed16(data, at: record + 12),
+                  let nameID = Self.u16(data, at: record + 18)
+            else { return [] }
+            axes.append(VariationAxis(tag: tag, minValue: minValue, defaultValue: defaultValue, maxValue: maxValue, nameID: nameID))
+        }
+        return axes
+    }
+
+    /// The named instances of a variable font, in `fvar` order (PureDraw #77). Each instance gives a
+    /// user-space coordinate per axis, matching `variationAxes`. Empty for a static or malformed font.
+    public var namedInstances: [VariationInstance] {
+        guard let fvar = tables["fvar"],
+              let axesOffset = Self.u16(data, at: fvar.offset + 4),
+              let axisCount = Self.u16(data, at: fvar.offset + 8),
+              let axisSize = Self.u16(data, at: fvar.offset + 10),
+              let instanceCount = Self.u16(data, at: fvar.offset + 12),
+              let instanceSize = Self.u16(data, at: fvar.offset + 14)
+        else { return [] }
+        // Instances follow the axes array; coordinates are one Fixed per axis after the 4-byte head.
+        let instancesStart = fvar.offset + axesOffset + axisCount * axisSize
+        let coordinateBytes = axisCount * 4
+        guard instanceSize >= coordinateBytes + 4 else { return [] }
+        let hasPostScriptName = instanceSize >= coordinateBytes + 6
+        var instances: [VariationInstance] = []
+        for index in 0 ..< instanceCount {
+            let record = instancesStart + index * instanceSize
+            guard let subfamilyNameID = Self.u16(data, at: record) else { return [] }
+            var coordinates: [Double] = []
+            for axis in 0 ..< axisCount {
+                guard let value = Self.fixed16(data, at: record + 4 + axis * 4) else { return [] }
+                coordinates.append(value)
+            }
+            let postScriptNameID: Int? = hasPostScriptName ? Self.u16(data, at: record + 4 + coordinateBytes) : nil
+            instances.append(VariationInstance(subfamilyNameID: subfamilyNameID, coordinates: coordinates, postScriptNameID: postScriptNameID))
+        }
+        return instances
+    }
+
     private func glyphRange(_ index: Int) -> (offset: Int, length: Int)? {
         guard index >= 0, index < numberOfGlyphs,
               let loca = tables["loca"], let glyf = tables["glyf"]
@@ -571,6 +631,13 @@ public struct Font: Equatable, Sendable {
     private static func f2dot14(_ bytes: [UInt8], at offset: Int) -> Double? {
         guard let raw = i16(bytes, at: offset) else { return nil }
         return Double(raw) / 16384.0
+    }
+
+    /// A signed 16.16 fixed-point value (the `Fixed` type used by `fvar` coordinates).
+    private static func fixed16(_ bytes: [UInt8], at offset: Int) -> Double? {
+        guard let raw = u32(bytes, at: offset) else { return nil }
+        let signed = raw >= 0x8000_0000 ? raw - 0x1_0000_0000 : raw
+        return Double(signed) / 65536.0
     }
 
     private static func tag(_ bytes: [UInt8], at offset: Int) -> String? {
