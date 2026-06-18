@@ -119,6 +119,63 @@ struct RendererTests {
         #endif
     }
 
+    @Test func nestedClipsIntersectAcrossRenderers() throws {
+        // The repo rule: BitmapRenderer == CoreGraphicsRenderer. Nested clips intersect
+        // (CGContextClip semantics); a fill inside the inner clip but OUTSIDE the
+        // intersection must render NOTHING in both. (Regression for the union-clip bug:
+        // both renderers once clipped to the unioned clipPath, so this fill leaked.)
+        let w = 100, h = 100
+        var context = GraphicsContext()
+        context.addRect(Rect(x: 0, y: 0, width: 40, height: 40))
+        context.clip()
+        context.addRect(Rect(x: 20, y: 20, width: 40, height: 40)) // intersection = (20,20)-(40,40)
+        context.clip()
+        context.setFillColor(.white)
+        context.fill(Rect(x: 44, y: 44, width: 12, height: 12)) // inside inner clip, outside intersection
+
+        let bmp = try BitmapRenderer(width: w, height: h).render(context)
+        let bmpOpaque = stride(from: 3, to: bmp.data.count, by: 4).filter { bmp.data[$0] > 0 }.count
+        #expect(bmpOpaque == 0, "BitmapRenderer leaked \(bmpOpaque)px outside the clip intersection")
+
+        #if canImport(CoreGraphics)
+            let cs = CGColorSpaceCreateDeviceRGB()
+            guard let cg = CGContext(
+                data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { Issue.record("no CGContext")
+                return
+            }
+            try CoreGraphicsRenderer(context: cg).render(context)
+            guard let data = cg.data else { Issue.record("no CGContext data")
+                return
+            }
+            let ptr = data.bindMemory(to: UInt8.self, capacity: w * h * 4)
+            var cgOpaque = 0
+            for i in stride(from: 3, to: w * h * 4, by: 4) where ptr[i] > 0 {
+                cgOpaque += 1
+            }
+            #expect(cgOpaque == 0, "CoreGraphicsRenderer leaked \(cgOpaque)px outside the clip intersection (union-clip bug)")
+        #endif
+    }
+
+    @Test func svgNestedClipsEmitIntersection() throws {
+        // SVG <clipPath> children union, so nested clips must be expressed by NESTING one
+        // clipPath inside another via clip-path. Two clips → an inner clip-0-0 and a final
+        // clip-0 that references it, so the element is clipped to the intersection.
+        var context = GraphicsContext()
+        context.addRect(Rect(x: 0, y: 0, width: 40, height: 40))
+        context.clip()
+        context.addRect(Rect(x: 20, y: 20, width: 40, height: 40))
+        context.clip()
+        context.setFillColor(.white)
+        context.fill(Rect(x: 0, y: 0, width: 64, height: 64))
+
+        let svg = try SVGRenderer().render(context)
+        #expect(svg.contains("<clipPath id=\"clip-0-0\">"), "expected an inner nested clipPath")
+        #expect(svg.contains("clip-path=\"url(#clip-0-0)\""), "final clipPath must reference the inner one (intersection)")
+        #expect(svg.contains("clip-path=\"url(#clip-0)\""), "element must reference the final clip stack id")
+    }
+
     @Test func pdfRendererOutputStructure() throws {
         var context = GraphicsContext()
         context.setFillColor(Color(red: 1.0, green: 0.0, blue: 0.0)) // Red

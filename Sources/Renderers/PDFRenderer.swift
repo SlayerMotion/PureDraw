@@ -198,10 +198,11 @@ public struct PDFRenderer: Renderer {
                 contentStream += "[] 0 d\n"
             }
 
-            // 4. Clip Path
-            if let clip = op.state.clipPath {
-                let pathStr = pdfPathString(for: clip)
-                contentStream += pathStr
+            // 4. Clip Path: clip each path in the stack; PDF's `W n` intersects with the
+            // current clip, so the result is their intersection (not the unioned clipPath,
+            // which would flood nested clips).
+            for clip in op.state.clipPaths {
+                contentStream += pdfPathString(for: clip)
                 contentStream += "W n\n"
             }
 

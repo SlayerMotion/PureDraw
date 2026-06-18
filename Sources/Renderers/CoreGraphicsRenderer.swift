@@ -64,11 +64,7 @@
                     }
 
                     // Apply Clip Path (if defined)
-                    if let clip = operation.state.clipPath {
-                        let cgPath = try createCGPath(from: clip)
-                        targetContext.addPath(cgPath)
-                        targetContext.clip()
-                    }
+                    try applyClip(operation.state, into: targetContext)
 
                     targetContext.beginTransparencyLayer(auxiliaryInfo: nil)
 
@@ -119,11 +115,7 @@
                     }
 
                     // 4. Apply Clip Path (if defined)
-                    if let clip = operation.state.clipPath {
-                        let cgPath = try createCGPath(from: clip)
-                        targetContext.addPath(cgPath)
-                        targetContext.clip()
-                    }
+                    try applyClip(operation.state, into: targetContext)
 
                     // 5. Draw Path Geometry
                     switch operation.kind {
@@ -485,6 +477,18 @@
                 throw RenderingError.cannotCreateGradient
             }
             return cgGradient
+        }
+
+        /// Applies the clip stack to the context. CoreGraphics' `clip()` intersects the
+        /// added path with the current clip, so clipping each path in `clipPaths` yields
+        /// their intersection (the true nested-clip region). Clipping the unioned
+        /// `clipPath` instead would let content inside one clip but outside another flood
+        /// through, diverging from BitmapRenderer (which intersects). No-op when empty.
+        private func applyClip(_ state: GraphicState, into context: CGContext) throws {
+            for path in state.clipPaths {
+                try context.addPath(createCGPath(from: path))
+                context.clip()
+            }
         }
 
         private func createCGPath(from path: Path) throws -> CGPath {

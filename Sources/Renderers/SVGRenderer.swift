@@ -24,13 +24,11 @@ public struct SVGRenderer: Renderer {
 
     public func draw(_ context: GraphicsContext) throws -> String {
         // 1. Gather all unique clip paths and shadows
-        var uniqueClipPaths: [Path] = []
+        var uniqueClipPaths: [[Path]] = [] // each entry is a clip STACK, intersected
         var uniqueShadows: [Shadow] = []
         for op in context.flattenedCommands {
-            if let clip = op.state.clipPath {
-                if !uniqueClipPaths.contains(clip) {
-                    uniqueClipPaths.append(clip)
-                }
+            if !op.state.clipPaths.isEmpty, !uniqueClipPaths.contains(op.state.clipPaths) {
+                uniqueClipPaths.append(op.state.clipPaths)
             }
             if let shadow = op.state.shadow {
                 if !uniqueShadows.contains(shadow) {
@@ -107,11 +105,18 @@ public struct SVGRenderer: Renderer {
 
         // 3. Serialize clip paths, shadows, and gradients into defs
         var defs: [String] = []
-        for (index, clipPath) in uniqueClipPaths.enumerated() {
-            let pathStr = svgPathString(for: clipPath)
-            defs.append("    <clipPath id=\"clip-\(index)\">")
-            defs.append("      <path d=\"\(pathStr)\" />")
-            defs.append("    </clipPath>")
+        // Each clip is the INTERSECTION of its stack. SVG <clipPath> children union, so
+        // intersection is expressed by NESTING: each path's clipPath references the
+        // previous one via clip-path; the element references the final id "clip-N". A
+        // single-clip stack emits one "clip-N" with no nesting (unchanged output).
+        for (index, stack) in uniqueClipPaths.enumerated() {
+            for (depth, clipPath) in stack.enumerated() {
+                let id = depth == stack.count - 1 ? "clip-\(index)" : "clip-\(index)-\(depth)"
+                let inner = depth == 0 ? "" : " clip-path=\"url(#clip-\(index)-\(depth - 1))\""
+                defs.append("    <clipPath id=\"\(id)\">")
+                defs.append("      <path d=\"\(svgPathString(for: clipPath))\"\(inner) />")
+                defs.append("    </clipPath>")
+            }
         }
         for (index, shadow) in uniqueShadows.enumerated() {
             let floodHex = hexColor(shadow.color)
@@ -247,7 +252,7 @@ public struct SVGRenderer: Renderer {
         textMatrix _: Geometry.AffineTransform,
         position: Point,
         state: GraphicState,
-        uniqueClipPaths: [Path],
+        uniqueClipPaths: [[Path]],
         uniqueShadows: [Shadow]
     ) -> String? {
         guard let text, drawingMode != .invisible, !text.isEmpty else { return nil }
@@ -291,7 +296,7 @@ public struct SVGRenderer: Renderer {
         for state: GraphicState,
         hasFill: Bool,
         fillRule: FillRule?,
-        uniqueClipPaths: [Path],
+        uniqueClipPaths: [[Path]],
         uniqueShadows: [Shadow]
     ) -> [String] {
         var attrs: [String] = []
@@ -357,8 +362,8 @@ public struct SVGRenderer: Renderer {
             }
         }
 
-        // Clipping
-        if let clip = state.clipPath, let clipIndex = uniqueClipPaths.firstIndex(of: clip) {
+        // Clipping (reference the final id of this clip stack's nested clipPaths).
+        if !state.clipPaths.isEmpty, let clipIndex = uniqueClipPaths.firstIndex(of: state.clipPaths) {
             attrs.append("clip-path=\"url(#clip-\(clipIndex))\"")
         }
 

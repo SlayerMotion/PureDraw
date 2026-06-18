@@ -47,7 +47,9 @@ public struct CanvasRenderer: Renderer {
                     js.append("\(contextName).shadowBlur = \(shadow.blur);")
                     js.append("\(contextName).shadowColor = '\(rgbaColor(shadow.color))';")
                 }
-                if let clip = op.state.clipPath {
+                // Clip each path in the stack; Canvas `clip()` intersects with the current
+                // clip, giving their intersection (not the unioned clipPath, which floods).
+                for clip in op.state.clipPaths {
                     js.append("\(contextName).beginPath();")
                     appendPathElements(clip, to: &js)
                     js.append("\(contextName).clip();")
@@ -92,7 +94,9 @@ public struct CanvasRenderer: Renderer {
                 }
 
                 // 5. Clip Path
-                if let clip = op.state.clipPath {
+                // Clip each path in the stack; Canvas `clip()` intersects with the current
+                // clip, giving their intersection (not the unioned clipPath, which floods).
+                for clip in op.state.clipPaths {
                     js.append("\(contextName).beginPath();")
                     appendPathElements(clip, to: &js)
                     js.append("\(contextName).clip();")

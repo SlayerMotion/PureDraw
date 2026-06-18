@@ -133,8 +133,10 @@ public struct PostScriptRenderer: Renderer {
                 ps += "[] 0 setdash\n"
             }
 
-            // 3. Clip Path
-            if let clip = op.state.clipPath {
+            // 3. Clip Path: clip each path in the stack; PostScript's `clip` intersects
+            // with the current clip, giving their intersection (not the unioned clipPath,
+            // which would flood nested clips).
+            for clip in op.state.clipPaths {
                 ps += psPathString(for: clip)
                 ps += "clip newpath\n"
             }
