@@ -125,4 +125,20 @@ struct CrossRendererConsistencyTests {
         c.fill(Rect(x: 0, y: 0, width: 40, height: 40))
         try expectConsistent(c, tolerance: 8, "translated fill")
     }
+
+    @Test func nonSeparableBlendConsistent() throws {
+        // The W3C non-separable blend modes (hue/saturation/color/luminosity) are implemented
+        // in BitmapRenderer (#111); cross-check them against CoreGraphics's native CGBlendMode
+        // so the luminosity/saturation transfer math matches the platform reference. A coloured
+        // foreground blends over a contrasting backdrop.
+        for mode: BlendMode in [.hue, .saturation, .color, .luminosity] {
+            var c = GraphicsContext()
+            c.setFillColor(Color(red: 0.2, green: 0.5, blue: 0.85, alpha: 1)) // backdrop
+            c.fill(Rect(x: 0, y: 0, width: 80, height: 80))
+            c.setBlendMode(mode)
+            c.setFillColor(Color(red: 0.9, green: 0.35, blue: 0.1, alpha: 1)) // foreground
+            c.fill(Rect(x: 10, y: 10, width: 60, height: 60))
+            try expectConsistent(c, tolerance: 18, "non-separable blend \(mode)")
+        }
+    }
 }

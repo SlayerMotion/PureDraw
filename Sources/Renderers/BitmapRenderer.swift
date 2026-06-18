@@ -566,6 +566,53 @@ public final class BitmapRenderer: Renderer, Sendable {
             cs <= 0.5 ? 2.0 * cs * cd : 1.0 - 2.0 * (1.0 - cs) * (1.0 - cd)
         }
 
+        // W3C non-separable blend modes (Compositing and Blending Level 1, §9.3): they blend
+        // the whole unpremultiplied colour triple (luminosity/saturation transfer), not each
+        // channel independently, then fold into the same premultiplied composite as separable.
+        typealias RGB = (r: Double, g: Double, b: Double)
+        func lum(_ c: RGB) -> Double {
+            0.3 * c.r + 0.59 * c.g + 0.11 * c.b
+        }
+        func clipColor(_ c: RGB) -> RGB {
+            let l = lum(c), n = min(c.r, c.g, c.b), x = max(c.r, c.g, c.b)
+            var out = c
+            if n < 0 { out = (l + (out.r - l) * l / (l - n), l + (out.g - l) * l / (l - n), l + (out.b - l) * l / (l - n)) }
+            if x > 1 { out = (l + (out.r - l) * (1 - l) / (x - l), l + (out.g - l) * (1 - l) / (x - l), l + (out.b - l) * (1 - l) / (x - l)) }
+            return out
+        }
+        func setLum(_ c: RGB, _ l: Double) -> RGB {
+            let d = l - lum(c)
+            return clipColor((c.r + d, c.g + d, c.b + d))
+        }
+        func sat(_ c: RGB) -> Double {
+            max(c.r, c.g, c.b) - min(c.r, c.g, c.b)
+        }
+        func setSat(_ c: RGB, _ s: Double) -> RGB {
+            // Set the saturation by the channels' rank order (min stays 0, mid scaled, max = s).
+            var v = [c.r, c.g, c.b]
+            let order = [0, 1, 2].sorted { v[$0] < v[$1] } // [low, mid, high] indices
+            let lo = order[0], mid = order[1], hi = order[2]
+            if v[hi] > v[lo] {
+                v[mid] = (v[mid] - v[lo]) * s / (v[hi] - v[lo])
+                v[hi] = s
+            } else {
+                v[mid] = 0
+                v[hi] = 0
+            }
+            v[lo] = 0
+            return (v[0], v[1], v[2])
+        }
+        func nonSeparable(_ blend: (_ cs: RGB, _ cb: RGB) -> RGB) {
+            let blendedAlpha = srcA * dstA
+            let cs: RGB = (unpremul(srcR, srcA), unpremul(srcG, srcA), unpremul(srcB, srcA))
+            let cb: RGB = (unpremul(dstR, dstA), unpremul(dstG, dstA), unpremul(dstB, dstA))
+            let m = blend(cs, cb)
+            outA = srcA + dstA * (1.0 - srcA)
+            outR = srcR * (1.0 - dstA) + dstR * (1.0 - srcA) + blendedAlpha * m.r
+            outG = srcG * (1.0 - dstA) + dstG * (1.0 - srcA) + blendedAlpha * m.g
+            outB = srcB * (1.0 - dstA) + dstB * (1.0 - srcA) + blendedAlpha * m.b
+        }
+
         switch state.blendMode {
         case .normal:
             outA = srcA + dstA * (1.0 - srcA)
@@ -639,10 +686,22 @@ public final class BitmapRenderer: Renderer, Sendable {
             outB = srcB
             outA = srcA
 
+        case .hue:
+            nonSeparable { cs, cb in setLum(setSat(cs, sat(cb)), lum(cb)) }
+
+        case .saturation:
+            nonSeparable { cs, cb in setLum(setSat(cb, sat(cs)), lum(cb)) }
+
+        case .color:
+            nonSeparable { cs, cb in setLum(cs, lum(cb)) }
+
+        case .luminosity:
+            nonSeparable { cs, cb in setLum(cb, lum(cs)) }
+
         default:
-            // The non-separable modes (hue/saturation/color/luminosity) and the remaining
-            // Porter-Duff source/destination compositing operators are not yet implemented
-            // in the software rasterizer; they composite source-over until they are. The
+            // The remaining Porter-Duff source/destination compositing operators
+            // (source-in/out/atop, destination-*, xor) are not yet implemented in the
+            // software rasterizer; they composite source-over until they are. The
             // CoreGraphicsRenderer path handles them via the native CGBlendMode.
             outA = srcA + dstA * (1.0 - srcA)
             outR = srcR + dstR * (1.0 - srcA)
