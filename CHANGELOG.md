@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-06-18
+
+### Fixed
+
+- Non-finite geometry no longer traps the bitmap rasterizers, completing the finite/NaN
+  hardening started in 1.0.2. `BitmapRenderer` skips an image draw whose destination rect or
+  transform projects to non-finite device corners (the bounds `Int(floor/ceil(...))` would
+  trap); `ShadowRasterizer` clamps a non-finite blur radius or offset to no-blur / no-offset;
+  a non-finite pattern tile size falls back to 1x1. The gradient device bounds and
+  `ProjectiveImageRasterizer` were already guarded and are unchanged.
+
 ## [1.0.2] - 2026-06-18
 
 ### Fixed
