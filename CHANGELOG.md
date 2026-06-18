@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-06-18
+
+### Fixed
+
+- Non-finite bounds no longer trap. `Int(NaN/Inf)` crashes, so every bounds-to-Int path is
+  guarded: `CoverageRasterizer` requires all four extents finite; `PostScriptRenderer` and
+  `SVGRenderer` fall back to a default box via `isFinite` (catching NaN and both infinities,
+  not just `== ±infinity`); `PNGEncoder.encodeAnimated` sanitizes `frameDelay`; `rectIsFinite`
+  now also checks the origin.
+
+### Added
+
+- `Pattern` adopts `Validatable` (`patternIsValid`: finite bounds with positive size and
+  tiling steps). `colorIsValid`/`gradientStopIsValid` reject NaN/Inf explicitly.
+
 ## [1.0.1] - 2026-06-18
 
 ### Fixed
