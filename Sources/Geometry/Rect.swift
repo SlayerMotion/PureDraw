@@ -8,10 +8,14 @@ import Validation
 
 /// A rectangle in a two-dimensional coordinate system.
 public struct Rect: Equatable, Sendable, Validatable {
+    /// The corner the rectangle is anchored at (its minimum-coordinate corner when standardized).
     public var origin: Point
+    /// The width; may be negative before standardization.
     public var width: Double
+    /// The height; may be negative before standardization.
     public var height: Double
 
+    /// The rectangle at the origin with zero size.
     public static let zero = Rect(origin: Point.zero, width: 0, height: 0)
 
     /// A null rectangle sentinel.
@@ -28,38 +32,46 @@ public struct Rect: Equatable, Sendable, Validatable {
         height: Double.infinity
     )
 
+    /// Creates a rectangle from an origin and a size.
     public init(origin: Point, width: Double, height: Double) {
         self.origin = origin
         self.width = width
         self.height = height
     }
 
+    /// Creates a rectangle from origin coordinates and a size.
     public init(x: Double, y: Double, width: Double, height: Double) {
         origin = Point(x: x, y: y)
         self.width = width
         self.height = height
     }
 
+    /// The smallest x coordinate (the left edge of the standardized rectangle).
     public var minX: Double {
         origin.x
     }
 
+    /// The smallest y coordinate (the top edge in a top-left-origin space).
     public var minY: Double {
         origin.y
     }
 
+    /// The largest x coordinate (`origin.x + width`).
     public var maxX: Double {
         origin.x + width
     }
 
+    /// The largest y coordinate (`origin.y + height`).
     public var maxY: Double {
         origin.y + height
     }
 
+    /// The x coordinate of the center.
     public var midX: Double {
         origin.x + width / 2.0
     }
 
+    /// The y coordinate of the center.
     public var midY: Double {
         origin.y + height / 2.0
     }
@@ -74,10 +86,12 @@ public struct Rect: Equatable, Sendable, Validatable {
         origin.x == -Double.infinity && origin.y == -Double.infinity && width == Double.infinity && height == Double.infinity
     }
 
+    /// Whether the rectangle encloses no area (null, or non-positive width or height).
     public var isEmpty: Bool {
         isNull || width <= 0.0 || height <= 0.0
     }
 
+    /// Returns an equivalent rectangle with non-negative width and height.
     public func standardized() -> Rect {
         if isNull { return .null }
         if isInfinite { return .infinite }
@@ -93,6 +107,7 @@ public struct Rect: Equatable, Sendable, Validatable {
         return r
     }
 
+    /// Returns the smallest integer-aligned rectangle that fully contains this one.
     public func integral() -> Rect {
         if isNull { return .null }
         if isInfinite { return .infinite }
@@ -104,6 +119,8 @@ public struct Rect: Equatable, Sendable, Validatable {
         return Rect(x: minX, y: minY, width: max(0.0, maxX - minX), height: max(0.0, maxY - minY))
     }
 
+    /// Returns the rectangle inset by `dx` on each horizontal edge and `dy` on each vertical edge
+    /// (negative values outset it); the size is clamped at zero.
     public func insetBy(dx: Double, dy: Double) -> Rect {
         if isNull { return .null }
         if isInfinite { return .infinite }
@@ -116,6 +133,7 @@ public struct Rect: Equatable, Sendable, Validatable {
         )
     }
 
+    /// Returns the rectangle translated by `(dx, dy)`.
     public func offsetBy(dx: Double, dy: Double) -> Rect {
         if isNull { return .null }
         if isInfinite { return .infinite }
@@ -126,6 +144,7 @@ public struct Rect: Equatable, Sendable, Validatable {
         )
     }
 
+    /// Returns this rectangle's size positioned at the center of `outer`.
     public func centered(in outer: Rect) -> Rect {
         if isNull { return .null }
         if isInfinite { return .infinite }
@@ -136,6 +155,7 @@ public struct Rect: Equatable, Sendable, Validatable {
         return Rect(x: newX, y: newY, width: stdSelf.width, height: stdSelf.height)
     }
 
+    /// Splits the rectangle `amount` units from `edge`, returning the slice and the remainder.
     public func divided(at amount: Double, from edge: RectEdge) -> (slice: Rect, remainder: Rect) {
         if isNull { return (.null, .null) }
         if isInfinite { return (.infinite, .infinite) }
@@ -162,6 +182,7 @@ public struct Rect: Equatable, Sendable, Validatable {
         }
     }
 
+    /// Whether the rectangle contains `point` (edges inclusive).
     public func contains(_ point: Point) -> Bool {
         if isNull { return false }
         if isInfinite { return point.x.isFinite && point.y.isFinite }
@@ -170,6 +191,7 @@ public struct Rect: Equatable, Sendable, Validatable {
             point.y >= std.minY && point.y <= std.maxY
     }
 
+    /// Whether the rectangle fully contains `other`.
     public func contains(_ other: Rect) -> Bool {
         if isNull || other.isNull { return false }
         if isInfinite { return true }
@@ -180,6 +202,7 @@ public struct Rect: Equatable, Sendable, Validatable {
             stdOther.minY >= std.minY && stdOther.maxY <= std.maxY
     }
 
+    /// Whether the rectangle and `other` overlap in a positive area.
     public func intersects(_ other: Rect) -> Bool {
         if isNull || other.isNull { return false }
         if isInfinite || other.isInfinite { return true }
@@ -189,6 +212,7 @@ public struct Rect: Equatable, Sendable, Validatable {
             std.minY < stdOther.maxY && stdOther.minY < std.maxY
     }
 
+    /// Returns the smallest rectangle that contains both this one and `other`.
     public func union(_ other: Rect) -> Rect {
         if isNull { return other }
         if other.isNull { return self }
@@ -204,6 +228,7 @@ public struct Rect: Equatable, Sendable, Validatable {
         return Rect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
+    /// Returns the overlapping region of the two rectangles, or `.null` if they do not overlap.
     public func intersection(_ other: Rect) -> Rect {
         if isNull || other.isNull { return .null }
         if isInfinite { return other.standardized() }
@@ -238,6 +263,7 @@ public struct Rect: Equatable, Sendable, Validatable {
         return Rect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
+    /// Validates that the dimensions are valid and all coordinates are finite.
     public static var defaultValidator: Validator<Rect> {
         Validator()
             .validating(.rectHasValidDimensions)

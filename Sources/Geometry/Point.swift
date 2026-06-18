@@ -7,11 +7,15 @@ import Validation
 
 /// A point in a two-dimensional coordinate system.
 public struct Point: Equatable, Sendable, Validatable {
+    /// The horizontal coordinate.
     public var x: Double
+    /// The vertical coordinate.
     public var y: Double
 
+    /// The point at the origin (0, 0).
     public static let zero = Point(x: 0, y: 0)
 
+    /// Creates a point from its coordinates.
     public init(x: Double, y: Double) {
         self.x = x
         self.y = y
@@ -35,6 +39,7 @@ public struct Point: Equatable, Sendable, Validatable {
         return Point(x: newX, y: newY)
     }
 
+    /// Validates that both coordinates are finite.
     public static var defaultValidator: Validator<Point> {
         Validator().validating(.pointIsFinite)
     }

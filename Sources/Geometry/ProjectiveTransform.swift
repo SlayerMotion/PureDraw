@@ -16,14 +16,23 @@ import Validation
 /// `x_final = x_new / w_new`
 /// `y_final = y_new / w_new`
 public struct ProjectiveTransform: Equatable, Sendable, Validatable {
+    /// Row 1, column 1 of the 3x3 matrix.
     public var m11: Double
+    /// Row 1, column 2.
     public var m12: Double
+    /// Row 1, column 3 (the x perspective term).
     public var m13: Double
+    /// Row 2, column 1.
     public var m21: Double
+    /// Row 2, column 2.
     public var m22: Double
+    /// Row 2, column 3 (the y perspective term).
     public var m23: Double
+    /// Row 3, column 1 (the x translation).
     public var m31: Double
+    /// Row 3, column 2 (the y translation).
     public var m32: Double
+    /// Row 3, column 3 (the homogeneous scale).
     public var m33: Double
 
     /// The identity projective transform.
@@ -33,6 +42,7 @@ public struct ProjectiveTransform: Equatable, Sendable, Validatable {
         m31: 0.0, m32: 0.0, m33: 1.0
     )
 
+    /// Creates a projective transform from its nine matrix entries, in row-major order.
     public init(
         m11: Double, m12: Double, m13: Double,
         m21: Double, m22: Double, m23: Double,
@@ -211,6 +221,7 @@ public struct ProjectiveTransform: Equatable, Sendable, Validatable {
         )
     }
 
+    /// Validates that the matrix is finite and invertible.
     public static var defaultValidator: Validator<ProjectiveTransform> {
         Validator()
             .validating(.projectiveMatrixIsReversible)

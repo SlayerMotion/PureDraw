@@ -18,16 +18,23 @@ import Validation
 /// [ tx  ty  1 ]
 /// ```
 public struct AffineTransform: Equatable, Sendable, Validatable {
+    /// The `a` entry: x scale (and x contribution to x).
     public var a: Double
+    /// The `b` entry: the y shear (x contribution to y).
     public var b: Double
+    /// The `c` entry: the x shear (y contribution to x).
     public var c: Double
+    /// The `d` entry: y scale (y contribution to y).
     public var d: Double
+    /// The x translation.
     public var tx: Double
+    /// The y translation.
     public var ty: Double
 
     /// The identity transform: `[1 0 0 1 0 0]`.
     public static let identity = AffineTransform(a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0)
 
+    /// Creates a transform from its six matrix entries.
     public init(a: Double, b: Double, c: Double, d: Double, tx: Double, ty: Double) {
         self.a = a
         self.b = b
