@@ -194,6 +194,35 @@ struct VariableFontTests {
             #expect(coreTextVariedButFlat <= 1, "CoreText varies glyphs the parser leaves flat: composite variation may be broken")
         }
 
+        /// CFF2 outlines (PureDraw #78): the CFF2-flavored variable font `SFIndia.ttc` is parsed and
+        /// its glyph outlines (at the default instance) are checked against CoreText's own paths for
+        /// the same face, confirming the CFF2 structure parse and the Type 2 charstring interpreter.
+        @Test func cff2OutlineMatchesCoreText() throws {
+            let path = "/System/Library/Fonts/SFIndia.ttc"
+            guard let data = FileManager.default.contents(atPath: path) else { return }
+            let font = try Font(data: [UInt8](data))
+            guard let provider = CGDataProvider(data: data as CFData), let cgFont = CGFont(provider) else { return }
+            let upm = Double(font.unitsPerEm)
+            let ctFont = CTFontCreateWithGraphicsFont(cgFont, CGFloat(upm), nil, nil)
+            let tolerance = max(2.0, upm * 0.01)
+
+            // SFIndia is an Indic-script font (no Latin cmap), so iterate glyph indices directly.
+            var compared = 0
+            for glyph in 1 ..< min(120, font.numberOfGlyphs) {
+                guard let mine = font.outline(forGlyph: glyph),
+                      let ct = CTFontCreatePathForGlyph(ctFont, CGGlyph(glyph), nil)
+                else { continue }
+                let myPoints = pathPoints(mine)
+                let ctPoints = cgPathPoints(ct)
+                guard myPoints.count > 3, ctPoints.count > 3 else { continue }
+                #expect(hausdorff(myPoints, ctPoints) < tolerance, "glyph \(glyph): CFF2 outline diverges from CoreText")
+                #expect(hausdorff(ctPoints, myPoints) < tolerance, "glyph \(glyph): CoreText has CFF2 points the parser misses")
+                compared += 1
+                if compared >= 12 { break }
+            }
+            #expect(compared >= 6, "expected to compare several CFF2 glyphs against CoreText")
+        }
+
         private func ctGlyphPath(_ cgFont: CGFont, glyph: Int, size: Double, axis: Int, value: Double) -> CGPath? {
             let attributes = [kCTFontVariationAttribute: [axis: value]] as CFDictionary
             let descriptor = CTFontDescriptorCreateWithAttributes(attributes)

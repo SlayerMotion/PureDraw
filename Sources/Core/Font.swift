@@ -6,10 +6,10 @@
 import Geometry
 import Validation
 
-/// A parsed TrueType font (`.ttf`, or the first face of a `.ttc` collection).
-/// Decodes `cmap` for character-to-glyph mapping and `glyf` for quadratic
-/// outlines, returned as `Path` values in font units with y pointing up.
-/// CFF-outlined OpenType fonts (`OTTO`) are not supported.
+/// A parsed TrueType or OpenType font (`.ttf`/`.otf`, or the first face of a `.ttc`
+/// collection). Decodes `cmap` for character-to-glyph mapping and outlines from `glyf`
+/// (quadratic), `CFF ` (Type 2), or `CFF2` (the variable-font Type 2 form), returned as
+/// `Path` values in font units with y pointing up.
 public struct Font: Equatable, Sendable {
     /// Font units per em square; glyph coordinates divide by this.
     public let unitsPerEm: Int
@@ -30,6 +30,7 @@ public struct Font: Equatable, Sendable {
     private let indexToLocFormat: Int
     private let numberOfHMetrics: Int
     private let cff: CFFFont?
+    private let cff2: CFF2Font?
 
     /// Equality compares the underlying font data; every parsed field is
     /// derived from it.
@@ -101,13 +102,19 @@ public struct Font: Equatable, Sendable {
             throw Self.error("missing cmap table")
         }
 
-        // Outlines come from either glyf/loca (TrueType) or a CFF table
-        // (PostScript-outlined OpenType).
+        // Outlines come from glyf/loca (TrueType), a CFF table (PostScript-outlined
+        // OpenType), or a CFF2 table (the variable-font PostScript form).
         var parsedCFF: CFFFont?
+        var parsedCFF2: CFF2Font?
         if let cffTable = tableDirectory["CFF "] {
             parsedCFF = CFFFont(data: bytes, offset: cffTable.offset, length: cffTable.length)
             guard parsedCFF != nil else {
                 throw Self.error("invalid CFF table")
+            }
+        } else if let cff2Table = tableDirectory["CFF2"] {
+            parsedCFF2 = CFF2Font(data: bytes, offset: cff2Table.offset, length: cff2Table.length)
+            guard parsedCFF2 != nil else {
+                throw Self.error("invalid CFF2 table")
             }
         } else if tableDirectory["glyf"] == nil || tableDirectory["loca"] == nil {
             throw Self.error("missing glyf/loca or CFF outline tables")
@@ -122,6 +129,7 @@ public struct Font: Equatable, Sendable {
         indexToLocFormat = locFormat
         numberOfHMetrics = max(1, hMetricCount)
         cff = parsedCFF
+        cff2 = parsedCFF2
     }
 
     private static func error(_ reason: String) -> ValidationError {
@@ -240,6 +248,9 @@ public struct Font: Equatable, Sendable {
     public func outline(forGlyph index: Int) -> Path? {
         if let cff {
             return cff.outline(glyphIndex: index)
+        }
+        if let cff2 {
+            return cff2.outline(glyphIndex: index)
         }
         return outline(forGlyph: index, depth: 0)
     }
