@@ -24,10 +24,12 @@ enum ShadowRasterizer {
         offset: Point,
         blur: Double
     ) -> [Double] {
-        let radius = min(Int(blur.rounded()), max(width, height))
+        // A non-finite blur or offset (e.g. a malformed shadow or an out-of-range animated
+        // value) traps the `Int(...)` conversions; treat it as no blur / no offset.
+        let radius = min(Int((blur.isFinite ? blur : 0).rounded()), max(width, height))
         let blurred = boxBlurredAlpha(coverage, width: width, height: height, radius: radius)
-        let dx = Int(offset.x.rounded())
-        let dy = Int(offset.y.rounded())
+        let dx = Int((offset.x.isFinite ? offset.x : 0).rounded())
+        let dy = Int((offset.y.isFinite ? offset.y : 0).rounded())
         var result = [Double](repeating: 0, count: width * height)
         for y in 0 ..< height {
             for x in 0 ..< width {

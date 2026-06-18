@@ -102,9 +102,10 @@ public final class BitmapRenderer: Renderer, Sendable {
                 if let cached = layerCache[key] {
                     stamp = cached
                 } else {
+                    // A non-finite pattern tile size traps `Int(...)`; fall back to 1x1.
                     let layerRenderer = BitmapRenderer(
-                        width: max(1, Int(layer.width.rounded(.up))),
-                        height: max(1, Int(layer.height.rounded(.up))),
+                        width: layer.width.isFinite ? max(1, Int(layer.width.rounded(.up))) : 1,
+                        height: layer.height.isFinite ? max(1, Int(layer.height.rounded(.up))) : 1,
                         colorSpace: colorSpace,
                         layerDepth: layerDepth + 1
                     )
@@ -697,6 +698,11 @@ public final class BitmapRenderer: Renderer, Sendable {
         let dp1 = p1.applying(state.transform)
         let dp2 = p2.applying(state.transform)
         let dp3 = p3.applying(state.transform)
+
+        // A non-finite destination rect or transform projects to non-finite corners, and the
+        // device-bounds `Int(floor/ceil(...))` below traps on `Int(NaN/Inf)`; skip the draw.
+        guard dp0.x.isFinite, dp0.y.isFinite, dp1.x.isFinite, dp1.y.isFinite,
+              dp2.x.isFinite, dp2.y.isFinite, dp3.x.isFinite, dp3.y.isFinite else { return }
 
         let minX = max(0, Int(floor(min(dp0.x, dp1.x, dp2.x, dp3.x))))
         let maxX = min(width - 1, Int(ceil(max(dp0.x, dp1.x, dp2.x, dp3.x))))

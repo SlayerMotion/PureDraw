@@ -197,6 +197,32 @@ struct RendererTests {
         _ = try? PDFRenderer(width: 64, height: 64).render(context)
     }
 
+    @Test func nonFiniteImageAndShadowDoNotTrap() throws {
+        // Image device-bounds (BitmapRenderer.rasterizeImage) and the shadow blur/offset
+        // (ShadowRasterizer) convert geometry to Int; a non-finite destination rect,
+        // transform, blur, or offset must not trap.
+        let image = try Image(width: 2, height: 2, alphaInfo: .last, data: [UInt8](repeating: 200, count: 16))
+        for bad in [Double.nan, .infinity, -.infinity] {
+            // Non-finite image destination rect.
+            var imageContext = GraphicsContext()
+            imageContext.draw(image, in: Rect(x: bad, y: 0, width: 10, height: bad))
+            _ = try? BitmapRenderer(width: 32, height: 32).render(imageContext)
+
+            // Non-finite transform under a finite image draw.
+            var transformContext = GraphicsContext()
+            transformContext.concatenate(AffineTransform(a: bad, b: 0, c: 0, d: 1, tx: bad, ty: 0))
+            transformContext.draw(image, in: Rect(x: 0, y: 0, width: 10, height: 10))
+            _ = try? BitmapRenderer(width: 32, height: 32).render(transformContext)
+
+            // Non-finite shadow blur and offset around a filled rect.
+            var shadowContext = GraphicsContext()
+            shadowContext.setShadow(offset: Point(x: bad, y: bad), blur: bad, color: .black)
+            shadowContext.setFillColor(.white)
+            shadowContext.fill(Rect(x: 8, y: 8, width: 16, height: 16))
+            _ = try? BitmapRenderer(width: 32, height: 32).render(shadowContext)
+        } // must not trap
+    }
+
     @Test func pngEncoderToleratesNonFiniteFrameDelay() throws {
         // Int((frameDelay * 1000).rounded()) traps on NaN/Inf; the encoder sanitizes it.
         let frame = try BitmapRenderer(width: 2, height: 2).render(GraphicsContext())
