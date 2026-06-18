@@ -711,6 +711,8 @@ public struct Path: Equatable, Sendable, Validatable {
         (p1.x - p0.x) * (p2.y - p0.y) - (p2.x - p0.x) * (p1.y - p0.y)
     }
 
+    /// Flattens the path into one closed polygon per subpath (every subpath is treated as closed),
+    /// the form area fills and point-in-polygon tests expect. Use `toPolylines()` for stroking.
     public func toPolygons() -> [[Point]] {
         toPolylines().map { polyline in
             var points = polyline.points

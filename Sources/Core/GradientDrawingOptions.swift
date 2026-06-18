@@ -11,6 +11,8 @@ public struct GradientDrawingOptions: OptionSet, Sendable, Equatable {
         self.rawValue = rawValue
     }
 
+    /// Fill the region before the first stop with the start color instead of leaving it uncovered.
     public static let drawsBeforeStartLocation = GradientDrawingOptions(rawValue: 1 << 0)
+    /// Fill the region after the last stop with the end color instead of leaving it uncovered.
     public static let drawsAfterEndLocation = GradientDrawingOptions(rawValue: 1 << 1)
 }

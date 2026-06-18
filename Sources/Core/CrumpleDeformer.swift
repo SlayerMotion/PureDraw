@@ -19,6 +19,8 @@ public struct CrumpleDeformer: Sendable {
     /// The scale of the wrinkles (multiplier on wrinkle amplitude).
     public var wrinkleStrength: Double
 
+    /// Creates a deformer pinching toward `center` within `radius`, with the given pinch and
+    /// wrinkle strengths.
     public init(
         center: Point,
         radius: Double,

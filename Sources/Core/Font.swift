@@ -17,6 +17,7 @@ public struct Font: Equatable, Sendable {
     public let ascent: Double
     /// Typographic descent in font units (typically negative).
     public let descent: Double
+    /// The number of glyphs in the font, the valid range for a glyph index.
     public let numberOfGlyphs: Int
 
     /// The raw sfnt bytes the font was parsed from, for embedding in formats
@@ -40,10 +41,13 @@ public struct Font: Equatable, Sendable {
 
     // MARK: - Parsing
 
+    /// Parses a font from a data provider, throwing a `ValidationError` if the sfnt is unreadable.
     public init(provider: DataProvider) throws {
         try self.init(data: provider.data())
     }
 
+    /// Parses a font from raw sfnt bytes (`.ttf`/`.otf`, or the first face of a `.ttc`). Throws a
+    /// `ValidationError` describing the first malformed or missing required table.
     public init(data bytes: [UInt8]) throws {
         var fontStart = 0
         if Self.tag(bytes, at: 0) == "ttcf" {
