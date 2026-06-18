@@ -244,6 +244,34 @@ public struct Font: Equatable, Sendable {
         return outline(forGlyph: index, depth: 0)
     }
 
+    /// The embedded bitmap for `index`, if the font carries an Apple `sbix` table with a PNG
+    /// strike for that glyph (PureDraw #80). Color/emoji fonts store glyphs as bitmaps here
+    /// rather than as outlines; the first strike that has a PNG for the glyph is decoded (via
+    /// the PNG decoder, #103). Returns nil for outline glyphs, empty strikes, or the
+    /// non-PNG graphic types (`jpg `, `tiff`, `dupe`), which are not decoded.
+    public func glyphBitmap(forGlyph index: Int) -> Image? {
+        guard index >= 0, index < numberOfGlyphs, let sbix = tables["sbix"] else { return nil }
+        let base = sbix.offset
+        guard let numStrikes = Self.u32(data, at: base + 4), numStrikes > 0 else { return nil }
+        for strike in 0 ..< numStrikes {
+            guard let strikeOffset = Self.u32(data, at: base + 8 + strike * 4) else { continue }
+            let strikeBase = base + strikeOffset
+            // strike: ppem (2), ppi (2), then numGlyphs+1 u32 glyph-data offsets (from strikeBase).
+            let offsetTable = strikeBase + 4
+            guard let glyphOffset = Self.u32(data, at: offsetTable + index * 4),
+                  let nextOffset = Self.u32(data, at: offsetTable + (index + 1) * 4),
+                  nextOffset > glyphOffset // equal means no bitmap for this glyph in this strike
+            else { continue }
+            // glyph data: originOffsetX (2), originOffsetY (2), graphicType tag (4), image bytes.
+            let glyphStart = strikeBase + glyphOffset
+            guard let graphicType = Self.tag(data, at: glyphStart + 4) else { continue }
+            let imageStart = glyphStart + 8, imageEnd = strikeBase + nextOffset
+            guard graphicType == "png ", imageStart < imageEnd, imageEnd <= data.count else { continue }
+            return try? ImageDecoder.decode(Array(data[imageStart ..< imageEnd]))
+        }
+        return nil
+    }
+
     private func glyphRange(_ index: Int) -> (offset: Int, length: Int)? {
         guard index >= 0, index < numberOfGlyphs,
               let loca = tables["loca"], let glyf = tables["glyf"]
