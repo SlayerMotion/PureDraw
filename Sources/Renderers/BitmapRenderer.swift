@@ -781,14 +781,6 @@ public final class BitmapRenderer: Renderer, Sendable {
 
         case .xor:
             porterDuff(1.0 - dstA, 1.0 - srcA) // source and destination where the other is absent
-
-        default:
-            // Defensive fallback for any future BlendMode case: composite source-over.
-            // All modes the enum currently defines are handled above.
-            outA = srcA + dstA * (1.0 - srcA)
-            outR = srcR + dstR * (1.0 - srcA)
-            outG = srcG + dstG * (1.0 - srcA)
-            outB = srcB + dstB * (1.0 - srcA)
         }
 
         buffer[index] = UInt8(min(255, max(0, Int(round(outR * 255.0)))))
