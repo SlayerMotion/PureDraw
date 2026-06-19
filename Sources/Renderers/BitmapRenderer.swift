@@ -625,8 +625,14 @@ public final class BitmapRenderer: Renderer, Sendable {
         func clipColor(_ c: RGB) -> RGB {
             let l = lum(c), n = min(c.r, c.g, c.b), x = max(c.r, c.g, c.b)
             var out = c
-            if n < 0 { out = (l + (out.r - l) * l / (l - n), l + (out.g - l) * l / (l - n), l + (out.b - l) * l / (l - n)) }
-            if x > 1 { out = (l + (out.r - l) * (1 - l) / (x - l), l + (out.g - l) * (1 - l) / (x - l), l + (out.b - l) * (1 - l) / (x - l)) }
+            // The W3C scaling is `l + (c - l) * span / (denominator)`. For an achromatic
+            // colour (r == g == b) the denominator `l - n` / `x - l` is 0 AND every
+            // `c - l` numerator is 0, so the true limit is the colour unchanged; guarding
+            // the zero denominator returns exactly that instead of evaluating 0/0 -> NaN.
+            // (An out-of-gamut achromatic value stays out of gamut here and is clamped by
+            // the byte quantiser, matching CoreGraphics.)
+            if n < 0, l - n != 0 { out = (l + (out.r - l) * l / (l - n), l + (out.g - l) * l / (l - n), l + (out.b - l) * l / (l - n)) }
+            if x > 1, x - l != 0 { out = (l + (out.r - l) * (1 - l) / (x - l), l + (out.g - l) * (1 - l) / (x - l), l + (out.b - l) * (1 - l) / (x - l)) }
             return out
         }
         func setLum(_ c: RGB, _ l: Double) -> RGB {
@@ -783,10 +789,18 @@ public final class BitmapRenderer: Renderer, Sendable {
             porterDuff(1.0 - dstA, 1.0 - srcA) // source and destination where the other is absent
         }
 
-        buffer[index] = UInt8(min(255, max(0, Int(round(outR * 255.0)))))
-        buffer[index + 1] = UInt8(min(255, max(0, Int(round(outG * 255.0)))))
-        buffer[index + 2] = UInt8(min(255, max(0, Int(round(outB * 255.0)))))
-        buffer[index + 3] = UInt8(min(255, max(0, Int(round(outA * 255.0)))))
+        /// Quantise to a byte by clamping in Double space BEFORE the integer conversion, so a
+        /// non-finite or out-of-range channel degrades to a clamped byte instead of trapping
+        /// `Int(NaN/Inf)` or overflowing `Int(huge)`. Non-finite -> 0 (transparent/black).
+        func toByte(_ v: Double) -> UInt8 {
+            let scaled = (v * 255.0).rounded()
+            guard scaled.isFinite else { return 0 }
+            return UInt8(min(255.0, max(0.0, scaled)))
+        }
+        buffer[index] = toByte(outR)
+        buffer[index + 1] = toByte(outG)
+        buffer[index + 2] = toByte(outB)
+        buffer[index + 3] = toByte(outA)
     }
 
     /// Draws `image` warped from `rect` onto a device quad through a projective
