@@ -1049,9 +1049,15 @@ public struct Font: Equatable, Sendable {
 
     /// A signed 16.16 fixed-point value (the `Fixed` type used by `fvar` coordinates).
     private static func fixed16(_ bytes: [UInt8], at offset: Int) -> Double? {
-        guard let raw = u32(bytes, at: offset) else { return nil }
-        let signed = raw >= 0x8000_0000 ? raw - 0x1_0000_0000 : raw
-        return Double(signed) / 65536.0
+        guard offset >= 0, offset + 4 <= bytes.count else { return nil }
+        // Read as UInt32 and reinterpret the two's-complement sign so the math is
+        // correct on 32-bit targets (the literals 0x8000_0000 / 0x1_0000_0000
+        // overflow a 32-bit Int, e.g. on wasm32).
+        let raw = (UInt32(bytes[offset]) << 24)
+            | (UInt32(bytes[offset + 1]) << 16)
+            | (UInt32(bytes[offset + 2]) << 8)
+            | UInt32(bytes[offset + 3])
+        return Double(Int32(bitPattern: raw)) / 65536.0
     }
 
     private static func tag(_ bytes: [UInt8], at offset: Int) -> String? {
