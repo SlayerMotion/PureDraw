@@ -7,7 +7,10 @@ import PackageDescription
 // Hard rule for this repo: NO external SPM dependencies.
 
 /// ---------- Dependencies ----------
-let deps: [Package.Dependency] = []
+let deps: [Package.Dependency] = [
+    // Documentation tooling (build-time plugin only; not linked into the library).
+    .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.3"),
+]
 
 /// ---------- Products ----------
 let allProducts: [Product] = {
