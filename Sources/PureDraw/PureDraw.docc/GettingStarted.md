@@ -5,11 +5,11 @@ Draw a picture and render it to an image.
 ## Overview
 
 PureDraw separates *describing* a picture from *rendering* it. You issue drawing
-commands to a ``GraphicsContext``, then hand the context to a renderer.
+commands to a `GraphicsContext`, then hand the context to a renderer.
 
 ### Describe the picture
 
-A ``GraphicsContext`` is a value type that records drawing operations together
+A `GraphicsContext` is a value type that records drawing operations together
 with the graphics state in effect when each is issued.
 
 ```swift
@@ -29,10 +29,10 @@ context.strokeEllipse(in: Rect(x: 20, y: 20, width: 60, height: 60))
 
 Because each command captures the current state, changing the fill color later
 does not affect shapes already recorded. Bracket temporary changes with
-``GraphicsContext/saveGState()`` and ``GraphicsContext/restoreGState()``, and
-build free-form shapes with ``GraphicsContext/move(to:)``,
-``GraphicsContext/addLine(to:)``, ``GraphicsContext/addCurve(to:control1:control2:)``,
-and ``GraphicsContext/fillPath(using:)``.
+`GraphicsContext.saveGState()` and `GraphicsContext.restoreGState()`, and
+build free-form shapes with `GraphicsContext.move(to:)`,
+`GraphicsContext.addLine(to:)`, `GraphicsContext.addCurve(to:control1:control2:)`,
+and `GraphicsContext.fillPath(using:)`.
 
 ### Render it
 
@@ -41,9 +41,9 @@ let renderer = BitmapRenderer(width: 100, height: 100)
 let image = try renderer.render(context)   // a raw-RGBA Image
 ```
 
-``Renderer/render(_:)`` validates the context, rejecting non-finite or
+`Renderer.render(_:)` validates the context, rejecting non-finite or
 out-of-range values before drawing, then produces the backend's output (an
-``Image`` for ``BitmapRenderer``).
+`Image` for `BitmapRenderer`).
 
 To produce a document or code instead of pixels, swap in a different renderer
 without changing the drawing code; see <doc:ChoosingARenderer>.

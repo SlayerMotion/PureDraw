@@ -10,7 +10,7 @@ codec. Decoders are strict: unsupported or malformed input throws or returns
 
 ### Images
 
-``ImageDecoder`` turns encoded bytes into a raw-RGBA ``Image``. It handles PNG
+`ImageDecoder` turns encoded bytes into a raw-RGBA `Image`. It handles PNG
 (8-bit grayscale, RGB, RGBA, grayscale+alpha, and palette) and `data:` URIs
 wrapping a base64 PNG.
 
@@ -21,12 +21,12 @@ let image = try ImageDecoder.decode(pngBytes)        // [UInt8] -> Image
 let fromURI = try ImageDecoder.decode(dataURI: uri)  // "data:image/png;base64,..."
 ```
 
-Unsupported formats and malformed data throw ``ImageDecoder/Error``.
+Unsupported formats and malformed data throw `ImageDecoder.Error`.
 
 ### Fonts
 
 Parse a TrueType or OpenType font from its sfnt bytes, then map characters to
-glyphs and read their outlines as ``Path`` values (in font units, y up).
+glyphs and read their outlines as `Path` values (in font units, y up).
 
 ```swift
 let font = try Font(data: sfntBytes)
@@ -38,7 +38,7 @@ if let glyph = font.glyphIndex(for: "A"),
 
 Outlines come from `glyf` (TrueType), `CFF `, or `CFF2` (the variable-font
 PostScript form) transparently. A WOFF 1.0 wrapper is decoded with
-``Font/init(woff:)``.
+`Font.init(woff:)`.
 
 ### Color and bitmap glyphs
 
