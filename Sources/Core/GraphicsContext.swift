@@ -504,7 +504,7 @@ public struct GraphicsContext: Sendable, Validatable {
     public mutating func showText(_ text: String) {
         guard let font = currentState.font else { return }
         let glyphs = text.unicodeScalars.map { font.glyphIndex(for: $0) ?? 0 }
-        recordText(glyphs: glyphs, text: text)
+        recordText(glyphs: glyphs, text: text, advances: nil)
     }
 
     /// Shows glyphs starting at the given position, advancing the text position.
@@ -518,13 +518,31 @@ public struct GraphicsContext: Sendable, Validatable {
     /// the text matrix's x axis. Glyph-index runs carry no source string, so
     /// they render as outlines on every backend.
     public mutating func showGlyphs(_ glyphs: [Int]) {
-        recordText(glyphs: glyphs, text: nil)
+        recordText(glyphs: glyphs, text: nil, advances: nil)
+    }
+
+    /// Shows glyphs at the given position, positioning each by a caller-supplied
+    /// advance in user space rather than the font's nominal metric. Mirrors
+    /// `CGContextShowGlyphsWithAdvances`: a layout engine (kerning, justification,
+    /// shaped runs) drives the positions. Each advance displaces the pen along the
+    /// text matrix's x axis.
+    public mutating func showGlyphs(_ glyphs: [Int], advances: [Double], at position: Point) {
+        setTextPosition(position)
+        showGlyphs(glyphs, advances: advances)
+    }
+
+    /// Shows glyphs at the current text position, positioning each by a
+    /// caller-supplied advance in user space.
+    public mutating func showGlyphs(_ glyphs: [Int], advances: [Double]) {
+        recordText(glyphs: glyphs, text: nil, advances: advances)
     }
 
     /// Records a text run as a single high-level operation and advances the
     /// pen. Backends without native text expand it to glyph outlines via
-    /// `textLoweredCommands`; SVG and PDF can render it as real text.
-    private mutating func recordText(glyphs: [Int], text: String?) {
+    /// `textLoweredCommands`; SVG and PDF can render it as real text. When
+    /// `advances` is non-nil, each glyph is displaced by the supplied user-space
+    /// advance instead of the font's nominal advance width.
+    private mutating func recordText(glyphs: [Int], text: String?, advances: [Double]?) {
         guard let font = currentState.font, font.unitsPerEm > 0 else { return }
 
         commands.append(DrawOperation(
@@ -535,7 +553,8 @@ public struct GraphicsContext: Sendable, Validatable {
                 fontSize: currentState.fontSize,
                 drawingMode: currentState.textDrawingMode,
                 textMatrix: textMatrix,
-                position: textPosition
+                position: textPosition,
+                advances: advances
             ),
             state: currentState
         ))
@@ -544,7 +563,7 @@ public struct GraphicsContext: Sendable, Validatable {
         let scale = currentState.fontSize / Double(font.unitsPerEm)
         let clips = currentState.textDrawingMode.clips
         var glyphClip = Path()
-        for glyph in glyphs {
+        for (index, glyph) in glyphs.enumerated() {
             if clips, let outline = font.outline(forGlyph: glyph) {
                 // The placement matches the lowering in `Layer.lowerText` exactly.
                 let placement = AffineTransform.identity
@@ -553,7 +572,13 @@ public struct GraphicsContext: Sendable, Validatable {
                     .translatedBy(x: textPosition.x, y: textPosition.y)
                 glyphClip.addPath(outline.applying(placement))
             }
-            let advance = font.advanceWidth(forGlyph: glyph) * scale + currentState.characterSpacing
+            // A supplied advance is a final user-space displacement; the font advance
+            // is in em units scaled to user space, plus character spacing.
+            let advance: Double = if let advances, index < advances.count {
+                advances[index]
+            } else {
+                font.advanceWidth(forGlyph: glyph) * scale + currentState.characterSpacing
+            }
             textPosition = Point(
                 x: textPosition.x + advance * textMatrix.a,
                 y: textPosition.y + advance * textMatrix.b

@@ -33,7 +33,7 @@ public struct DrawOperation: Equatable, Sendable, Validatable {
         /// rect-to-device projective mapping, so it can render a 3D-projected quad.
         case drawImageProjective(Image, rect: Rect, transform: ProjectiveTransform)
         case drawLayer(Layer, rect: Rect)
-        case showText(glyphs: [Int], text: String?, font: Font, fontSize: Double, drawingMode: TextDrawingMode, textMatrix: AffineTransform, position: Point)
+        case showText(glyphs: [Int], text: String?, font: Font, fontSize: Double, drawingMode: TextDrawingMode, textMatrix: AffineTransform, position: Point, advances: [Double]?)
     }
 
     /// The drawing command and its geometry.

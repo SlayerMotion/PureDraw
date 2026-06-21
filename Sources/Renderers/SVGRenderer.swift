@@ -200,7 +200,7 @@ public struct SVGRenderer: Renderer {
                 elements.append("  <g \(attrsStr)>")
             case .endTransparencyLayer:
                 elements.append("  </g>")
-            case let .showText(_, text, _, fontSize, drawingMode, textMatrix, position):
+            case let .showText(_, text, _, fontSize, drawingMode, textMatrix, position, _):
                 if let element = svgTextElement(
                     text: text,
                     fontSize: fontSize,

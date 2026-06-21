@@ -138,7 +138,7 @@ public struct PDFRenderer: Renderer {
             return fontUsages.count - 1
         }
         for op in context.layerFlattenedCommands {
-            guard case let .showText(glyphs, text, font, _, mode, _, _) = op.kind, mode != .invisible else { continue }
+            guard case let .showText(glyphs, text, font, _, mode, _, _, _) = op.kind, mode != .invisible else { continue }
             let index = fontIndex(font)
             fontUsages[index].glyphs.formUnion(glyphs)
             if let text {
@@ -401,7 +401,7 @@ public struct PDFRenderer: Renderer {
                 contentStream += "\(rect.width) 0 0 \(rect.height) \(rect.origin.x) \(rect.origin.y) cm\n"
                 contentStream += "/\(imgName) Do\n"
                 contentStream += "Q\n"
-            case let .showText(glyphs, _, font, fontSize, mode, _, position):
+            case let .showText(glyphs, _, font, fontSize, mode, _, position, _):
                 if !glyphs.isEmpty, mode != .invisible {
                     let name = "F\(fontIndex(font))"
                     // Clip modes are lowered to outlines before reaching the native

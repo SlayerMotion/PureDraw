@@ -65,15 +65,16 @@ public extension GraphicsContext {
     static func lowerText(_ operations: [DrawOperation], preservingNamedText: Bool = false) -> [DrawOperation] {
         var result: [DrawOperation] = []
         for operation in operations {
-            guard case let .showText(glyphs, text, font, fontSize, drawingMode, textMatrix, position) = operation.kind else {
+            guard case let .showText(glyphs, text, font, fontSize, drawingMode, textMatrix, position, advances) = operation.kind else {
                 result.append(operation)
                 continue
             }
             // A run with a source string and an identity text matrix can be
             // rendered as native text by SVG/PDF; leave it intact for them. The
-            // clip modes lower so the glyph clip (set on the context at record
-            // time) and the paint stay correct; anything else lowers to outlines.
-            if preservingNamedText, text != nil, textMatrix == .identity, !drawingMode.clips {
+            // clip modes and supplied-advance runs lower so the glyph clip (set on
+            // the context at record time) and the per-glyph positions stay correct;
+            // anything else lowers to outlines.
+            if preservingNamedText, text != nil, textMatrix == .identity, !drawingMode.clips, advances == nil {
                 result.append(operation)
                 continue
             }
@@ -83,7 +84,7 @@ public extension GraphicsContext {
             guard font.unitsPerEm > 0, paintMode != .invisible else { continue }
             let scale = fontSize / Double(font.unitsPerEm)
             var pen = position
-            for glyph in glyphs {
+            for (index, glyph) in glyphs.enumerated() {
                 if let outline = font.outline(forGlyph: glyph) {
                     // Font units are y-up; user space is y-down, so flip while
                     // scaling, then apply the text matrix and the pen position.
@@ -104,7 +105,13 @@ public extension GraphicsContext {
                         break
                     }
                 }
-                let advance = font.advanceWidth(forGlyph: glyph) * scale + operation.state.characterSpacing
+                // A supplied advance positions the next glyph directly; otherwise the
+                // font's advance width plus character spacing does.
+                let advance: Double = if let advances, index < advances.count {
+                    advances[index]
+                } else {
+                    font.advanceWidth(forGlyph: glyph) * scale + operation.state.characterSpacing
+                }
                 pen = Point(x: pen.x + advance * textMatrix.a, y: pen.y + advance * textMatrix.b)
             }
         }

@@ -57,7 +57,7 @@ extension ValidationReachTests {
     @Test func negativeShowTextFontSizeIsCaught() throws {
         let font = try Font(data: MiniFont.build())
         let op = DrawOperation(
-            kind: .showText(glyphs: [1], text: "A", font: font, fontSize: -5, drawingMode: .fill, textMatrix: .identity, position: .zero),
+            kind: .showText(glyphs: [1], text: "A", font: font, fontSize: -5, drawingMode: .fill, textMatrix: .identity, position: .zero, advances: nil),
             state: GraphicState()
         )
         #expect(throws: ValidationErrorCollection.self) { try op.validate() }
@@ -66,7 +66,7 @@ extension ValidationReachTests {
     @Test func negativeGlyphIndexIsCaught() throws {
         let font = try Font(data: MiniFont.build())
         let op = DrawOperation(
-            kind: .showText(glyphs: [-1], text: nil, font: font, fontSize: 10, drawingMode: .fill, textMatrix: .identity, position: .zero),
+            kind: .showText(glyphs: [-1], text: nil, font: font, fontSize: 10, drawingMode: .fill, textMatrix: .identity, position: .zero, advances: nil),
             state: GraphicState()
         )
         #expect(throws: ValidationErrorCollection.self) { try op.validate() }
@@ -75,7 +75,7 @@ extension ValidationReachTests {
     @Test func validShowTextOperationPasses() throws {
         let font = try Font(data: MiniFont.build())
         let op = DrawOperation(
-            kind: .showText(glyphs: [1], text: "A", font: font, fontSize: 10, drawingMode: .fill, textMatrix: .identity, position: .zero),
+            kind: .showText(glyphs: [1], text: "A", font: font, fontSize: 10, drawingMode: .fill, textMatrix: .identity, position: .zero, advances: nil),
             state: GraphicState()
         )
         try op.validate()

@@ -234,7 +234,7 @@ public extension Validation {
         .init(
             description: "Text-show operation parameters are valid",
             check: { context in
-                guard case let .showText(glyphs, _, _, fontSize, _, _, _) = context.subject.kind else { return [] }
+                guard case let .showText(glyphs, _, _, fontSize, _, _, _, _) = context.subject.kind else { return [] }
                 var errors: [ValidationError] = []
                 if fontSize < 0 {
                     errors.append(ValidationError(
