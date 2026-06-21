@@ -114,6 +114,14 @@ public struct GraphicState: Equatable, Sendable, Validatable {
     /// The tiling pattern used by fill operations; nil fills with `fillColor`.
     public var fillPattern: Pattern?
 
+    /// The tiling pattern used by stroke operations; nil strokes with `strokeColor`.
+    public var strokePattern: Pattern?
+
+    /// The phase that anchors the pattern lattice, the `CGContextSetPatternPhase`
+    /// equivalent: tiles are placed relative to this origin so they do not shift
+    /// when the CTM changes.
+    public var patternPhase: Point
+
     /// The current active image-based clipping mask.
     public var maskImage: Image?
 
@@ -152,6 +160,8 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         characterSpacing: Double = 0.0,
         textDrawingMode: TextDrawingMode = .fill,
         fillPattern: Pattern? = nil,
+        strokePattern: Pattern? = nil,
+        patternPhase: Point = .zero,
         maskImage: Image? = nil,
         maskRect: Rect? = nil,
         maskTransform: Geometry.AffineTransform? = nil
@@ -183,6 +193,8 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         self.characterSpacing = characterSpacing
         self.textDrawingMode = textDrawingMode
         self.fillPattern = fillPattern
+        self.strokePattern = strokePattern
+        self.patternPhase = patternPhase
         self.maskImage = maskImage
         self.maskRect = maskRect
         self.maskTransform = maskTransform

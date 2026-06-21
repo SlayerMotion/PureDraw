@@ -62,7 +62,7 @@ extension GraphicsContext {
     /// own commands carry through their transforms, colors (colored patterns)
     /// or the current fill color (uncolored patterns), composed with the
     /// current CTM.
-    func patternFillCommands(of path: Path, pattern: Pattern) -> [DrawOperation] {
+    func patternFillCommands(of path: Path, pattern: Pattern, phase: Point = .zero) -> [DrawOperation] {
         guard pattern.bounds.width > 0, pattern.bounds.height > 0,
               pattern.xStep > 0, pattern.yStep > 0
         else { return [] }
@@ -70,11 +70,12 @@ extension GraphicsContext {
         let bbox = path.boundingBox
         guard !bbox.isNull, !bbox.isEmpty else { return [] }
 
-        // Tile indices whose cell extent intersects the fill bounding box.
-        let iMin = Int(((bbox.minX - pattern.bounds.minX - pattern.bounds.width) / pattern.xStep).rounded(.down))
-        let iMax = Int(((bbox.maxX - pattern.bounds.minX) / pattern.xStep).rounded(.up))
-        let jMin = Int(((bbox.minY - pattern.bounds.minY - pattern.bounds.height) / pattern.yStep).rounded(.down))
-        let jMax = Int(((bbox.maxY - pattern.bounds.minY) / pattern.yStep).rounded(.up))
+        // Tile indices whose cell extent intersects the fill bounding box. The
+        // phase anchors the lattice, so it shifts both the index range and the tiles.
+        let iMin = Int(((bbox.minX - pattern.bounds.minX - phase.x - pattern.bounds.width) / pattern.xStep).rounded(.down))
+        let iMax = Int(((bbox.maxX - pattern.bounds.minX - phase.x) / pattern.xStep).rounded(.up))
+        let jMin = Int(((bbox.minY - pattern.bounds.minY - phase.y - pattern.bounds.height) / pattern.yStep).rounded(.down))
+        let jMax = Int(((bbox.maxY - pattern.bounds.minY - phase.y) / pattern.yStep).rounded(.up))
         guard iMin <= iMax, jMin <= jMax else { return [] }
         guard (iMax - iMin + 1) * (jMax - jMin + 1) <= Self.maxPatternTiles else { return [] }
 
@@ -90,7 +91,7 @@ extension GraphicsContext {
 
         for j in jMin ... jMax {
             for i in iMin ... iMax {
-                let tile = AffineTransform.translation(x: Double(i) * pattern.xStep, y: Double(j) * pattern.yStep)
+                let tile = AffineTransform.translation(x: Double(i) * pattern.xStep + phase.x, y: Double(j) * pattern.yStep + phase.y)
                 for cellOp in cellCommands {
                     let composed = cellOp.state.transform
                         .concatenating(tile)

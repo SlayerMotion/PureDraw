@@ -391,9 +391,21 @@ public struct GraphicsContext: Sendable, Validatable {
         currentState.fillPattern = pattern
     }
 
+    /// Sets the tiling pattern used by stroke operations; pass nil to stroke with
+    /// the stroke color again.
+    public mutating func setStrokePattern(_ pattern: Pattern?) {
+        currentState.strokePattern = pattern
+    }
+
+    /// Sets the pattern phase, the origin the pattern lattice is anchored to, the
+    /// `CGContextSetPatternPhase` equivalent.
+    public mutating func setPatternPhase(_ phase: Point) {
+        currentState.patternPhase = phase
+    }
+
     /// Strokes the specified path using the current graphics state, leaving the current path of the context unchanged.
     public mutating func stroke(_ path: Path) {
-        commands.append(DrawOperation(kind: .stroke(path), state: currentState))
+        recordStroke(of: path)
     }
 
     /// Fills the specified path using the current graphics state, leaving the current path of the context unchanged.
@@ -406,9 +418,29 @@ public struct GraphicsContext: Sendable, Validatable {
     /// support.
     private mutating func recordFill(of path: Path, rule: FillRule) {
         if let pattern = currentState.fillPattern {
-            commands.append(contentsOf: patternFillCommands(of: path, pattern: pattern))
+            commands.append(contentsOf: patternFillCommands(of: path, pattern: pattern, phase: currentState.patternPhase))
         } else {
             commands.append(DrawOperation(kind: .fill(path, rule: rule), state: currentState))
+        }
+    }
+
+    /// Records a stroke, expanding into tiled cell operations clipped to the
+    /// stroked outline when a stroke pattern is set, so the pattern tiles within
+    /// the stroke on every backend.
+    private mutating func recordStroke(of path: Path) {
+        if let pattern = currentState.strokePattern {
+            let dash = currentState.dashPattern.contains { $0 > 0 } ? currentState.dashPattern : []
+            let outline = path.strokedOutline(
+                lineWidth: currentState.lineWidth,
+                lineCap: currentState.lineCap,
+                lineJoin: currentState.lineJoin,
+                miterLimit: currentState.miterLimit,
+                dashLengths: dash,
+                dashPhase: currentState.dashPhase
+            )
+            commands.append(contentsOf: patternFillCommands(of: outline, pattern: pattern, phase: currentState.patternPhase))
+        } else {
+            commands.append(DrawOperation(kind: .stroke(path), state: currentState))
         }
     }
 
