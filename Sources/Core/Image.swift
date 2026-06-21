@@ -249,6 +249,37 @@ public extension Image {
         )
     }
 
+    /// A copy of this image with its alpha modulated per pixel by `mask`, the analog of
+    /// `CGImageCreateWithMask`. By default `mask` is a soft (alpha) mask: its coverage multiplies this
+    /// image's alpha, so the image shows where the mask reveals and hides where it blocks. With
+    /// `asImageMask` true the mask is a Core Graphics image mask, inverted, so the image is painted
+    /// where the mask is dark and blocked where it is light. The mask is sampled to this image's
+    /// dimensions; the result is an opaque-format RGBA image that draws on every backend.
+    func masked(by mask: Image, asImageMask: Bool = false) -> Image? {
+        func byte(_ value: Double) -> UInt8 {
+            UInt8(min(255, max(0, Int(value * 255 + 0.5))))
+        }
+        var bytes = [UInt8]()
+        bytes.reserveCapacity(width * height * 4)
+        for y in 0 ..< height {
+            for x in 0 ..< width {
+                let color = pixelColor(x: x, y: y)
+                // Sample the mask at the matching normalized position (nearest).
+                let u = (Double(x) + 0.5) / Double(width)
+                let v = (Double(y) + 0.5) / Double(height)
+                let maskX = min(mask.width - 1, max(0, Int(u * Double(mask.width))))
+                let maskY = min(mask.height - 1, max(0, Int(v * Double(mask.height))))
+                let coverage = mask.maskCoverage(x: maskX, y: maskY)
+                let alpha = color.alpha * (asImageMask ? 1 - coverage : coverage)
+                bytes.append(byte(color.red * alpha))
+                bytes.append(byte(color.green * alpha))
+                bytes.append(byte(color.blue * alpha))
+                bytes.append(byte(alpha))
+            }
+        }
+        return try? Image(width: width, height: height, alphaInfo: .premultipliedLast, data: bytes)
+    }
+
     /// Resolves the clip-mask coverage of a pixel: the alpha channel when the image has one, luminance otherwise.
     /// White (or opaque) reveals, black (or transparent) hides. The result is clamped to 0...1.
     func maskCoverage(x: Int, y: Int) -> Double {
