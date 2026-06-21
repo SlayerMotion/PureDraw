@@ -404,11 +404,18 @@ public struct PDFRenderer: Renderer {
             case let .showText(glyphs, _, font, fontSize, mode, _, position):
                 if !glyphs.isEmpty, mode != .invisible {
                     let name = "F\(fontIndex(font))"
+                    // Clip modes are lowered to outlines before reaching the native
+                    // text path, so they are mapped here only for exhaustiveness; the
+                    // values are the PDF `Tr` text-clip render modes (4 through 7).
                     let renderMode = switch mode {
                     case .fill: 0
                     case .stroke: 1
                     case .fillStroke: 2
                     case .invisible: 3
+                    case .fillClip: 4
+                    case .strokeClip: 5
+                    case .fillStrokeClip: 6
+                    case .clip: 7
                     }
                     if mode != .stroke {
                         contentStream += pdfFillColorString(for: op.state.fillColor)

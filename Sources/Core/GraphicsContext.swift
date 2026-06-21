@@ -542,12 +542,29 @@ public struct GraphicsContext: Sendable, Validatable {
 
         // Advance the pen so the next show starts after this run.
         let scale = currentState.fontSize / Double(font.unitsPerEm)
+        let clips = currentState.textDrawingMode.clips
+        var glyphClip = Path()
         for glyph in glyphs {
+            if clips, let outline = font.outline(forGlyph: glyph) {
+                // The placement matches the lowering in `Layer.lowerText` exactly.
+                let placement = AffineTransform.identity
+                    .scaledBy(x: scale, y: -scale)
+                    .concatenating(textMatrix)
+                    .translatedBy(x: textPosition.x, y: textPosition.y)
+                glyphClip.addPath(outline.applying(placement))
+            }
             let advance = font.advanceWidth(forGlyph: glyph) * scale + currentState.characterSpacing
             textPosition = Point(
                 x: textPosition.x + advance * textMatrix.a,
                 y: textPosition.y + advance * textMatrix.b
             )
+        }
+
+        // The glyph outlines become the clipping path for subsequent drawing; the
+        // text just shown is painted unclipped. Mirrors the Core Graphics text-clip
+        // modes (the paint portion is lowered by `Layer.lowerText`).
+        if clips, !glyphClip.isEmpty {
+            currentState.clipPaths.append(glyphClip)
         }
     }
 

@@ -70,13 +70,17 @@ public extension GraphicsContext {
                 continue
             }
             // A run with a source string and an identity text matrix can be
-            // rendered as native text by SVG/PDF; leave it intact for them.
-            // Anything else lowers to outlines so it stays correct.
-            if preservingNamedText, text != nil, textMatrix == .identity {
+            // rendered as native text by SVG/PDF; leave it intact for them. The
+            // clip modes lower so the glyph clip (set on the context at record
+            // time) and the paint stay correct; anything else lowers to outlines.
+            if preservingNamedText, text != nil, textMatrix == .identity, !drawingMode.clips {
                 result.append(operation)
                 continue
             }
-            guard font.unitsPerEm > 0, drawingMode != .invisible else { continue }
+            // The paint portion of a clip mode is its equivalent non-clipping
+            // mode; the clip itself is added to the graphics state at record time.
+            let paintMode = drawingMode.paintMode
+            guard font.unitsPerEm > 0, paintMode != .invisible else { continue }
             let scale = fontSize / Double(font.unitsPerEm)
             var pen = position
             for glyph in glyphs {
@@ -88,7 +92,7 @@ public extension GraphicsContext {
                         .concatenating(textMatrix)
                         .translatedBy(x: pen.x, y: pen.y)
                     let placed = outline.applying(placement)
-                    switch drawingMode {
+                    switch paintMode {
                     case .fill:
                         result.append(DrawOperation(kind: .fill(placed, rule: .winding), state: operation.state))
                     case .stroke:
@@ -96,7 +100,7 @@ public extension GraphicsContext {
                     case .fillStroke:
                         result.append(DrawOperation(kind: .fill(placed, rule: .winding), state: operation.state))
                         result.append(DrawOperation(kind: .stroke(placed), state: operation.state))
-                    case .invisible:
+                    case .invisible, .fillClip, .strokeClip, .fillStrokeClip, .clip:
                         break
                     }
                 }
