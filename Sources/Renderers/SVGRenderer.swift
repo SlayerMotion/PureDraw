@@ -467,37 +467,18 @@ public struct SVGRenderer: Renderer {
         appendUInt32(0, to: &data)
 
         // --- PIXEL DATA ---
-        for index in stride(from: 0, to: image.data.count, by: 4) {
-            guard index + 3 < image.data.count else { break }
-            let r = Double(image.data[index]) / 255.0
-            let g = Double(image.data[index + 1]) / 255.0
-            let b = Double(image.data[index + 2]) / 255.0
-            let a = Double(image.data[index + 3]) / 255.0
-
-            var outR = r
-            var outG = g
-            var outB = b
-            var outA = a
-
-            switch image.alphaInfo {
-            case .premultipliedLast, .premultipliedFirst:
-                if a > 0 {
-                    outR = r / a
-                    outG = g / a
-                    outB = b / a
-                }
-            case .last, .first:
-                break
-            case .none, .noneSkipLast, .noneSkipFirst:
-                outA = 1.0
+        // Resolve each pixel through `pixelColor`, which already decodes the bit depth, un-premultiplies
+        // alpha, and looks up an indexed palette. This makes wide (16-bit/float), decode-array, and
+        // indexed images export correctly, and skips any row padding rather than treating it as pixels.
+        for y in 0 ..< image.height {
+            for x in 0 ..< image.width {
+                let color = image.pixelColor(x: x, y: y)
+                let byteB = UInt8(min(255, max(0, Int(round(color.blue * 255.0)))))
+                let byteG = UInt8(min(255, max(0, Int(round(color.green * 255.0)))))
+                let byteR = UInt8(min(255, max(0, Int(round(color.red * 255.0)))))
+                let byteA = UInt8(min(255, max(0, Int(round(color.alpha * 255.0)))))
+                data.append(contentsOf: [byteB, byteG, byteR, byteA])
             }
-
-            let byteB = UInt8(min(255, max(0, Int(round(outB * 255.0)))))
-            let byteG = UInt8(min(255, max(0, Int(round(outG * 255.0)))))
-            let byteR = UInt8(min(255, max(0, Int(round(outR * 255.0)))))
-            let byteA = UInt8(min(255, max(0, Int(round(outA * 255.0)))))
-
-            data.append(contentsOf: [byteB, byteG, byteR, byteA])
         }
 
         return data

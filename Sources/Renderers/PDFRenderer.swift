@@ -324,35 +324,17 @@ public struct PDFRenderer: Renderer {
 
                 let hasAlpha = image.alphaInfo != .none
 
-                for index in stride(from: 0, to: image.data.count, by: 4) {
-                    guard index + 3 < image.data.count else { break }
-                    let r = Double(image.data[index]) / 255.0
-                    let g = Double(image.data[index + 1]) / 255.0
-                    let b = Double(image.data[index + 2]) / 255.0
-                    let a = Double(image.data[index + 3]) / 255.0
-
-                    var outR = r
-                    var outG = g
-                    var outB = b
-                    var outA = a
-
-                    switch image.alphaInfo {
-                    case .premultipliedLast, .premultipliedFirst:
-                        if a > 0 {
-                            outR = r / a
-                            outG = g / a
-                            outB = b / a
-                        }
-                    case .last, .first:
-                        break
-                    case .none, .noneSkipLast, .noneSkipFirst:
-                        outA = 1.0
+                // Resolve each pixel through `pixelColor`, which decodes the bit depth, un-premultiplies
+                // alpha, and looks up an indexed palette, so wide (16-bit/float), decode-array, and
+                // indexed images embed correctly and row padding is skipped rather than read as pixels.
+                for y in 0 ..< image.height {
+                    for x in 0 ..< image.width {
+                        let color = image.pixelColor(x: x, y: y)
+                        rgbData.append(UInt8(min(255, max(0, Int(round(color.red * 255.0))))))
+                        rgbData.append(UInt8(min(255, max(0, Int(round(color.green * 255.0))))))
+                        rgbData.append(UInt8(min(255, max(0, Int(round(color.blue * 255.0))))))
+                        alphaData.append(UInt8(min(255, max(0, Int(round(color.alpha * 255.0))))))
                     }
-
-                    rgbData.append(UInt8(min(255, max(0, Int(round(outR * 255.0))))))
-                    rgbData.append(UInt8(min(255, max(0, Int(round(outG * 255.0))))))
-                    rgbData.append(UInt8(min(255, max(0, Int(round(outB * 255.0))))))
-                    alphaData.append(UInt8(min(255, max(0, Int(round(outA * 255.0))))))
                 }
 
                 // Valid zlib (FlateDecode) framing; Apple's NSData zlib emits

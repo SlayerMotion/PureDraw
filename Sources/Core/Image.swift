@@ -28,6 +28,11 @@ public struct Image: Sendable, Equatable {
     /// from `[0, 1]` onto `[min, max]`. `nil` is the identity decode. A reversed pair `[1, 0]`
     /// inverts the component.
     public let decode: [Double]?
+    /// The indexed (palette) color space, if this image's samples are palette indices rather than
+    /// color components. When set, each 8-bit sample is an index resolved through the palette; the
+    /// base space and per-entry alpha come from the palette colors. `nil` is an ordinary direct-color
+    /// image.
+    public let indexedColorSpace: IndexedColorSpace?
     /// The raw pixel bytes, laid out per the other fields.
     public let data: [UInt8]
 
@@ -45,6 +50,7 @@ public struct Image: Sendable, Equatable {
         alphaInfo: AlphaInfo = .premultipliedLast,
         maskingColors: [Double]? = nil,
         decode: [Double]? = nil,
+        indexedColorSpace: IndexedColorSpace? = nil,
         data: [UInt8]
     ) throws {
         let computedBytesPerRow = bytesPerRow ?? (width * bitsPerPixel / 8)
@@ -65,6 +71,7 @@ public struct Image: Sendable, Equatable {
         self.alphaInfo = alphaInfo
         self.maskingColors = maskingColors
         self.decode = decode
+        self.indexedColorSpace = indexedColorSpace
         self.data = data
     }
 }
@@ -83,6 +90,13 @@ public extension Image {
         let bytesPerPixel = bitsPerPixel / 8
         let pixelStart = y * bytesPerRow + x * bytesPerPixel
         guard pixelStart + bytesPerPixel <= data.count else { return .clear }
+
+        // An indexed image's sample is a palette index, not a color component: read the 8-bit index and
+        // resolve it through the table, whose entries carry their own color and alpha. Sub-byte
+        // (1/2/4-bit) indices are not yet unpacked (#133/#135).
+        if let indexed = indexedColorSpace {
+            return indexed.color(at: Int(data[pixelStart]))
+        }
 
         let alphaFirst = alphaInfo.isAlphaFirst
         let hasAlpha = alphaInfo.hasAlpha
@@ -231,6 +245,7 @@ public extension Image {
             alphaInfo: alphaInfo,
             maskingColors: maskingColors,
             decode: decode,
+            indexedColorSpace: indexedColorSpace,
             data: newData
         )
     }
