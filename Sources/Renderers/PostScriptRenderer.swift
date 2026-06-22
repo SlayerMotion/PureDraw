@@ -265,8 +265,13 @@ public struct PostScriptRenderer: Renderer {
             case .beginTransparencyLayer, .endTransparencyLayer, .drawLayer, .showText:
                 break // layers expanded, text lowered to outlines, transparency group flattened
             case .drawImageProjective:
+                // PostScript image placement is an affine image matrix with no perspective image
+                // operator, so a projective warp cannot be expressed. Fail loud rather than silently
+                // degrade to affine.
                 throw UnsupportedOperationError(operation: "drawImageProjective", renderer: "PostScriptRenderer")
             case .dropShadow:
+                // PostScript level 2/3 has no Gaussian blur operator, so a soft drop shadow cannot be
+                // expressed. Fail loud rather than approximate with a hard offset copy.
                 throw UnsupportedOperationError(operation: "dropShadow", renderer: "PostScriptRenderer")
             }
 

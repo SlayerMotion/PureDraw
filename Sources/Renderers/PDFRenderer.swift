@@ -437,8 +437,14 @@ public struct PDFRenderer: Renderer {
             case .drawLayer:
                 break // expanded by layerFlattenedCommands
             case .drawImageProjective:
+                // PDF image placement is an affine image matrix; a perspective warp would need a Type 7
+                // (Coons/tensor) patch mesh of the sampled image, which this writer does not emit. Fail
+                // loud rather than silently degrade to affine.
                 throw UnsupportedOperationError(operation: "drawImageProjective", renderer: "PDFRenderer")
             case .dropShadow:
+                // A soft (blurred) drop shadow needs a smoothly varying soft mask (SMask) built from a
+                // blurred coverage image; this writer emits only vector content, so fail loud rather than
+                // approximate with a hard offset copy.
                 throw UnsupportedOperationError(operation: "dropShadow", renderer: "PDFRenderer")
             }
 

@@ -2,11 +2,13 @@
 //  UnsupportedOperationTests.swift
 //  PureDraw
 //
-//  The vector renderers (SVG, PostScript, Canvas, PDF) cannot represent an explicit
-//  drop-shadow or a projective image warp, and previously skipped them silently, losing part
-//  of the drawing with no signal (PureDraw #114, audit .audit/PureDraw.md #5). They now throw
-//  a typed UnsupportedOperationError instead. Operations they CAN represent (or that are
-//  expanded/lowered upstream: layers, text) still render.
+//  The vector renderers previously skipped operations they could not represent silently, losing
+//  part of the drawing with no signal (PureDraw #114, audit .audit/PureDraw.md #5). They now throw
+//  a typed UnsupportedOperationError instead. As of #137 the explicit drop shadow exports through
+//  SVG (a shadow-only filter) and Canvas (the Filters API), so only PDF and PostScript, which have
+//  no Gaussian blur, still throw on it; a projective image warp is affine-only on every vector back
+//  end and still throws everywhere. Operations they CAN represent (or that are expanded/lowered
+//  upstream: layers, text) still render.
 //
 
 import Core
@@ -37,12 +39,18 @@ struct UnsupportedOperationTests {
         return c
     }
 
-    @Test func vectorRenderersThrowOnDropShadow() throws {
+    @Test func blurlessVectorRenderersThrowOnDropShadow() throws {
         let c = dropShadowContext()
-        #expect(throws: UnsupportedOperationError.self) { _ = try SVGRenderer().render(c) }
+        // PDF and PostScript have no Gaussian blur, so a soft drop shadow stays unsupported.
         #expect(throws: UnsupportedOperationError.self) { _ = try PostScriptRenderer().render(c) }
-        #expect(throws: UnsupportedOperationError.self) { _ = try CanvasRenderer().render(c) }
         #expect(throws: UnsupportedOperationError.self) { _ = try PDFRenderer(width: 40, height: 40).render(c) }
+    }
+
+    @Test func svgAndCanvasNowExportDropShadow() throws {
+        let c = dropShadowContext()
+        // SVG and Canvas can express a soft offset shadow, so the drop shadow no longer throws.
+        _ = try SVGRenderer().render(c)
+        _ = try CanvasRenderer().render(c)
     }
 
     @Test func vectorRenderersThrowOnProjectiveImage() throws {
@@ -56,11 +64,11 @@ struct UnsupportedOperationTests {
     @Test func errorNamesOperationAndRenderer() {
         let c = dropShadowContext()
         do {
-            _ = try SVGRenderer().render(c)
-            Issue.record("expected SVGRenderer to throw on dropShadow")
+            _ = try PDFRenderer(width: 40, height: 40).render(c)
+            Issue.record("expected PDFRenderer to throw on dropShadow")
         } catch let error as UnsupportedOperationError {
             #expect(error.operation == "dropShadow")
-            #expect(error.renderer == "SVGRenderer")
+            #expect(error.renderer == "PDFRenderer")
         } catch {
             Issue.record("expected UnsupportedOperationError, got \(error)")
         }

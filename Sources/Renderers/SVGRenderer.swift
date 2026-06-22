@@ -33,6 +33,9 @@ public struct SVGRenderer: Renderer {
             if !op.state.clipPaths.isEmpty, !uniqueClipPaths.contains(op.state.clipPaths) {
                 uniqueClipPaths.append(op.state.clipPaths)
             }
+            // An explicit drop shadow realizes its shadow through its own shadow-only filter, so it
+            // must not contribute a source-plus-shadow feDropShadow filter to the implicit-shadow set.
+            if case .dropShadow = op.kind { continue }
             if let shadow = op.state.shadow {
                 if !uniqueShadows.contains(shadow) {
                     uniqueShadows.append(shadow)
@@ -149,6 +152,20 @@ public struct SVGRenderer: Renderer {
                     defs.append("      <stop offset=\"\(stop.location)\" stop-color=\"\(colorHex)\" stop-opacity=\"\(stop.color.alpha)\" />")
                 }
                 defs.append("    </radialGradient>")
+            case .dropShadow:
+                // The explicit drop shadow paints only the shadow of a path (the CALayer.shadowPath
+                // analog), so it needs a shadow-only filter rather than the source-plus-shadow
+                // feDropShadow used for an implicit state shadow: blur the path's alpha, offset it,
+                // and flood it with the shadow colour clipped to that offset alpha.
+                if let shadow = op.state.shadow {
+                    let floodHex = hexColor(shadow.color)
+                    defs.append("    <filter id=\"dropshadow-\(opIndex)\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\">")
+                    defs.append("      <feGaussianBlur in=\"SourceAlpha\" stdDeviation=\"\(shadow.blur / 2.0)\" />")
+                    defs.append("      <feOffset dx=\"\(shadow.offset.x)\" dy=\"\(shadow.offset.y)\" result=\"offsetblur\" />")
+                    defs.append("      <feFlood flood-color=\"\(floodHex)\" flood-opacity=\"\(shadow.color.alpha)\" />")
+                    defs.append("      <feComposite in2=\"offsetblur\" operator=\"in\" />")
+                    defs.append("    </filter>")
+                }
             default:
                 break
             }
@@ -216,9 +233,27 @@ public struct SVGRenderer: Renderer {
             case .drawLayer:
                 break // expanded by layerFlattenedCommands
             case .drawImageProjective:
+                // A projective (perspective) image map is not expressible in SVG: <image> and the
+                // transform attribute apply only an affine matrix, and there is no standard element
+                // for a perspective texture map. Fail loud rather than silently degrade to affine.
                 throw UnsupportedOperationError(operation: "drawImageProjective", renderer: "SVGRenderer")
-            case .dropShadow:
-                throw UnsupportedOperationError(operation: "dropShadow", renderer: "SVGRenderer")
+            case let .dropShadow(p):
+                // Paint only the shadow of the path through the shadow-only filter built in defs.
+                // With no shadow set the operation paints nothing, matching the raster renderer.
+                guard op.state.shadow != nil else { break }
+                let pathStr = svgPathString(for: p)
+                var attrs: [String] = []
+                let t = op.state.transform
+                if t != .identity {
+                    attrs.append("transform=\"matrix(\(t.a) \(t.b) \(t.c) \(t.d) \(t.tx) \(t.ty))\"")
+                }
+                if !op.state.clipPaths.isEmpty, let clipIndex = uniqueClipPaths.firstIndex(of: op.state.clipPaths) {
+                    attrs.append("clip-path=\"url(#clip-\(clipIndex))\"")
+                }
+                // The fill is irrelevant: the filter rebuilds the output from SourceAlpha and feFlood.
+                attrs.append("fill=\"black\"")
+                attrs.append("filter=\"url(#dropshadow-\(opIndex))\"")
+                elements.append("  <path d=\"\(pathStr)\" \(attrs.joined(separator: " ")) />")
             }
         }
 

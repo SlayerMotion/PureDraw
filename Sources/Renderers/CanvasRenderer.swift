@@ -178,10 +178,26 @@ public struct CanvasRenderer: Renderer {
                 case .drawLayer, .showText:
                     break // layers expanded, text lowered to outlines by flattenedCommands
                 case .drawImageProjective:
+                    // A projective (perspective) image map is not expressible on a 2D canvas: setTransform
+                    // takes only an affine matrix and drawImage cannot warp to an arbitrary quad. Fail loud
+                    // rather than silently degrade to an affine approximation.
                     throw UnsupportedOperationError(operation: "drawImageProjective", renderer: "CanvasRenderer")
 
-                case .dropShadow:
-                    throw UnsupportedOperationError(operation: "dropShadow", renderer: "CanvasRenderer")
+                case let .dropShadow(path):
+                    // Paint only the shadow of the path (the CALayer.shadowPath analog). Cancel any
+                    // inherited state shadow, then build the shadow shape directly: blur with the Canvas
+                    // Filters API, offset, and fill the path in the shadow colour. With no shadow set this
+                    // paints nothing, matching the raster renderer.
+                    if let shadow = op.state.shadow {
+                        js.append("\(contextName).shadowColor = 'transparent';")
+                        js.append("\(contextName).filter = 'blur(\(shadow.blur / 2.0)px)';")
+                        js.append("\(contextName).translate(\(shadow.offset.x), \(shadow.offset.y));")
+                        js.append("\(contextName).fillStyle = '\(rgbaColor(shadow.color))';")
+                        js.append("\(contextName).beginPath();")
+                        appendPathElements(path, to: &js)
+                        js.append("\(contextName).fill();")
+                        js.append("\(contextName).filter = 'none';")
+                    }
 
                 case let .drawImage(image, rect):
                     let canvasVar = "imgCanvas_\(opIndex)"
