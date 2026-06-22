@@ -59,7 +59,18 @@ struct CanvasRendererTests {
         c.fill(Rect(x: 0, y: 0, width: 40, height: 40))
         let js = try CanvasRenderer().render(c)
         #expect(js.contains("beginPath();"), "a clip must begin a path")
-        #expect(js.contains("clip();"), "a clip must emit clip()")
+        #expect(js.contains("clip('nonzero');"), "a winding clip must emit clip('nonzero')")
+    }
+
+    @Test func evenOddClipEmitsRule() throws {
+        var c = GraphicsContext()
+        c.addRect(Rect(x: 0, y: 0, width: 40, height: 40))
+        c.addRect(Rect(x: 10, y: 10, width: 20, height: 20))
+        c.clip(using: .evenOdd)
+        c.setFillColor(.white)
+        c.fill(Rect(x: 0, y: 0, width: 40, height: 40))
+        let js = try CanvasRenderer().render(c)
+        #expect(js.contains("clip('evenodd');"), "an even-odd clip must emit clip('evenodd')")
     }
 
     @Test func transformEmitsTransformMatrix() throws {

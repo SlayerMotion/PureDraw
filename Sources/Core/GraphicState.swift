@@ -48,7 +48,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
     /// them all: Core Graphics' `clip` intersects the new path with the current
     /// clip, it does not union. Keeping them apart preserves that distinction,
     /// which a single combined path loses.
-    public var clipPaths: [Path]
+    public var clipPaths: [ClipPath]
 
     /// The clip stack appended into a single path: a UNION, not the intersection that
     /// nested clipping actually means. This is retained only for renderers that emit
@@ -64,12 +64,12 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         get {
             guard !clipPaths.isEmpty else { return nil }
             var combined = Path()
-            for path in clipPaths {
-                combined.addPath(path)
+            for clip in clipPaths {
+                combined.addPath(clip.path)
             }
             return combined
         }
-        set { clipPaths = newValue.map { [$0] } ?? [] }
+        set { clipPaths = newValue.map { [ClipPath(path: $0)] } ?? [] }
     }
 
     /// The shadow properties to apply to drawing operations.
@@ -178,7 +178,7 @@ public struct GraphicState: Equatable, Sendable, Validatable {
         self.dashPhase = dashPhase
         self.alpha = alpha
         self.blendMode = blendMode
-        clipPaths = clipPath.map { [$0] } ?? []
+        clipPaths = clipPath.map { [ClipPath(path: $0)] } ?? []
         self.shadow = shadow
         self.shouldAntialias = shouldAntialias
         self.allowsAntialiasing = allowsAntialiasing

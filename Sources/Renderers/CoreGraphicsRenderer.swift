@@ -493,9 +493,9 @@
         /// `clipPath` instead would let content inside one clip but outside another flood
         /// through, diverging from BitmapRenderer (which intersects). No-op when empty.
         private func applyClip(_ state: GraphicState, into context: CGContext) throws {
-            for path in state.clipPaths {
-                try context.addPath(createCGPath(from: path))
-                context.clip()
+            for clip in state.clipPaths {
+                try context.addPath(createCGPath(from: clip.path))
+                context.clip(using: clip.rule == .evenOdd ? .evenOdd : .winding)
             }
         }
 

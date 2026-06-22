@@ -84,7 +84,7 @@ struct ErgonomicAPITests {
         context.clip(to: [])
         #expect(context.currentState.clipPaths.count == 1)
         // The pushed region is degenerate (zero area): nothing remains drawable.
-        let box = context.currentState.clipPaths[0].boundingBox
+        let box = context.currentState.clipPaths[0].path.boundingBox
         #expect(box.isEmpty || box.isNull)
     }
 

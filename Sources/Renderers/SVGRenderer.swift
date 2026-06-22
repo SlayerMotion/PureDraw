@@ -27,7 +27,7 @@ public struct SVGRenderer: Renderer {
     /// Emits an SVG document reproducing the context's recorded operations.
     public func draw(_ context: GraphicsContext) throws -> String {
         // 1. Gather all unique clip paths and shadows
-        var uniqueClipPaths: [[Path]] = [] // each entry is a clip STACK, intersected
+        var uniqueClipPaths: [[ClipPath]] = [] // each entry is a clip STACK, intersected
         var uniqueShadows: [Shadow] = []
         for op in context.flattenedCommands {
             if !op.state.clipPaths.isEmpty, !uniqueClipPaths.contains(op.state.clipPaths) {
@@ -112,11 +112,12 @@ public struct SVGRenderer: Renderer {
         // previous one via clip-path; the element references the final id "clip-N". A
         // single-clip stack emits one "clip-N" with no nesting (unchanged output).
         for (index, stack) in uniqueClipPaths.enumerated() {
-            for (depth, clipPath) in stack.enumerated() {
+            for (depth, clip) in stack.enumerated() {
                 let id = depth == stack.count - 1 ? "clip-\(index)" : "clip-\(index)-\(depth)"
                 let inner = depth == 0 ? "" : " clip-path=\"url(#clip-\(index)-\(depth - 1))\""
+                let ruleAttr = clip.rule == .evenOdd ? " clip-rule=\"evenodd\"" : ""
                 defs.append("    <clipPath id=\"\(id)\">")
-                defs.append("      <path d=\"\(svgPathString(for: clipPath))\"\(inner) />")
+                defs.append("      <path d=\"\(svgPathString(for: clip.path))\"\(ruleAttr)\(inner) />")
                 defs.append("    </clipPath>")
             }
         }
@@ -294,7 +295,7 @@ public struct SVGRenderer: Renderer {
         textMatrix _: Geometry.AffineTransform,
         position: Point,
         state: GraphicState,
-        uniqueClipPaths: [[Path]],
+        uniqueClipPaths: [[ClipPath]],
         uniqueShadows: [Shadow]
     ) -> String? {
         guard let text, drawingMode != .invisible, !text.isEmpty else { return nil }
@@ -338,7 +339,7 @@ public struct SVGRenderer: Renderer {
         for state: GraphicState,
         hasFill: Bool,
         fillRule: FillRule?,
-        uniqueClipPaths: [[Path]],
+        uniqueClipPaths: [[ClipPath]],
         uniqueShadows: [Shadow]
     ) -> [String] {
         var attrs: [String] = []

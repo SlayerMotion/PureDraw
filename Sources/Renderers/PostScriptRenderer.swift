@@ -137,8 +137,8 @@ public struct PostScriptRenderer: Renderer {
             // with the current clip, giving their intersection (not the unioned clipPath,
             // which would flood nested clips).
             for clip in op.state.clipPaths {
-                ps += psPathString(for: clip)
-                ps += "clip newpath\n"
+                ps += psPathString(for: clip.path)
+                ps += clip.rule == .evenOdd ? "eoclip newpath\n" : "clip newpath\n"
             }
 
             // 3b. Draw Shadow (if present)

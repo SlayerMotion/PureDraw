@@ -72,4 +72,34 @@ struct ClipIntersectionTests {
         let image = try BitmapRenderer(width: 40, height: 40).render(context)
         #expect(paintedPixels(image) == 16 * 16)
     }
+
+    /// An even-odd clip masks to the even-odd region of its path: two nested rectangles wound the same
+    /// way leave the inner area a hole, so a gradient bounded by the clip paints the ring but not the
+    /// centre. (Regression: the clip rule was dropped, so every clip used winding.)
+    @Test func evenOddClipMasksToTheEvenOddRegion() throws {
+        var context = GraphicsContext()
+        context.addRect(Rect(x: 10, y: 10, width: 40, height: 40)) // outer, covers [10,50)
+        context.addRect(Rect(x: 20, y: 20, width: 20, height: 20)) // inner, covers [20,40)
+        context.clip(using: .evenOdd)
+        context.drawLinearGradient(gradient, start: Point(x: 10, y: 30), end: Point(x: 50, y: 30))
+
+        let image = try BitmapRenderer(width: 60, height: 60).render(context)
+        // The ring (in the outer rect, outside the inner) is painted.
+        #expect(image.data[(12 * 60 + 12) * 4 + 3] == 255)
+        // The centre (inside the inner rect) is a hole under even-odd.
+        #expect(image.data[(30 * 60 + 30) * 4 + 3] == 0)
+    }
+
+    /// The same two nested rectangles under the default winding clip fill the centre (winding number
+    /// two is nonzero), so the rule is honored, not ignored in the other direction either.
+    @Test func windingClipFillsTheNestedRegion() throws {
+        var context = GraphicsContext()
+        context.addRect(Rect(x: 10, y: 10, width: 40, height: 40))
+        context.addRect(Rect(x: 20, y: 20, width: 20, height: 20))
+        context.clip() // winding (the default)
+        context.drawLinearGradient(gradient, start: Point(x: 10, y: 30), end: Point(x: 50, y: 30))
+
+        let image = try BitmapRenderer(width: 60, height: 60).render(context)
+        #expect(image.data[(30 * 60 + 30) * 4 + 3] == 255) // centre filled under winding
+    }
 }

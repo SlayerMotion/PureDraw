@@ -209,8 +209,8 @@ public struct PDFRenderer: Renderer {
             // current clip, so the result is their intersection (not the unioned clipPath,
             // which would flood nested clips).
             for clip in op.state.clipPaths {
-                contentStream += pdfPathString(for: clip)
-                contentStream += "W n\n"
+                contentStream += pdfPathString(for: clip.path)
+                contentStream += clip.rule == .evenOdd ? "W* n\n" : "W n\n"
             }
 
             // 4b. Draw Shadow (if present)

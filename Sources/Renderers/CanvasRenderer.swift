@@ -76,8 +76,8 @@ public struct CanvasRenderer: Renderer {
                 // clip, giving their intersection (not the unioned clipPath, which floods).
                 for clip in op.state.clipPaths {
                     js.append("\(contextName).beginPath();")
-                    appendPathElements(clip, to: &js)
-                    js.append("\(contextName).clip();")
+                    appendPathElements(clip.path, to: &js)
+                    js.append("\(contextName).clip(\(clip.rule == .evenOdd ? "'evenodd'" : "'nonzero'"));")
                 }
             case .endTransparencyLayer:
                 js.append("\(contextName).restore();")
@@ -123,8 +123,8 @@ public struct CanvasRenderer: Renderer {
                 // clip, giving their intersection (not the unioned clipPath, which floods).
                 for clip in op.state.clipPaths {
                     js.append("\(contextName).beginPath();")
-                    appendPathElements(clip, to: &js)
-                    js.append("\(contextName).clip();")
+                    appendPathElements(clip.path, to: &js)
+                    js.append("\(contextName).clip(\(clip.rule == .evenOdd ? "'evenodd'" : "'nonzero'"));")
                 }
 
                 // 6. Draw Operation

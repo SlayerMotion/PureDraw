@@ -208,7 +208,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         strokeState.transform = .identity
         // Carry the whole clip STACK pre-transformed (not the unioned `clipPath`), so
         // rasterizeFill intersects nested clips for the stroke too.
-        strokeState.clipPaths = state.clipPaths.map { $0.applying(state.transform) }
+        strokeState.clipPaths = state.clipPaths.map { ClipPath(path: $0.path.applying(state.transform), rule: $0.rule) }
         rasterizeFill(path: strokeShape, state: strokeState, color: color, rule: .winding, clipCache: clipCache, buffer: &buffer)
     }
 
@@ -217,6 +217,7 @@ public final class BitmapRenderer: Renderer, Sendable {
     /// so this hits every time after the first and skips re-rasterizing it.
     final class ClipCache {
         var path: Path?
+        var rule: FillRule = .winding
         var antialiased = false
         var coverage: CoverageRasterizer.CoverageMap?
         var valid = false
@@ -226,13 +227,14 @@ public final class BitmapRenderer: Renderer, Sendable {
     /// match the cached entry. The pixel-center (aliased) rule matches
     /// `contains(center, .winding)` exactly, so gradient/image output is
     /// unchanged.
-    private func cachedClipCoverage(_ devicePath: Path, antialiased: Bool, cache: ClipCache) -> CoverageRasterizer.CoverageMap? {
-        if cache.valid, cache.antialiased == antialiased, cache.path == devicePath {
+    private func cachedClipCoverage(_ devicePath: Path, rule: FillRule, antialiased: Bool, cache: ClipCache) -> CoverageRasterizer.CoverageMap? {
+        if cache.valid, cache.antialiased == antialiased, cache.rule == rule, cache.path == devicePath {
             return cache.coverage
         }
         let coverage = CoverageRasterizer(canvasWidth: width, canvasHeight: height)
-            .coverage(of: devicePath, rule: .winding, antialiased: antialiased)
+            .coverage(of: devicePath, rule: rule, antialiased: antialiased)
         cache.path = devicePath
+        cache.rule = rule
         cache.antialiased = antialiased
         cache.coverage = coverage
         cache.valid = true
@@ -255,15 +257,15 @@ public final class BitmapRenderer: Renderer, Sendable {
         // share a device-space path): use the shared one-entry cache.
         if state.clipPaths.count == 1 {
             guard let coverage = cachedClipCoverage(
-                state.clipPaths[0].applying(state.transform), antialiased: antialiased, cache: cache
+                state.clipPaths[0].path.applying(state.transform), rule: state.clipPaths[0].rule, antialiased: antialiased, cache: cache
             ) else { return (nil, true) }
             return (coverage, false)
         }
         let rasterizer = CoverageRasterizer(canvasWidth: width, canvasHeight: height)
         var combined: CoverageRasterizer.CoverageMap?
-        for path in state.clipPaths {
+        for clip in state.clipPaths {
             guard let coverage = rasterizer.coverage(
-                of: path.applying(state.transform), rule: .winding, antialiased: antialiased
+                of: clip.path.applying(state.transform), rule: clip.rule, antialiased: antialiased
             ) else { return (nil, true) }
             combined = combined.map { Self.intersectCoverage($0, coverage) } ?? coverage
         }

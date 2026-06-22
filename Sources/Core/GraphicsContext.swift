@@ -559,7 +559,7 @@ public struct GraphicsContext: Sendable, Validatable {
     }
 
     /// Intersects the current clipping path with the current path and clears the current path.
-    public mutating func clip(using _: FillRule = .winding) {
+    public mutating func clip(using rule: FillRule = .winding) {
         guard !currentPath.isEmpty else { return }
         // Push the path onto the clip stack rather than appending it into one
         // combined path. The effective clip is the intersection of the stack;
@@ -567,7 +567,7 @@ public struct GraphicsContext: Sendable, Validatable {
         // with the ancestor clip, which (for a gradient, bounded by the clip
         // alone) floods past it. Renderers that bound output by their own coverage
         // read the combined ``GraphicState/clipPath``; gradients intersect the stack.
-        currentState.clipPaths.append(currentPath)
+        currentState.clipPaths.append(ClipPath(path: currentPath, rule: rule))
         currentPath = Path()
     }
 
@@ -575,7 +575,7 @@ public struct GraphicsContext: Sendable, Validatable {
     /// `CGContextClipToRect` equivalent. Like every clip it can only narrow the
     /// drawable region: the effective clip is the intersection of the whole stack.
     public mutating func clip(to rect: Rect) {
-        currentState.clipPaths.append(Path(rect: rect))
+        currentState.clipPaths.append(ClipPath(path: Path(rect: rect)))
     }
 
     /// Intersects the current clipping path with the union of the given
@@ -587,14 +587,14 @@ public struct GraphicsContext: Sendable, Validatable {
         guard !rects.isEmpty else {
             // No rectangles means an empty region. Push a degenerate, zero-area
             // path so the stack intersection becomes empty rather than a no-op.
-            currentState.clipPaths.append(Path(rect: Rect(x: 0, y: 0, width: 0, height: 0)))
+            currentState.clipPaths.append(ClipPath(path: Path(rect: Rect(x: 0, y: 0, width: 0, height: 0))))
             return
         }
         var union = Path()
         for rect in rects {
             union.addPath(Path(rect: rect))
         }
-        currentState.clipPaths.append(union)
+        currentState.clipPaths.append(ClipPath(path: union))
     }
 
     /// Intersects the current clipping path with the clipping mask defined by the specified image.
@@ -727,7 +727,7 @@ public struct GraphicsContext: Sendable, Validatable {
         // text just shown is painted unclipped. Mirrors the Core Graphics text-clip
         // modes (the paint portion is lowered by `Layer.lowerText`).
         if clips, !glyphClip.isEmpty {
-            currentState.clipPaths.append(glyphClip)
+            currentState.clipPaths.append(ClipPath(path: glyphClip))
         }
     }
 
