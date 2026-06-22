@@ -387,6 +387,25 @@ public struct GraphicsContext: Sendable, Validatable {
         )
     }
 
+    /// Draws a shading into the current clip, the `CGContextDrawShading` equivalent. The shading
+    /// lowers to the matching axial or radial gradient draw, so it fills the current clipping path
+    /// exactly as that gradient would and is exported by every backend that supports the gradient.
+    public mutating func drawShading(_ shading: Shading) {
+        switch shading.kind {
+        case let .axial(start, end):
+            drawLinearGradient(shading.gradient, start: start, end: end, options: shading.drawingOptions)
+        case let .radial(startCenter, startRadius, endCenter, endRadius):
+            drawRadialGradient(
+                shading.gradient,
+                startCenter: startCenter,
+                startRadius: startRadius,
+                endCenter: endCenter,
+                endRadius: endRadius,
+                options: shading.drawingOptions
+            )
+        }
+    }
+
     /// Records a stroke command in the buffer using the current state and clears the current path.
     public mutating func strokePath() {
         guard !currentPath.isEmpty else { return }
