@@ -22,9 +22,13 @@ public final class PDFPageInterpreter {
 
     public init() {}
 
-    /// Interprets the content-stream bytes, returning the resulting context.
-    public func interpret(_ content: [UInt8]) -> GraphicsContext {
+    /// Interprets the content-stream bytes, returning the resulting context. `initialTransform` seeds
+    /// the CTM before the content runs, so a caller can place the page into a destination (see
+    /// ``PDFDocument/Page/destinationTransform(for:into:)``); the content's own operators compose on
+    /// top of it.
+    public func interpret(_ content: [UInt8], initialTransform: AffineTransform = .identity) -> GraphicsContext {
         context = GraphicsContext()
+        context.concatenate(initialTransform)
         var scanner = PDFScanner()
         registerPathOperators(into: &scanner)
         registerColorOperators(into: &scanner)

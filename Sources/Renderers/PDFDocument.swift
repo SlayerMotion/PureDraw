@@ -55,6 +55,25 @@ public struct PDFDocument: Equatable, Sendable {
             let ty = rect.minY + (rect.height - scaledHeight) / 2 - source.minY * scale
             return AffineTransform(a: scale, b: 0, c: 0, d: scale, tx: tx, ty: ty)
         }
+
+        /// The transform that fits the box into `rect` for a top-left-origin (y-down) context, the form
+        /// used to replay a page into a ``GraphicsContext``: like ``drawingTransform(for:in:)`` but with
+        /// the y axis inverted, since a PDF page's space is bottom-left-origin (y-up). Seeding a
+        /// ``PDFPageInterpreter`` with this cancels the content's own page-space flip, so the page is
+        /// reproduced upright in the destination.
+        public func destinationTransform(for box: PDFBox = .crop, into rect: Rect) -> AffineTransform {
+            let source = boxRect(box)
+            guard source.width > 0, source.height > 0, rect.width > 0, rect.height > 0 else { return .identity }
+            let scale = min(rect.width / source.width, rect.height / source.height)
+            let offsetX = rect.minX + (rect.width - source.width * scale) / 2
+            let offsetY = rect.minY + (rect.height - source.height * scale) / 2
+            // x' = offsetX + (x - minX) * scale; y' = offsetY + (height - (y - minY)) * scale (flipped).
+            return AffineTransform(
+                a: scale, b: 0, c: 0, d: -scale,
+                tx: offsetX - source.minX * scale,
+                ty: offsetY + source.height * scale + source.minY * scale
+            )
+        }
     }
 
     /// The pages in document order.
