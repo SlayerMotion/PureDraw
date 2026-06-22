@@ -390,6 +390,7 @@
             case .first: .first
             case .noneSkipLast: .noneSkipLast
             case .noneSkipFirst: .noneSkipFirst
+            case .alphaOnly: .alphaOnly
             }
             let bitmapInfo = CGBitmapInfo(rawValue: cgAlphaInfo.rawValue)
             guard let cgImage = CGImage(

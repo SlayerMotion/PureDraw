@@ -154,6 +154,11 @@ public extension Image {
             }
         }
 
+        // An alpha-only image is a single alpha channel with no color components; the color is black.
+        if alphaInfo.isAlphaOnly {
+            return Color(red: 0, green: 0, blue: 0, alpha: readNormalized(slot: 0))
+        }
+
         // Physical slots: when alpha (or a skipped byte) is first, the color components follow it.
         let colorSlotBase = alphaFirst ? 1 : 0
         var rawComponents: [Double] = []

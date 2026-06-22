@@ -348,7 +348,7 @@ public struct CanvasRenderer: Renderer {
                     outG = g / a
                     outB = b / a
                 }
-            case .last, .first:
+            case .last, .first, .alphaOnly:
                 break
             case .none, .noneSkipLast, .noneSkipFirst:
                 outA = 1.0

@@ -233,7 +233,7 @@ public struct PostScriptRenderer: Renderer {
                         }
                     case .last, .first:
                         break
-                    case .none, .noneSkipLast, .noneSkipFirst:
+                    case .none, .noneSkipLast, .noneSkipFirst, .alphaOnly:
                         break
                     }
 
