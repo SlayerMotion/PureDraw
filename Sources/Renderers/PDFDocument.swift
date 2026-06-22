@@ -14,11 +14,21 @@ public struct PDFDocument: Equatable, Sendable {
         public let mediaBox: Rect
         /// The crop box; defaults to the media box when the page does not set one.
         public let cropBox: Rect
+        /// The page's content-stream bytes, the operators a `CGPDFPage` would draw. When the page's
+        /// `/Contents` is an array of streams they are concatenated, separated by a newline, as the
+        /// format requires. Empty when the page has no content stream.
+        public let content: [UInt8]
 
-        /// Creates a page from its media and crop boxes.
-        public init(mediaBox: Rect, cropBox: Rect) {
+        /// The content stream decoded as text, for inspection. Valid only for uncompressed streams.
+        public var contentText: String {
+            String(decoding: content, as: UTF8.self)
+        }
+
+        /// Creates a page from its boxes and optional content-stream bytes.
+        public init(mediaBox: Rect, cropBox: Rect, content: [UInt8] = []) {
             self.mediaBox = mediaBox
             self.cropBox = cropBox
+            self.content = content
         }
 
         /// The rectangle for a named box, defaulting to the media box when absent, as `CGPDFPageGetBoxRect` does.

@@ -63,14 +63,22 @@ struct PDFValueParser {
             guard let value = parseValue(at: &cursor) else { break }
             dict[key] = value
         }
-        // A 'stream' keyword may follow the dictionary; the bytes are not needed for the page model.
+        // A 'stream' keyword may follow the dictionary, introducing raw bytes up to 'endstream'.
         let saved = cursor
         skipWhitespaceAndComments(&cursor)
         if matchKeyword("stream", &cursor) {
+            // The keyword is followed by CR LF or LF, then the data begins.
+            if cursor < data.count, data[cursor] == 0x0D { cursor += 1 }
+            if cursor < data.count, data[cursor] == 0x0A { cursor += 1 }
+            let start = cursor
             skipToKeyword("endstream", &cursor)
-        } else {
-            cursor = saved
+            // `cursor` now sits just past 'endstream'; the data ends before it, less the framing EOL.
+            var end = cursor - "endstream".count
+            if end > start, data[end - 1] == 0x0A { end -= 1 }
+            if end > start, data[end - 1] == 0x0D { end -= 1 }
+            return .stream(dict, Array(data[start ..< max(start, end)]))
         }
+        cursor = saved
         return .dictionary(dict)
     }
 

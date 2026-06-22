@@ -46,7 +46,8 @@ public struct PDFDocumentReader {
 
         if node["Type"]?.nameValue == "Page" || node["Kids"] == nil {
             let mediaBox = media ?? .zero
-            pages.append(PDFDocument.Page(mediaBox: mediaBox, cropBox: crop ?? mediaBox))
+            let content = contentBytes(node["Contents"], objects: objects)
+            pages.append(PDFDocument.Page(mediaBox: mediaBox, cropBox: crop ?? mediaBox, content: content))
             return
         }
 
@@ -56,6 +57,22 @@ public struct PDFDocumentReader {
                   let child = objects[PDFObjectKey(num, gen)]?.dictionaryValue else { continue }
             collectPages(node: child, inheritedMedia: media, inheritedCrop: crop, objects: objects, into: &pages)
         }
+    }
+
+    /// Resolves a page's `/Contents` to its concatenated content-stream bytes. `/Contents` is either a
+    /// stream reference or an array of stream references, which are joined with a newline so operators
+    /// split across streams still tokenize, as the format requires.
+    private func contentBytes(_ value: PDFValue?, objects: [PDFObjectKey: PDFValue]) -> [UInt8] {
+        let resolved = resolve(value, objects: objects)
+        if let bytes = resolved?.streamBytes { return bytes }
+        guard let elements = resolved?.arrayValue else { return [] }
+        var bytes: [UInt8] = []
+        for element in elements {
+            guard let streamBytes = resolve(element, objects: objects)?.streamBytes else { continue }
+            if !bytes.isEmpty { bytes.append(0x0A) }
+            bytes.append(contentsOf: streamBytes)
+        }
+        return bytes
     }
 
     /// Resolves a value (possibly an indirect reference) to a rectangle from a four-number array.
