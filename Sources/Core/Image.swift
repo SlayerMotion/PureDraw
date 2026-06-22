@@ -53,7 +53,9 @@ public struct Image: Sendable, Equatable {
         indexedColorSpace: IndexedColorSpace? = nil,
         data: [UInt8]
     ) throws {
-        let computedBytesPerRow = bytesPerRow ?? (width * bitsPerPixel / 8)
+        // Round up to a whole byte so a sub-byte (1/2/4-bit) row reserves its final partial byte; for
+        // whole-byte depths this is exactly `width * bitsPerPixel / 8`.
+        let computedBytesPerRow = bytesPerRow ?? ((width * bitsPerPixel + 7) / 8)
         let minBytes = height * computedBytesPerRow
         guard data.count >= minBytes else {
             throw ValidationError(
@@ -91,11 +93,27 @@ public extension Image {
         let pixelStart = y * bytesPerRow + x * bytesPerPixel
         guard pixelStart + bytesPerPixel <= data.count else { return .clear }
 
-        // An indexed image's sample is a palette index, not a color component: read the 8-bit index and
-        // resolve it through the table, whose entries carry their own color and alpha. Sub-byte
-        // (1/2/4-bit) indices are not yet unpacked (#133/#135).
+        // An indexed image's sample is a palette index, not a color component: read the index and
+        // resolve it through the table, whose entries carry their own color and alpha. Indices may be
+        // 8-bit (one byte) or sub-byte (1/2/4-bit) packed most-significant-first within each byte, the
+        // PNG / `CGImage` indexed layout, with each row padded to a whole byte.
         if let indexed = indexedColorSpace {
-            return indexed.color(at: Int(data[pixelStart]))
+            let bits = bitsPerComponent
+            let rowStart = y * bytesPerRow
+            let index: Int
+            if bits >= 8 {
+                let byteIndex = rowStart + x * (bits / 8)
+                guard byteIndex < data.count else { return .clear }
+                index = Int(data[byteIndex])
+            } else {
+                // Most-significant-first: pixel 0 occupies the high bits of the first byte.
+                let samplesPerByte = 8 / bits
+                let byteIndex = rowStart + x / samplesPerByte
+                guard byteIndex < data.count else { return .clear }
+                let shift = 8 - bits * (x % samplesPerByte + 1)
+                index = (Int(data[byteIndex]) >> shift) & ((1 << bits) - 1)
+            }
+            return indexed.color(at: index)
         }
 
         let alphaFirst = alphaInfo.isAlphaFirst
