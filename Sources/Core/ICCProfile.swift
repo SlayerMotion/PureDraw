@@ -77,4 +77,59 @@ public struct ICCProfile: Equatable, Sendable {
             z: redColumn.z * r + greenColumn.z * g + blueColumn.z * b
         )
     }
+
+    /// Converts a PCS XYZ colour back to device RGB (`0...1`): the inverse matrix to linear light, then
+    /// the inverse tone curves. The inverse of ``toConnectionXYZ(red:green:blue:)``. Linear values are
+    /// clamped to the gamut before the inverse curve, so an out-of-gamut XYZ maps to the gamut boundary
+    /// (colorimetric clamping). Returns `nil` for a non-matrix or singular profile.
+    public func fromConnectionXYZ(_ xyz: XYZColor) -> (red: Double, green: Double, blue: Double)? {
+        guard let inverse = inverseMatrix() else { return nil }
+        let linearRed = inverse[0][0] * xyz.x + inverse[0][1] * xyz.y + inverse[0][2] * xyz.z
+        let linearGreen = inverse[1][0] * xyz.x + inverse[1][1] * xyz.y + inverse[1][2] * xyz.z
+        let linearBlue = inverse[2][0] * xyz.x + inverse[2][1] * xyz.y + inverse[2][2] * xyz.z
+        return (
+            (redCurve ?? .identity).inverseValue(at: min(1, max(0, linearRed))),
+            (greenCurve ?? .identity).inverseValue(at: min(1, max(0, linearGreen))),
+            (blueCurve ?? .identity).inverseValue(at: min(1, max(0, linearBlue)))
+        )
+    }
+
+    /// Converts a device RGB colour from this profile to `destination`, the colour-managed transform: to
+    /// the shared PCS (XYZ) through this profile, then back through the destination. Both profiles' PCS
+    /// is D50, so no extra chromatic adaptation is needed. Returns `nil` if either is not a matrix
+    /// profile.
+    public func convert(red: Double, green: Double, blue: Double, to destination: ICCProfile) -> (red: Double, green: Double, blue: Double)? {
+        guard let xyz = toConnectionXYZ(red: red, green: green, blue: blue) else { return nil }
+        return destination.fromConnectionXYZ(xyz)
+    }
+
+    /// The inverse of the 3x3 RGB-to-XYZ matrix (its columns are the channel XYZ values), or `nil` when
+    /// the matrix is missing or singular.
+    private func inverseMatrix() -> [[Double]]? {
+        guard let r = redColumn, let g = greenColumn, let b = blueColumn else { return nil }
+        let m = [[r.x, g.x, b.x], [r.y, g.y, b.y], [r.z, g.z, b.z]]
+        let determinant =
+            m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+                - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+                + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+        guard determinant != 0 else { return nil }
+        let inverseDeterminant = 1.0 / determinant
+        return [
+            [
+                (m[1][1] * m[2][2] - m[1][2] * m[2][1]) * inverseDeterminant,
+                (m[0][2] * m[2][1] - m[0][1] * m[2][2]) * inverseDeterminant,
+                (m[0][1] * m[1][2] - m[0][2] * m[1][1]) * inverseDeterminant,
+            ],
+            [
+                (m[1][2] * m[2][0] - m[1][0] * m[2][2]) * inverseDeterminant,
+                (m[0][0] * m[2][2] - m[0][2] * m[2][0]) * inverseDeterminant,
+                (m[0][2] * m[1][0] - m[0][0] * m[1][2]) * inverseDeterminant,
+            ],
+            [
+                (m[1][0] * m[2][1] - m[1][1] * m[2][0]) * inverseDeterminant,
+                (m[0][1] * m[2][0] - m[0][0] * m[2][1]) * inverseDeterminant,
+                (m[0][0] * m[1][1] - m[0][1] * m[1][0]) * inverseDeterminant,
+            ],
+        ]
+    }
 }

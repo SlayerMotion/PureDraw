@@ -42,6 +42,27 @@ public enum ICCToneCurve: Equatable, Sendable {
         }
     }
 
+    /// The inverse curve: the `x` in `0...1` whose ``value(at:)`` is `y`, mapping linear light back to a
+    /// device value. A pure gamma inverts analytically; the table and parametric forms are monotonic, so
+    /// the inverse is found by bisection to full Double precision. This is the encode direction needed to
+    /// convert a colour *into* a profile.
+    public func inverseValue(at y: Double) -> Double {
+        switch self {
+        case .identity:
+            return y
+        case let .gamma(g):
+            return g <= 0 || y <= 0 ? 0 : pow(y, 1.0 / g)
+        case .table, .parametric:
+            // Bisection on the monotonically increasing curve over [0, 1].
+            var low = 0.0, high = 1.0
+            for _ in 0 ..< 60 {
+                let mid = (low + high) / 2
+                if value(at: mid) < y { low = mid } else { high = mid }
+            }
+            return (low + high) / 2
+        }
+    }
+
     private static func power(_ base: Double, _ exponent: Double) -> Double {
         base <= 0 ? 0 : pow(base, exponent)
     }
