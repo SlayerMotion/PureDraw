@@ -173,6 +173,54 @@ public struct GraphicsContext: Sendable, Validatable {
         currentState.transform = currentState.transform.concatenating(transform)
     }
 
+    // MARK: - Coordinate Conversion
+
+    /// Maps a point from user space into device space by applying the CTM, the
+    /// `CGContextConvertPointToDeviceSpace` equivalent. PureDraw draws in the CTM
+    /// image of user space, so device space is exactly that image: there is no
+    /// further base transform between them.
+    public func convertToDeviceSpace(_ point: Point) -> Point {
+        point.applying(currentState.transform)
+    }
+
+    /// Maps a point from device space back into user space by applying the
+    /// inverse CTM, the `CGContextConvertPointToUserSpace` equivalent. Whenever
+    /// the CTM is invertible this is the exact inverse of
+    /// ``convertToDeviceSpace(_:)-(Point)``.
+    public func convertToUserSpace(_ point: Point) -> Point {
+        point.applying(currentState.transform.inverted())
+    }
+
+    /// Maps a rectangle from user space into device space, the
+    /// `CGContextConvertRectToDeviceSpace` equivalent. Under a rotation or shear
+    /// the image is not axis-aligned, so the result is its bounding box, exactly
+    /// as Core Graphics returns.
+    public func convertToDeviceSpace(_ rect: Rect) -> Rect {
+        Self.transform(rect, by: currentState.transform)
+    }
+
+    /// Maps a rectangle from device space back into user space, the
+    /// `CGContextConvertRectToUserSpace` equivalent.
+    public func convertToUserSpace(_ rect: Rect) -> Rect {
+        Self.transform(rect, by: currentState.transform.inverted())
+    }
+
+    /// Transforms a rectangle's four corners and returns their axis-aligned
+    /// bounding box, the `CGRectApplyAffineTransform` rule.
+    private static func transform(_ rect: Rect, by t: Geometry.AffineTransform) -> Rect {
+        let corners = [
+            Point(x: rect.minX, y: rect.minY),
+            Point(x: rect.maxX, y: rect.minY),
+            Point(x: rect.minX, y: rect.maxY),
+            Point(x: rect.maxX, y: rect.maxY),
+        ].map { $0.applying(t) }
+        let xs = corners.map(\.x)
+        let ys = corners.map(\.y)
+        let minX = xs.min() ?? 0
+        let minY = ys.min() ?? 0
+        return Rect(x: minX, y: minY, width: (xs.max() ?? 0) - minX, height: (ys.max() ?? 0) - minY)
+    }
+
     // MARK: - Path Construction
 
     /// Moves the current path to the specified point, starting a new subpath.
@@ -466,6 +514,19 @@ public struct GraphicsContext: Sendable, Validatable {
         fill(path)
     }
 
+    /// Clears the given rectangle to transparent, the `CGContextClearRect`
+    /// equivalent: every covered pixel's color and alpha are set to zero. This is
+    /// a Porter-Duff *clear* of the rectangle, so it ignores the fill color, fill
+    /// pattern, shadow, and global alpha; only the current clip still confines it.
+    public mutating func clear(_ rect: Rect) {
+        var state = currentState
+        state.blendMode = .clear
+        state.alpha = 1
+        state.fillPattern = nil
+        state.shadow = nil
+        commands.append(DrawOperation(kind: .fill(Path(rect: rect), rule: .winding), state: state))
+    }
+
     /// Strokes the boundary of an ellipse that fits inside the specified rectangle.
     public mutating func strokeEllipse(in rect: Rect) {
         let path = Path(ellipseIn: rect)
@@ -489,6 +550,32 @@ public struct GraphicsContext: Sendable, Validatable {
         // read the combined ``GraphicState/clipPath``; gradients intersect the stack.
         currentState.clipPaths.append(currentPath)
         currentPath = Path()
+    }
+
+    /// Intersects the current clipping path with the given rectangle, the
+    /// `CGContextClipToRect` equivalent. Like every clip it can only narrow the
+    /// drawable region: the effective clip is the intersection of the whole stack.
+    public mutating func clip(to rect: Rect) {
+        currentState.clipPaths.append(Path(rect: rect))
+    }
+
+    /// Intersects the current clipping path with the union of the given
+    /// rectangles, the `CGContextClipToRects` equivalent. A point passes if it
+    /// lies in any of the rectangles, and that union then intersects the current
+    /// clip. An empty list clips everything away, matching Core Graphics, where
+    /// clipping to no rectangles leaves nothing drawable.
+    public mutating func clip(to rects: [Rect]) {
+        guard !rects.isEmpty else {
+            // No rectangles means an empty region. Push a degenerate, zero-area
+            // path so the stack intersection becomes empty rather than a no-op.
+            currentState.clipPaths.append(Path(rect: Rect(x: 0, y: 0, width: 0, height: 0)))
+            return
+        }
+        var union = Path()
+        for rect in rects {
+            union.addPath(Path(rect: rect))
+        }
+        currentState.clipPaths.append(union)
     }
 
     /// Intersects the current clipping path with the clipping mask defined by the specified image.
