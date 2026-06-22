@@ -23,6 +23,11 @@ public struct Image: Sendable, Equatable {
     public let alphaInfo: AlphaInfo
     /// Optional color or color-range to treat as transparent (chroma key), if any.
     public let maskingColors: [Double]?
+    /// Optional per-color-component decode array, the `CGImage` `decode` parameter: two values
+    /// `[min, max]` per color component (alpha is never decoded), remapping each sampled component
+    /// from `[0, 1]` onto `[min, max]`. `nil` is the identity decode. A reversed pair `[1, 0]`
+    /// inverts the component.
+    public let decode: [Double]?
     /// The raw pixel bytes, laid out per the other fields.
     public let data: [UInt8]
 
@@ -39,6 +44,7 @@ public struct Image: Sendable, Equatable {
         colorSpace: ColorSpace = .deviceRGB,
         alphaInfo: AlphaInfo = .premultipliedLast,
         maskingColors: [Double]? = nil,
+        decode: [Double]? = nil,
         data: [UInt8]
     ) throws {
         let computedBytesPerRow = bytesPerRow ?? (width * bitsPerPixel / 8)
@@ -58,6 +64,7 @@ public struct Image: Sendable, Equatable {
         self.colorSpace = colorSpace
         self.alphaInfo = alphaInfo
         self.maskingColors = maskingColors
+        self.decode = decode
         self.data = data
     }
 }
@@ -74,90 +81,68 @@ public extension Image {
     /// Decodes the color of a single pixel, honoring color space, alpha layout, row padding, and masking colors.
     func pixelColor(x: Int, y: Int) -> Color {
         let bytesPerPixel = bitsPerPixel / 8
-        let index = y * bytesPerRow + x * bytesPerPixel
-        guard index + bytesPerPixel <= data.count else { return .clear }
+        let pixelStart = y * bytesPerRow + x * bytesPerPixel
+        guard pixelStart + bytesPerPixel <= data.count else { return .clear }
 
         let alphaFirst = alphaInfo.isAlphaFirst
         let hasAlpha = alphaInfo.hasAlpha
 
+        let componentCount = switch colorSpace {
+        case .deviceGray: 1
+        case .deviceRGB: 3
+        case .deviceCMYK: 4
+        }
+
+        // Width of one component in bytes. Only whole-byte depths are decoded here; sub-byte
+        // (1/2/4-bit) and indexed bitmaps depend on the indexed colour-space work (#133).
+        let bytesPerComponent: Int = switch bitsPerComponent {
+        case 16, 32: bitsPerComponent / 8
+        default: 1
+        }
+
+        /// Reads the slot-th component of this pixel as a normalized value. Components are laid out in
+        /// order with the alpha (or skipped byte) first or last; `slot` indexes that physical order.
+        /// 8-bit is `byte / 255`, 16-bit big-endian is `word / 65535`, 32-bit is an IEEE float in host
+        /// (little-endian) order, the `kCGBitmapFloatComponents` layout, which may exceed 1 for HDR.
+        func readNormalized(slot: Int) -> Double {
+            let offset = pixelStart + slot * bytesPerComponent
+            guard offset + bytesPerComponent <= data.count else { return 0 }
+            switch bitsPerComponent {
+            case 16:
+                let value = (UInt16(data[offset]) << 8) | UInt16(data[offset + 1])
+                return Double(value) / 65535.0
+            case 32:
+                let bits = UInt32(data[offset])
+                    | (UInt32(data[offset + 1]) << 8)
+                    | (UInt32(data[offset + 2]) << 16)
+                    | (UInt32(data[offset + 3]) << 24)
+                return Double(Float(bitPattern: bits))
+            default:
+                return Double(data[offset]) / 255.0
+            }
+        }
+
+        // Physical slots: when alpha (or a skipped byte) is first, the color components follow it.
+        let colorSlotBase = alphaFirst ? 1 : 0
         var rawComponents: [Double] = []
+        rawComponents.reserveCapacity(componentCount)
+        for component in 0 ..< componentCount {
+            var value = readNormalized(slot: colorSlotBase + component)
+            // The decode array remaps each color component from [0, 1] onto [min, max]; alpha is
+            // never decoded. A reversed pair inverts the component.
+            if let decode, decode.count >= 2 * (component + 1) {
+                let lower = decode[2 * component]
+                let upper = decode[2 * component + 1]
+                value = lower + value * (upper - lower)
+            }
+            rawComponents.append(value)
+        }
+
         var rawAlpha = 1.0
-
-        switch colorSpace {
-        case .deviceGray:
-            if bytesPerPixel >= 2 {
-                if alphaFirst {
-                    rawAlpha = Double(data[index]) / 255.0
-                    rawComponents = [Double(data[index + 1]) / 255.0]
-                } else {
-                    rawComponents = [Double(data[index]) / 255.0]
-                    rawAlpha = Double(data[index + 1]) / 255.0
-                }
-            } else if bytesPerPixel == 1 {
-                rawComponents = [Double(data[index]) / 255.0]
-                rawAlpha = 1.0
-            } else {
-                return .clear
-            }
-
-        case .deviceRGB:
-            if bytesPerPixel >= 4 {
-                if alphaFirst {
-                    rawAlpha = Double(data[index]) / 255.0
-                    rawComponents = [
-                        Double(data[index + 1]) / 255.0,
-                        Double(data[index + 2]) / 255.0,
-                        Double(data[index + 3]) / 255.0,
-                    ]
-                } else {
-                    rawComponents = [
-                        Double(data[index]) / 255.0,
-                        Double(data[index + 1]) / 255.0,
-                        Double(data[index + 2]) / 255.0,
-                    ]
-                    rawAlpha = Double(data[index + 3]) / 255.0
-                }
-            } else if bytesPerPixel == 3 {
-                rawComponents = [
-                    Double(data[index]) / 255.0,
-                    Double(data[index + 1]) / 255.0,
-                    Double(data[index + 2]) / 255.0,
-                ]
-                rawAlpha = 1.0
-            } else {
-                return .clear
-            }
-
-        case .deviceCMYK:
-            if bytesPerPixel >= 5 {
-                if alphaFirst {
-                    rawAlpha = Double(data[index]) / 255.0
-                    rawComponents = [
-                        Double(data[index + 1]) / 255.0,
-                        Double(data[index + 2]) / 255.0,
-                        Double(data[index + 3]) / 255.0,
-                        Double(data[index + 4]) / 255.0,
-                    ]
-                } else {
-                    rawComponents = [
-                        Double(data[index]) / 255.0,
-                        Double(data[index + 1]) / 255.0,
-                        Double(data[index + 2]) / 255.0,
-                        Double(data[index + 3]) / 255.0,
-                    ]
-                    rawAlpha = Double(data[index + 4]) / 255.0
-                }
-            } else if bytesPerPixel >= 4 {
-                rawComponents = [
-                    Double(data[index]) / 255.0,
-                    Double(data[index + 1]) / 255.0,
-                    Double(data[index + 2]) / 255.0,
-                    Double(data[index + 3]) / 255.0,
-                ]
-                rawAlpha = 1.0
-            } else {
-                return .clear
-            }
+        if hasAlpha {
+            // Alpha sits before the color components (first) or after them (last).
+            let alphaSlot = alphaFirst ? 0 : componentCount
+            rawAlpha = readNormalized(slot: alphaSlot)
         }
 
         // CoreGraphics applies masking colors only to images without alpha; match that here.
@@ -245,6 +230,7 @@ public extension Image {
             colorSpace: colorSpace,
             alphaInfo: alphaInfo,
             maskingColors: maskingColors,
+            decode: decode,
             data: newData
         )
     }
