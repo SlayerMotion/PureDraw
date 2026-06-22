@@ -19,14 +19,21 @@ public final class BitmapRenderer: Renderer, Sendable {
     /// The color space the output pixels are produced in.
     public let colorSpace: ColorSpace
 
+    /// Whether the output image carries 32-bit float components instead of 8-bit bytes. With floats the
+    /// rasterizer composites at full precision (no per-step quantization), so overlapping translucent
+    /// draws and smooth gradients keep their precision, the `kCGBitmapFloatComponents` analog.
+    public let floatComponents: Bool
+
     /// Guards against unbounded recursion through self-referential layers.
     private let layerDepth: Int
 
-    /// Creates a rasterizer that renders into a `width` by `height` buffer.
-    public init(width: Int, height: Int, colorSpace: ColorSpace = .deviceRGB) {
+    /// Creates a rasterizer that renders into a `width` by `height` buffer. Set `floatComponents` to
+    /// emit a 32-bit-float-per-component image composited at full precision.
+    public init(width: Int, height: Int, colorSpace: ColorSpace = .deviceRGB, floatComponents: Bool = false) {
         self.width = width
         self.height = height
         self.colorSpace = colorSpace
+        self.floatComponents = floatComponents
         layerDepth = 0
     }
 
@@ -34,6 +41,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         self.width = width
         self.height = height
         self.colorSpace = colorSpace
+        floatComponents = false
         self.layerDepth = layerDepth
     }
 
@@ -46,8 +54,8 @@ public final class BitmapRenderer: Renderer, Sendable {
             )
         }
 
-        var currentBuffer = [UInt8](repeating: 0, count: width * height * 4)
-        var bufferStack: [[UInt8]] = []
+        var currentBuffer = PixelSurface(pixelCount: width * height, float: floatComponents)
+        var bufferStack: [PixelSurface] = []
         var beginOpStack: [DrawOperation] = []
         // Each layer rasterizes once per pass; stamps reuse the cached image.
         var layerCache: [ObjectIdentifier: Image] = [:]
@@ -60,7 +68,7 @@ public final class BitmapRenderer: Renderer, Sendable {
             case .beginTransparencyLayer:
                 bufferStack.append(currentBuffer)
                 beginOpStack.append(op)
-                currentBuffer = [UInt8](repeating: 0, count: width * height * 4)
+                currentBuffer = PixelSurface(pixelCount: width * height, float: floatComponents)
 
             case .endTransparencyLayer:
                 guard !bufferStack.isEmpty, !beginOpStack.isEmpty else { continue }
@@ -127,21 +135,23 @@ public final class BitmapRenderer: Renderer, Sendable {
             }
         }
 
+        let bitsPerComponent = floatComponents ? 32 : 8
+        let bitsPerPixel = floatComponents ? 128 : 32
         return try Image(
             width: width,
             height: height,
-            bitsPerComponent: 8,
-            bitsPerPixel: 32,
-            bytesPerRow: width * 4,
+            bitsPerComponent: bitsPerComponent,
+            bitsPerPixel: bitsPerPixel,
+            bytesPerRow: width * bitsPerPixel / 8,
             colorSpace: colorSpace,
             alphaInfo: .premultipliedLast,
-            data: currentBuffer
+            data: currentBuffer.outputData()
         )
     }
 
     // MARK: - Rasterization Helpers
 
-    private func rasterizeFill(path: Path, state: GraphicState, color: Color, rule: FillRule, clipCache: ClipCache, buffer: inout [UInt8]) {
+    private func rasterizeFill(path: Path, state: GraphicState, color: Color, rule: FillRule, clipCache: ClipCache, buffer: inout PixelSurface) {
         let transformedPath = path.applying(state.transform)
         let rasterizer = CoverageRasterizer(canvasWidth: width, canvasHeight: height)
         guard let pathCoverage = rasterizer.coverage(of: transformedPath, rule: rule, antialiased: state.shouldAntialias) else { return }
@@ -164,7 +174,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         }
     }
 
-    private func rasterizeStroke(path: Path, state: GraphicState, color: Color, clipCache: ClipCache, buffer: inout [UInt8]) {
+    private func rasterizeStroke(path: Path, state: GraphicState, color: Color, clipCache: ClipCache, buffer: inout PixelSurface) {
         let scale = sqrt(abs(state.transform.a * state.transform.d - state.transform.b * state.transform.c))
         let deviceLineWidth = max(0.5, state.lineWidth * scale)
 
@@ -285,7 +295,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         return CoverageRasterizer.CoverageMap(minX: minX, minY: minY, width: w, height: h, values: values)
     }
 
-    private func rasterizeLinearGradient(grad: Gradient, start: Point, end: Point, state: GraphicState, clipCache: ClipCache, buffer: inout [UInt8]) {
+    private func rasterizeLinearGradient(grad: Gradient, start: Point, end: Point, state: GraphicState, clipCache: ClipCache, buffer: inout PixelSurface) {
         let (clipCoverage, skip) = gradientClipCoverage(state, cache: clipCache)
         if skip { return }
         let bounds = clipCoverage.map {
@@ -331,7 +341,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         startAngle: Double,
         state: GraphicState,
         clipCache: ClipCache,
-        buffer: inout [UInt8]
+        buffer: inout PixelSurface
     ) {
         let (clipCoverage, skip) = gradientClipCoverage(state, cache: clipCache)
         if skip { return }
@@ -374,7 +384,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         endRadius: Double,
         state: GraphicState,
         clipCache: ClipCache,
-        buffer: inout [UInt8]
+        buffer: inout PixelSurface
     ) {
         let (clipCoverage, skip) = gradientClipCoverage(state, cache: clipCache)
         if skip { return }
@@ -481,7 +491,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         return .black
     }
 
-    private func compositeLayer(_ layer: [UInt8], into parent: inout [UInt8], state: GraphicState) {
+    private func compositeLayer(_ layer: PixelSurface, into parent: inout PixelSurface, state: GraphicState) {
         // A transparency layer's shadow is cast by the composited silhouette: blur
         // and offset the layer's alpha, then paint it in the shadow color beneath
         // the content. Matches CoreGraphicsRenderer's ordering (shadow set before the
@@ -494,13 +504,10 @@ public final class BitmapRenderer: Renderer, Sendable {
         for y in 0 ..< height {
             for x in 0 ..< width {
                 let index = (y * width + x) * 4
-                let srcA = Double(layer[index + 3]) / 255.0
+                let (preR, preG, preB, srcA) = layer.read(index)
                 if srcA > 0 {
-                    let srcR = srcA > 0 ? (Double(layer[index]) / 255.0) / srcA : 0.0
-                    let srcG = srcA > 0 ? (Double(layer[index + 1]) / 255.0) / srcA : 0.0
-                    let srcB = srcA > 0 ? (Double(layer[index + 2]) / 255.0) / srcA : 0.0
-
-                    let color = Color(red: srcR, green: srcG, blue: srcB, alpha: srcA)
+                    // Un-premultiply to recover the layer's straight color before recompositing it.
+                    let color = Color(red: preR / srcA, green: preG / srcA, blue: preB / srcA, alpha: srcA)
                     blendPixel(x: x, y: y, color: color, state: state, buffer: &parent)
                 }
             }
@@ -511,10 +518,10 @@ public final class BitmapRenderer: Renderer, Sendable {
     /// color beneath the layer's content. The box blur approximates CoreGraphics's
     /// Gaussian shadow: the software path is structurally equivalent, not
     /// pixel-identical (as is already the case among PureDraw's other renderers).
-    private func compositeShadow(of layer: [UInt8], shadow: Shadow, state: GraphicState, into parent: inout [UInt8]) {
+    private func compositeShadow(of layer: PixelSurface, shadow: Shadow, state: GraphicState, into parent: inout PixelSurface) {
         var coverage = [Double](repeating: 0, count: width * height)
         for i in 0 ..< width * height {
-            coverage[i] = Double(layer[i * 4 + 3]) / 255.0
+            coverage[i] = layer.alpha(i * 4)
         }
         compositeShadow(fromCoverage: coverage, shadow: shadow, state: state, into: &parent)
     }
@@ -522,7 +529,7 @@ public final class BitmapRenderer: Renderer, Sendable {
     /// Paints the blurred, offset shadow of a coverage plane in the shadow color,
     /// the shared core of both the transparency-layer shadow (coverage from the
     /// layer's alpha) and `dropShadow` (coverage from an explicit path).
-    private func compositeShadow(fromCoverage coverage: [Double], shadow: Shadow, state: GraphicState, into parent: inout [UInt8]) {
+    private func compositeShadow(fromCoverage coverage: [Double], shadow: Shadow, state: GraphicState, into parent: inout PixelSurface) {
         let shadowAlpha = ShadowRasterizer.shadowAlpha(
             coverage: coverage, width: width, height: height, offset: shadow.offset, blur: shadow.blur
         )
@@ -548,7 +555,7 @@ public final class BitmapRenderer: Renderer, Sendable {
     /// body painted: the silhouette is rasterized, then blurred and offset by the
     /// shared shadow kernel. Like the transparency-layer shadow, the shadow itself is
     /// not re-clipped by the current clip path.
-    private func drawDropShadow(of path: Path, state: GraphicState, buffer: inout [UInt8]) {
+    private func drawDropShadow(of path: Path, state: GraphicState, buffer: inout PixelSurface) {
         guard let shadow = state.shadow else { return }
         let transformedPath = path.applying(state.transform)
         let rasterizer = CoverageRasterizer(canvasWidth: width, canvasHeight: height)
@@ -562,7 +569,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         compositeShadow(fromCoverage: coverage, shadow: shadow, state: state, into: &buffer)
     }
 
-    private func blendPixel(x: Int, y: Int, color: Color, state: GraphicState, coverage: Double = 1.0, buffer: inout [UInt8]) {
+    private func blendPixel(x: Int, y: Int, color: Color, state: GraphicState, coverage: Double = 1.0, buffer: inout PixelSurface) {
         let index = (y * width + x) * 4
 
         var maskAlpha = 1.0
@@ -586,10 +593,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         let srcG = color.green * srcA
         let srcB = color.blue * srcA
 
-        let dstR = Double(buffer[index]) / 255.0
-        let dstG = Double(buffer[index + 1]) / 255.0
-        let dstB = Double(buffer[index + 2]) / 255.0
-        let dstA = Double(buffer[index + 3]) / 255.0
+        let (dstR, dstG, dstB, dstA) = buffer.read(index)
 
         var outR = 0.0
         var outG = 0.0
@@ -789,25 +793,16 @@ public final class BitmapRenderer: Renderer, Sendable {
             porterDuff(1.0 - dstA, 1.0 - srcA) // source and destination where the other is absent
         }
 
-        /// Quantise to a byte by clamping in Double space BEFORE the integer conversion, so a
-        /// non-finite or out-of-range channel degrades to a clamped byte instead of trapping
-        /// `Int(NaN/Inf)` or overflowing `Int(huge)`. Non-finite -> 0 (transparent/black).
-        func toByte(_ v: Double) -> UInt8 {
-            let scaled = (v * 255.0).rounded()
-            guard scaled.isFinite else { return 0 }
-            return UInt8(min(255.0, max(0.0, scaled)))
-        }
-        buffer[index] = toByte(outR)
-        buffer[index + 1] = toByte(outG)
-        buffer[index + 2] = toByte(outB)
-        buffer[index + 3] = toByte(outA)
+        // Store the premultiplied result. The byte surface quantizes (as the renderer always has); the
+        // float surface keeps full precision. The clamp/non-finite handling lives in `PixelSurface`.
+        buffer.write(index, outR, outG, outB, outA)
     }
 
     /// Draws `image` warped from `rect` onto a device quad through a projective
     /// `transform`, using the shared software texture-mapper so it matches
     /// CoreGraphicsRenderer. The warped pixels composite source-over honoring the
     /// state's alpha, blend mode, mask, and clip path.
-    private func rasterizeImageProjective(_ image: Image, in rect: Rect, transform: ProjectiveTransform, state: GraphicState, clipCache: ClipCache, buffer: inout [UInt8]) {
+    private func rasterizeImageProjective(_ image: Image, in rect: Rect, transform: ProjectiveTransform, state: GraphicState, clipCache: ClipCache, buffer: inout PixelSurface) {
         guard let warped = ProjectiveImageRasterizer.warp(
             image, in: rect, transform: transform, width: width, height: height,
             quality: state.interpolationQuality, antialiased: state.shouldAntialias
@@ -835,7 +830,7 @@ public final class BitmapRenderer: Renderer, Sendable {
         }
     }
 
-    private func rasterizeImage(_ image: Image, in rect: Rect, state: GraphicState, clipCache: ClipCache, buffer: inout [UInt8]) {
+    private func rasterizeImage(_ image: Image, in rect: Rect, state: GraphicState, clipCache: ClipCache, buffer: inout PixelSurface) {
         let p0 = Point(x: rect.minX, y: rect.minY)
         let p1 = Point(x: rect.maxX, y: rect.minY)
         let p2 = Point(x: rect.maxX, y: rect.maxY)
