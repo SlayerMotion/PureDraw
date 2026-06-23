@@ -74,6 +74,19 @@ struct OpenTypeLayoutTests {
         #expect(kerning.adjustment(firstGlyph: 2, secondGlyph: 1) == 0) // glyph 2 not covered as first
     }
 
+    @Test("GSUB ligature substitution yields component-to-ligature rules")
+    func gsubLigature() throws {
+        let font = try Font(data: GsubFont.build())
+        let ligatures = font.ligatures()
+        #expect(ligatures == [LigatureSubstitution(components: [1, 2], ligatureGlyph: 3)])
+    }
+
+    @Test("a font without GSUB has no ligatures")
+    func noLigatures() throws {
+        let font = try Font(data: MiniFont.build())
+        #expect(font.ligatures().isEmpty)
+    }
+
     @Test("a font without a kern table has an empty kerning map")
     func noKern() throws {
         let font = try Font(data: MiniFont.build())
@@ -188,6 +201,34 @@ private enum GposFont2 {
         gpos += be16(1) + be16(2) + be16(1) + be16(1) // classDef2 f1: glyph 2 -> class 1
 
         return assemble(extra: ("GPOS", gpos))
+    }
+}
+
+/// A minimal TrueType font with a GSUB `liga` feature whose type-4 lookup is a
+/// LigatureSubst format 1 subtable: glyphs (1, 2) form ligature glyph 3.
+private enum GsubFont {
+    static func build() -> [UInt8] {
+        // GSUB layout (offsets relative to the table start):
+        //   0  header (10)        scriptList=10, featureList=12, lookupList=26
+        //   10 scriptList (2)
+        //   12 featureList (14)   feature 'liga' -> lookup 0
+        //   26 lookupList (12)    lookup type 4, subtable at +8 (->38)
+        //   38 LigatureSubst (8)  coverage +8, ligatureSet +14
+        //   46 coverage (6)       glyph 1
+        //   52 ligatureSet (4)    one ligature at +4
+        //   56 ligature (6)       ligatureGlyph 3, componentCount 2, component 2
+        var gsub: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gsub += be16(0)
+        gsub += be16(1) + Array("liga".utf8) + be16(8)
+        gsub += be16(0) + be16(1) + be16(0)
+        gsub += be16(1) + be16(4)
+        gsub += be16(4) + be16(0) + be16(1) + be16(8) // lookup: type 4, flag, subtableCount, offset
+        gsub += be16(1) + be16(8) + be16(1) + be16(14) // LigatureSubst f1: format, coverage, setCount, setOffset
+        gsub += be16(1) + be16(1) + be16(1) // coverage f1: glyph 1
+        gsub += be16(1) + be16(4) // ligatureSet: count, ligature offset
+        gsub += be16(3) + be16(2) + be16(2) // ligature: glyph 3, componentCount 2, component 2
+
+        return assemble(extra: ("GSUB", gsub))
     }
 }
 

@@ -453,6 +453,123 @@ public struct Font: Equatable, Sendable {
         }
     }
 
+    // MARK: - Substitution
+
+    /// The font's `liga` ligature substitution rules, for the shaping tier to
+    /// apply (for example `f` `i` becoming the `fi` ligature).
+    ///
+    /// This reads GSUB ligature substitution (lookup type 4) under the standard
+    /// `liga` feature, resolving extension lookups (type 7). Single substitution
+    /// (type 1) and the contextual lookups are the next slices of
+    /// SlayerMotion/PureDraw#140.
+    public func ligatures() -> [LigatureSubstitution] {
+        var result: [LigatureSubstitution] = []
+        parseGSUBLigatures(into: &result)
+        return result
+    }
+
+    private func parseGSUBLigatures(into result: inout [LigatureSubstitution]) {
+        guard let gsub = tables["GSUB"] else { return }
+        let base = gsub.offset
+        guard let featureListOffset = Self.u16(data, at: base + 6),
+              let lookupListOffset = Self.u16(data, at: base + 8)
+        else {
+            return
+        }
+        let featureList = base + featureListOffset
+        let lookupList = base + lookupListOffset
+
+        var ligatureLookupIndices: Set<Int> = []
+        if let featureCount = Self.u16(data, at: featureList) {
+            for featureIndex in 0 ..< featureCount {
+                let record = featureList + 2 + featureIndex * 6
+                guard Self.tag(data, at: record) == "liga",
+                      let featureOffset = Self.u16(data, at: record + 4)
+                else {
+                    continue
+                }
+                let feature = featureList + featureOffset
+                guard let lookupIndexCount = Self.u16(data, at: feature + 2) else { continue }
+                for lookupIndex in 0 ..< lookupIndexCount {
+                    if let index = Self.u16(data, at: feature + 4 + lookupIndex * 2) {
+                        ligatureLookupIndices.insert(index)
+                    }
+                }
+            }
+        }
+
+        guard let lookupCount = Self.u16(data, at: lookupList) else { return }
+        for index in ligatureLookupIndices where index < lookupCount {
+            guard let lookupOffset = Self.u16(data, at: lookupList + 2 + index * 2) else { continue }
+            let lookup = lookupList + lookupOffset
+            guard let lookupType = Self.u16(data, at: lookup),
+                  let subtableCount = Self.u16(data, at: lookup + 4)
+            else {
+                continue
+            }
+            for subtableIndex in 0 ..< subtableCount {
+                guard let subtableOffset = Self.u16(data, at: lookup + 6 + subtableIndex * 2) else { continue }
+                var subtable = lookup + subtableOffset
+                var effectiveType = lookupType
+                if lookupType == 7 {
+                    guard Self.u16(data, at: subtable) == 1,
+                          let extensionType = Self.u16(data, at: subtable + 2),
+                          let extensionOffset = Self.u32(data, at: subtable + 4)
+                    else {
+                        continue
+                    }
+                    effectiveType = extensionType
+                    subtable += extensionOffset
+                }
+                if effectiveType == 4 {
+                    parseLigatureSubst(subtable: subtable, into: &result)
+                }
+            }
+        }
+    }
+
+    /// Decodes a GSUB ligature substitution (type 4) subtable into `result`.
+    private func parseLigatureSubst(subtable: Int, into result: inout [LigatureSubstitution]) {
+        guard Self.u16(data, at: subtable) == 1,
+              let coverageOffset = Self.u16(data, at: subtable + 2),
+              let ligatureSetCount = Self.u16(data, at: subtable + 4),
+              let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+        else {
+            return
+        }
+        for ligatureSetIndex in 0 ..< ligatureSetCount {
+            guard let firstGlyph = coverage.glyph(atIndex: ligatureSetIndex),
+                  let ligatureSetOffset = Self.u16(data, at: subtable + 6 + ligatureSetIndex * 2)
+            else {
+                continue
+            }
+            let ligatureSet = subtable + ligatureSetOffset
+            guard let ligatureCount = Self.u16(data, at: ligatureSet) else { continue }
+            for ligatureIndex in 0 ..< ligatureCount {
+                guard let ligatureOffset = Self.u16(data, at: ligatureSet + 2 + ligatureIndex * 2) else { continue }
+                let ligature = ligatureSet + ligatureOffset
+                guard let ligatureGlyph = Self.u16(data, at: ligature),
+                      let componentCount = Self.u16(data, at: ligature + 2),
+                      componentCount >= 2
+                else {
+                    continue
+                }
+                var components = [firstGlyph]
+                var valid = true
+                for componentIndex in 0 ..< (componentCount - 1) {
+                    guard let component = Self.u16(data, at: ligature + 4 + componentIndex * 2) else {
+                        valid = false
+                        break
+                    }
+                    components.append(component)
+                }
+                if valid {
+                    result.append(LigatureSubstitution(components: components, ligatureGlyph: ligatureGlyph))
+                }
+            }
+        }
+    }
+
     // MARK: - Outlines
 
     /// The glyph outline as a path in font units (y up), or `nil` for empty
