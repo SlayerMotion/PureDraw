@@ -1,0 +1,2138 @@
+schema_version: "1"
+schemas:
+  - subject: "Geometry.Point"
+    base: null
+    properties:
+      - name: "x"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "y"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+    actions: []
+    validations: []
+  - subject: "Geometry.Rect"
+    base: null
+    properties:
+      - name: "origin"
+        semantic:
+          kind: "point"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "width"
+        semantic:
+          kind: "distance"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "height"
+        semantic:
+          kind: "distance"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+    actions: []
+    validations: []
+  - subject: "Geometry.AffineTransform"
+    base: null
+    properties:
+      - name: "a"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "1.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "b"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "c"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "d"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "1.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "tx"
+        semantic:
+          kind: "distance"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "ty"
+        semantic:
+          kind: "distance"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+    actions: []
+    validations:
+      - kind: "affineMatrixInvertible"
+  - subject: "Geometry.ProjectiveTransform"
+    base: null
+    properties:
+      - name: "m11"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "1.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "m12"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "m13"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "m21"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "m22"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "1.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "m23"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "m31"
+        semantic:
+          kind: "distance"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "m32"
+        semantic:
+          kind: "distance"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+      - name: "m33"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "number"
+          value: "1.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations:
+          - kind: "finiteNumber"
+    actions: []
+    validations:
+      - kind: "projectiveMatrixInvertible"
+  - subject: "PureDraw.ClipPath"
+    base: null
+    properties:
+      - name: "path"
+        semantic:
+          kind: "path"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "rule"
+        semantic:
+          kind: "enumeration"
+          cases:
+            - "winding"
+            - "evenOdd"
+        range: null
+        default:
+          kind: "text"
+          value: "winding"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+    actions: []
+    validations: []
+  - subject: "PureDraw.Shadow"
+    base: null
+    properties:
+      - name: "offset"
+        semantic:
+          kind: "point"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "blur"
+        semantic:
+          kind: "distance"
+        range:
+          min: "0.0"
+          max: "100.0"
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "color"
+        semantic:
+          kind: "color"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+    actions: []
+    validations: []
+  - subject: "PureDraw.GradientStop"
+    base: null
+    properties:
+      - name: "color"
+        semantic:
+          kind: "color"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "location"
+        semantic:
+          kind: "scalar"
+        range:
+          min: "0.0"
+          max: "1.0"
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+    actions: []
+    validations: []
+  - subject: "PureDraw.Gradient"
+    base: null
+    properties:
+      - name: "stops"
+        semantic:
+          kind: "list"
+          element:
+            kind: "nested"
+            subject: "PureDraw.GradientStop"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+    actions: []
+    validations: []
+  - subject: "PureDraw.IndexedColorSpace"
+    base: null
+    properties:
+      - name: "base"
+        semantic:
+          kind: "enumeration"
+          cases:
+            - "deviceRGB"
+            - "deviceCMYK"
+            - "deviceGray"
+        range: null
+        default:
+          kind: "text"
+          value: "deviceRGB"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "palette"
+        semantic:
+          kind: "list"
+          element:
+            kind: "color"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+    actions: []
+    validations: []
+  - subject: "PureDraw.Image"
+    base: null
+    properties:
+      - name: "width"
+        semantic:
+          kind: "scalar"
+        range:
+          min: "1.0"
+          max: "16384.0"
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "height"
+        semantic:
+          kind: "scalar"
+        range:
+          min: "1.0"
+          max: "16384.0"
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "bitsPerComponent"
+        semantic:
+          kind: "scalar"
+        range:
+          min: "1.0"
+          max: "32.0"
+        default:
+          kind: "integer"
+          value: "8"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "bitsPerPixel"
+        semantic:
+          kind: "scalar"
+        range:
+          min: "1.0"
+          max: "128.0"
+        default:
+          kind: "integer"
+          value: "32"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "bytesPerRow"
+        semantic:
+          kind: "scalar"
+        range: null
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "colorSpace"
+        semantic:
+          kind: "enumeration"
+          cases:
+            - "deviceRGB"
+            - "deviceCMYK"
+            - "deviceGray"
+        range: null
+        default:
+          kind: "text"
+          value: "deviceRGB"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "alphaInfo"
+        semantic:
+          kind: "enumeration"
+          cases:
+            - "none"
+            - "premultipliedLast"
+            - "premultipliedFirst"
+            - "last"
+            - "first"
+            - "noneSkipLast"
+            - "noneSkipFirst"
+            - "alphaOnly"
+        range: null
+        default:
+          kind: "text"
+          value: "premultipliedLast"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "maskingColors"
+        semantic:
+          kind: "optional"
+          element:
+            kind: "list"
+            element:
+              kind: "scalar"
+        range: null
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "decode"
+        semantic:
+          kind: "optional"
+          element:
+            kind: "list"
+            element:
+              kind: "scalar"
+        range: null
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "indexedColorSpace"
+        semantic:
+          kind: "optional"
+          element:
+            kind: "nested"
+            subject: "PureDraw.IndexedColorSpace"
+        range: null
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "data"
+        semantic:
+          kind: "list"
+          element:
+            kind: "scalar"
+        range: null
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+    actions: []
+    validations: []
+  - subject: "PureDraw.Font"
+    base: null
+    properties:
+      - name: "unitsPerEm"
+        semantic:
+          kind: "scalar"
+        range:
+          min: "1.0"
+          max: "65535.0"
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "ascent"
+        semantic:
+          kind: "distance"
+        range: null
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "descent"
+        semantic:
+          kind: "distance"
+        range: null
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "numberOfGlyphs"
+        semantic:
+          kind: "scalar"
+        range:
+          min: "0.0"
+          max: "65535.0"
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+    actions: []
+    validations: []
+  - subject: "PureDraw.Pattern"
+    base: null
+    properties:
+      - name: "bounds"
+        semantic:
+          kind: "nested"
+          subject: "Geometry.Rect"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "xStep"
+        semantic:
+          kind: "distance"
+        range:
+          min: "0.0"
+          max: "10000.0"
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "yStep"
+        semantic:
+          kind: "distance"
+        range:
+          min: "0.0"
+          max: "10000.0"
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "isColored"
+        semantic:
+          kind: "bool"
+        range: null
+        default:
+          kind: "boolean"
+          value: "true"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "context"
+        semantic:
+          kind: "nested"
+          subject: "PureDraw.GraphicsState"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+    actions: []
+    validations: []
+  - subject: "PureDraw.StrokeStyle"
+    base: null
+    properties:
+      - name: "lineWidth"
+        semantic:
+          kind: "distance"
+        range:
+          min: "0.0"
+          max: "256.0"
+        default:
+          kind: "number"
+          value: "1.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "stroke-style"
+        validations:
+          - kind: "finiteNumber"
+      - name: "lineCap"
+        semantic:
+          kind: "lineCap"
+        range: null
+        default:
+          kind: "text"
+          value: "butt"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "stroke-style"
+        validations: []
+      - name: "lineJoin"
+        semantic:
+          kind: "lineJoin"
+        range: null
+        default:
+          kind: "text"
+          value: "miter"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "stroke-style"
+        validations: []
+      - name: "miterLimit"
+        semantic:
+          kind: "distance"
+        range:
+          min: "0.0"
+          max: "256.0"
+        default:
+          kind: "number"
+          value: "10.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "stroke-style"
+        validations:
+          - kind: "finiteNumber"
+      - name: "dashPattern"
+        semantic:
+          kind: "dashPattern"
+        range: null
+        default:
+          kind: "numbers"
+          values: []
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "stroke-style"
+        validations:
+          - kind: "finiteNumberList"
+      - name: "dashPhase"
+        semantic:
+          kind: "distance"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "stroke-style"
+        validations:
+          - kind: "finiteNumber"
+    actions: []
+    validations: []
+  - subject: "PureDraw.GraphicsState"
+    base: null
+    properties:
+      - name: "transform"
+        semantic:
+          kind: "nested"
+          subject: "Geometry.AffineTransform"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations: []
+      - name: "strokeColor"
+        semantic:
+          kind: "color"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "fillColor"
+        semantic:
+          kind: "color"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "lineWidth"
+        semantic:
+          kind: "distance"
+        range:
+          min: "0.0"
+          max: "256.0"
+        default:
+          kind: "number"
+          value: "1.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "lineCap"
+        semantic:
+          kind: "lineCap"
+        range: null
+        default:
+          kind: "text"
+          value: "butt"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "lineJoin"
+        semantic:
+          kind: "lineJoin"
+        range: null
+        default:
+          kind: "text"
+          value: "miter"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "miterLimit"
+        semantic:
+          kind: "distance"
+        range:
+          min: "0.0"
+          max: "256.0"
+        default:
+          kind: "number"
+          value: "10.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "flatness"
+        semantic:
+          kind: "distance"
+        range:
+          min: "0.0"
+          max: "10.0"
+        default:
+          kind: "number"
+          value: "0.6"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "dashPattern"
+        semantic:
+          kind: "dashPattern"
+        range: null
+        default:
+          kind: "numbers"
+          values: []
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumberList"
+      - name: "dashPhase"
+        semantic:
+          kind: "distance"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "alpha"
+        semantic:
+          kind: "scalar"
+        range:
+          min: "0.0"
+          max: "1.0"
+        default:
+          kind: "number"
+          value: "1.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "blendMode"
+        semantic:
+          kind: "enumeration"
+          cases:
+            - "normal"
+            - "multiply"
+            - "screen"
+            - "overlay"
+            - "darken"
+            - "lighten"
+            - "colorDodge"
+            - "colorBurn"
+            - "softLight"
+            - "hardLight"
+            - "difference"
+            - "exclusion"
+            - "hue"
+            - "saturation"
+            - "color"
+            - "luminosity"
+            - "clear"
+            - "copy"
+            - "sourceIn"
+            - "sourceOut"
+            - "sourceAtop"
+            - "destinationOver"
+            - "destinationIn"
+            - "destinationOut"
+            - "destinationAtop"
+            - "xor"
+            - "plusDarker"
+            - "plusLighter"
+        range: null
+        default:
+          kind: "text"
+          value: "normal"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "clipPaths"
+        semantic:
+          kind: "list"
+          element:
+            kind: "nested"
+            subject: "PureDraw.ClipPath"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "shadow"
+        semantic:
+          kind: "optional"
+          element:
+            kind: "nested"
+            subject: "PureDraw.Shadow"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "shouldAntialias"
+        semantic:
+          kind: "bool"
+        range: null
+        default:
+          kind: "boolean"
+          value: "true"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "allowsAntialiasing"
+        semantic:
+          kind: "bool"
+        range: null
+        default:
+          kind: "boolean"
+          value: "true"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "interpolationQuality"
+        semantic:
+          kind: "enumeration"
+          cases:
+            - "default"
+            - "none"
+            - "low"
+            - "medium"
+            - "high"
+        range: null
+        default:
+          kind: "text"
+          value: "default"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "renderingIntent"
+        semantic:
+          kind: "enumeration"
+          cases:
+            - "default"
+            - "absoluteColorimetric"
+            - "relativeColorimetric"
+            - "perceptual"
+            - "saturation"
+        range: null
+        default:
+          kind: "text"
+          value: "default"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "shouldSmoothFonts"
+        semantic:
+          kind: "bool"
+        range: null
+        default:
+          kind: "boolean"
+          value: "true"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "allowsFontSmoothing"
+        semantic:
+          kind: "bool"
+        range: null
+        default:
+          kind: "boolean"
+          value: "true"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "shouldSubpixelPositionFonts"
+        semantic:
+          kind: "bool"
+        range: null
+        default:
+          kind: "boolean"
+          value: "true"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "shouldSubpixelQuantizeFonts"
+        semantic:
+          kind: "bool"
+        range: null
+        default:
+          kind: "boolean"
+          value: "true"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "font"
+        semantic:
+          kind: "optional"
+          element:
+            kind: "nested"
+            subject: "PureDraw.Font"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "fontSize"
+        semantic:
+          kind: "distance"
+        range:
+          min: "0.0"
+          max: "512.0"
+        default:
+          kind: "number"
+          value: "12.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "characterSpacing"
+        semantic:
+          kind: "distance"
+        range: null
+        default:
+          kind: "number"
+          value: "0.0"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations:
+          - kind: "finiteNumber"
+      - name: "textDrawingMode"
+        semantic:
+          kind: "enumeration"
+          cases:
+            - "fill"
+            - "stroke"
+            - "fillStroke"
+            - "invisible"
+            - "fillClip"
+            - "strokeClip"
+            - "fillStrokeClip"
+            - "clip"
+        range: null
+        default:
+          kind: "text"
+          value: "fill"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "fillPattern"
+        semantic:
+          kind: "optional"
+          element:
+            kind: "nested"
+            subject: "PureDraw.Pattern"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "strokePattern"
+        semantic:
+          kind: "optional"
+          element:
+            kind: "nested"
+            subject: "PureDraw.Pattern"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "patternPhase"
+        semantic:
+          kind: "point"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "maskImage"
+        semantic:
+          kind: "optional"
+          element:
+            kind: "nested"
+            subject: "PureDraw.Image"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "maskRect"
+        semantic:
+          kind: "optional"
+          element:
+            kind: "nested"
+            subject: "Geometry.Rect"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "maskTransform"
+        semantic:
+          kind: "optional"
+          element:
+            kind: "nested"
+            subject: "Geometry.AffineTransform"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "named"
+          name: "transform-matrix"
+        validations: []
+    actions:
+      - id: "set-fill-color"
+        name: "Set Fill Color"
+        category: "paint"
+        glyph: "paint-bucket"
+        preview:
+          kind: "property"
+          subject: "PureDraw.GraphicsState"
+          name: "fillColor"
+        params:
+          - name: "color"
+            semantic:
+              kind: "color"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "set-stroke-color"
+        name: "Set Stroke Color"
+        category: "stroke"
+        glyph: "paintbrush"
+        preview:
+          kind: "property"
+          subject: "PureDraw.GraphicsState"
+          name: "strokeColor"
+        params:
+          - name: "color"
+            semantic:
+              kind: "color"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "set-line-width"
+        name: "Set Line Width"
+        category: "stroke"
+        glyph: "line-width"
+        preview:
+          kind: "property"
+          subject: "PureDraw.GraphicsState"
+          name: "lineWidth"
+        params:
+          - name: "width"
+            semantic:
+              kind: "distance"
+            range:
+              min: "0.0"
+              max: "256.0"
+            default:
+              kind: "number"
+              value: "1.0"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations:
+              - kind: "finiteNumber"
+      - id: "set-line-dash"
+        name: "Set Line Dash"
+        category: "stroke"
+        glyph: "line-dash"
+        preview:
+          kind: "property"
+          subject: "PureDraw.GraphicsState"
+          name: "dashPattern"
+        params:
+          - name: "dashPattern"
+            semantic:
+              kind: "dashPattern"
+            range: null
+            default:
+              kind: "numbers"
+              values: []
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations:
+              - kind: "finiteNumberList"
+          - name: "dashPhase"
+            semantic:
+              kind: "distance"
+            range: null
+            default:
+              kind: "number"
+              value: "0.0"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations:
+              - kind: "finiteNumber"
+      - id: "set-line-cap"
+        name: "Set Line Cap"
+        category: "stroke"
+        glyph: "line-cap"
+        preview:
+          kind: "property"
+          subject: "PureDraw.GraphicsState"
+          name: "lineCap"
+        params:
+          - name: "cap"
+            semantic:
+              kind: "lineCap"
+            range: null
+            default:
+              kind: "text"
+              value: "butt"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "set-line-join"
+        name: "Set Line Join"
+        category: "stroke"
+        glyph: "line-join"
+        preview:
+          kind: "property"
+          subject: "PureDraw.GraphicsState"
+          name: "lineJoin"
+        params:
+          - name: "join"
+            semantic:
+              kind: "lineJoin"
+            range: null
+            default:
+              kind: "text"
+              value: "miter"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+    validations: []
+  - subject: "PureDraw.PathConstruction"
+    base: null
+    properties:
+      - name: "currentPoint"
+        semantic:
+          kind: "point"
+        range: null
+        default:
+          kind: "none"
+        editable: "false"
+        editor:
+          kind: "standard"
+        validations: []
+      - name: "currentPath"
+        semantic:
+          kind: "path"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+    actions:
+      - id: "move-to"
+        name: "Move To"
+        category: "path"
+        glyph: "move"
+        preview:
+          kind: "property"
+          subject: "PureDraw.PathConstruction"
+          name: "currentPath"
+        params:
+          - name: "point"
+            semantic:
+              kind: "point"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "add-line"
+        name: "Add Line"
+        category: "path"
+        glyph: "slash"
+        preview:
+          kind: "property"
+          subject: "PureDraw.PathConstruction"
+          name: "currentPath"
+        params:
+          - name: "point"
+            semantic:
+              kind: "point"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "add-curve"
+        name: "Add Cubic Curve"
+        category: "path"
+        glyph: "bezier-curve"
+        preview:
+          kind: "property"
+          subject: "PureDraw.PathConstruction"
+          name: "currentPath"
+        params:
+          - name: "point"
+            semantic:
+              kind: "point"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+          - name: "control1"
+            semantic:
+              kind: "point"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+          - name: "control2"
+            semantic:
+              kind: "point"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "close-subpath"
+        name: "Close Subpath"
+        category: "path"
+        glyph: "corner-down-left"
+        preview:
+          kind: "property"
+          subject: "PureDraw.PathConstruction"
+          name: "currentPath"
+        params: []
+      - id: "add-rect"
+        name: "Add Rect"
+        category: "path"
+        glyph: "square"
+        preview:
+          kind: "property"
+          subject: "PureDraw.PathConstruction"
+          name: "currentPath"
+        params:
+          - name: "rect"
+            semantic:
+              kind: "nested"
+              subject: "Geometry.Rect"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "add-ellipse"
+        name: "Add Ellipse"
+        category: "path"
+        glyph: "circle"
+        preview:
+          kind: "property"
+          subject: "PureDraw.PathConstruction"
+          name: "currentPath"
+        params:
+          - name: "rect"
+            semantic:
+              kind: "nested"
+              subject: "Geometry.Rect"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "add-arc"
+        name: "Add Arc"
+        category: "path"
+        glyph: "rotate-ccw"
+        preview:
+          kind: "property"
+          subject: "PureDraw.PathConstruction"
+          name: "currentPath"
+        params:
+          - name: "center"
+            semantic:
+              kind: "point"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+          - name: "radius"
+            semantic:
+              kind: "distance"
+            range:
+              min: "0.0"
+              max: "10000.0"
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations:
+              - kind: "finiteNumber"
+          - name: "startAngle"
+            semantic:
+              kind: "angle"
+            range: null
+            default:
+              kind: "number"
+              value: "0.0"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations:
+              - kind: "finiteNumber"
+          - name: "endAngle"
+            semantic:
+              kind: "angle"
+            range: null
+            default:
+              kind: "number"
+              value: "0.0"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations:
+              - kind: "finiteNumber"
+          - name: "clockwise"
+            semantic:
+              kind: "bool"
+            range: null
+            default:
+              kind: "boolean"
+              value: "false"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+    validations: []
+  - subject: "PureDraw.DrawingActions"
+    base: null
+    properties:
+      - name: "targetPath"
+        semantic:
+          kind: "path"
+        range: null
+        default:
+          kind: "none"
+        editable: "true"
+        editor:
+          kind: "standard"
+        validations: []
+    actions:
+      - id: "stroke-path"
+        name: "Stroke Path"
+        category: "draw"
+        glyph: "pen-line"
+        preview:
+          kind: "schema"
+          subject: "PureDraw.StrokeStyle"
+        params: []
+      - id: "fill-path"
+        name: "Fill Path"
+        category: "draw"
+        glyph: "paint-bucket"
+        preview:
+          kind: "property"
+          subject: "PureDraw.GraphicsState"
+          name: "fillColor"
+        params:
+          - name: "rule"
+            semantic:
+              kind: "enumeration"
+              cases:
+                - "winding"
+                - "evenOdd"
+            range: null
+            default:
+              kind: "text"
+              value: "winding"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "stroke-rect"
+        name: "Stroke Rect"
+        category: "draw"
+        glyph: "square"
+        preview:
+          kind: "schema"
+          subject: "PureDraw.StrokeStyle"
+        params:
+          - name: "rect"
+            semantic:
+              kind: "nested"
+              subject: "Geometry.Rect"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "fill-rect"
+        name: "Fill Rect"
+        category: "draw"
+        glyph: "square"
+        preview:
+          kind: "property"
+          subject: "PureDraw.GraphicsState"
+          name: "fillColor"
+        params:
+          - name: "rect"
+            semantic:
+              kind: "nested"
+              subject: "Geometry.Rect"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "draw-linear-gradient"
+        name: "Draw Linear Gradient"
+        category: "gradient"
+        glyph: "swatch-book"
+        preview:
+          kind: "schema"
+          subject: "PureDraw.Gradient"
+        params:
+          - name: "gradient"
+            semantic:
+              kind: "nested"
+              subject: "PureDraw.Gradient"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+          - name: "start"
+            semantic:
+              kind: "point"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+          - name: "end"
+            semantic:
+              kind: "point"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "draw-radial-gradient"
+        name: "Draw Radial Gradient"
+        category: "gradient"
+        glyph: "circle-dot"
+        preview:
+          kind: "schema"
+          subject: "PureDraw.Gradient"
+        params:
+          - name: "gradient"
+            semantic:
+              kind: "nested"
+              subject: "PureDraw.Gradient"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+          - name: "startCenter"
+            semantic:
+              kind: "point"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+          - name: "startRadius"
+            semantic:
+              kind: "distance"
+            range:
+              min: "0.0"
+              max: "10000.0"
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations:
+              - kind: "finiteNumber"
+          - name: "endCenter"
+            semantic:
+              kind: "point"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+          - name: "endRadius"
+            semantic:
+              kind: "distance"
+            range:
+              min: "0.0"
+              max: "10000.0"
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations:
+              - kind: "finiteNumber"
+      - id: "clip"
+        name: "Clip"
+        category: "clip"
+        glyph: "scissors"
+        preview:
+          kind: "property"
+          subject: "PureDraw.GraphicsState"
+          name: "clipPaths"
+        params:
+          - name: "rule"
+            semantic:
+              kind: "enumeration"
+              cases:
+                - "winding"
+                - "evenOdd"
+            range: null
+            default:
+              kind: "text"
+              value: "winding"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+      - id: "clear-rect"
+        name: "Clear Rect"
+        category: "draw"
+        glyph: "eraser"
+        preview:
+          kind: "action"
+          id: "clear-rect"
+        params:
+          - name: "rect"
+            semantic:
+              kind: "nested"
+              subject: "Geometry.Rect"
+            range: null
+            default:
+              kind: "none"
+            editable: "true"
+            editor:
+              kind: "standard"
+            validations: []
+    validations: []
+surface:
+  id: "cg-preUI"
+  title: "Core Graphics"
+  coverage_claims:
+    - id: "core-graphics-preui-coverage"
+      status: "theorem"
+      source: "PureDraw docs/preui/README.md plus cg-preUI.yaml schema inventory"
+      required_subjects:
+        - "Geometry.Point"
+        - "Geometry.Rect"
+        - "Geometry.AffineTransform"
+        - "Geometry.ProjectiveTransform"
+        - "PureDraw.ClipPath"
+        - "PureDraw.Shadow"
+        - "PureDraw.GradientStop"
+        - "PureDraw.Gradient"
+        - "PureDraw.IndexedColorSpace"
+        - "PureDraw.Image"
+        - "PureDraw.Font"
+        - "PureDraw.Pattern"
+        - "PureDraw.StrokeStyle"
+        - "PureDraw.GraphicsState"
+        - "PureDraw.PathConstruction"
+        - "PureDraw.DrawingActions"
+      grouped_subjects:
+        - "Geometry.Point"
+        - "Geometry.Rect"
+        - "Geometry.AffineTransform"
+        - "Geometry.ProjectiveTransform"
+        - "PureDraw.GraphicsState"
+        - "PureDraw.StrokeStyle"
+        - "PureDraw.Shadow"
+        - "PureDraw.PathConstruction"
+        - "PureDraw.ClipPath"
+        - "PureDraw.DrawingActions"
+        - "PureDraw.Gradient"
+        - "PureDraw.Pattern"
+      action_references:
+        - "paint.set-fill-color"
+        - "stroke.set-stroke-color"
+        - "stroke.set-line-width"
+        - "stroke.set-line-dash"
+        - "stroke.set-line-cap"
+        - "stroke.set-line-join"
+        - "path.move-to"
+        - "path.add-line"
+        - "path.add-curve"
+        - "path.close-subpath"
+        - "path.add-rect"
+        - "path.add-ellipse"
+        - "path.add-arc"
+        - "draw.stroke-path"
+        - "draw.fill-path"
+        - "draw.stroke-rect"
+        - "draw.fill-rect"
+        - "gradient.linear"
+        - "gradient.radial"
+        - "clip.clip"
+        - "draw.clear-rect"
+      required_editors:
+        - "transform-matrix"
+        - "stroke-style"
+  groups:
+    - id: "geometry"
+      title: "Geometry"
+      schema_subjects:
+        - "Geometry.Point"
+        - "Geometry.Rect"
+        - "Geometry.AffineTransform"
+        - "Geometry.ProjectiveTransform"
+    - id: "graphics-state"
+      title: "Graphics State"
+      schema_subjects:
+        - "PureDraw.GraphicsState"
+        - "PureDraw.StrokeStyle"
+        - "PureDraw.Shadow"
+    - id: "path"
+      title: "Path"
+      schema_subjects:
+        - "PureDraw.PathConstruction"
+        - "PureDraw.ClipPath"
+    - id: "paint-and-draw"
+      title: "Paint and Draw"
+      schema_subjects:
+        - "PureDraw.DrawingActions"
+        - "PureDraw.Gradient"
+        - "PureDraw.Pattern"
+  actions:
+    - id: "paint.set-fill-color"
+      schema_subject: "PureDraw.GraphicsState"
+      action_id: "set-fill-color"
+      preview:
+        kind: "property"
+        subject: "PureDraw.GraphicsState"
+        name: "fillColor"
+    - id: "stroke.set-stroke-color"
+      schema_subject: "PureDraw.GraphicsState"
+      action_id: "set-stroke-color"
+      preview:
+        kind: "property"
+        subject: "PureDraw.GraphicsState"
+        name: "strokeColor"
+    - id: "stroke.set-line-width"
+      schema_subject: "PureDraw.GraphicsState"
+      action_id: "set-line-width"
+      preview:
+        kind: "property"
+        subject: "PureDraw.GraphicsState"
+        name: "lineWidth"
+    - id: "stroke.set-line-dash"
+      schema_subject: "PureDraw.GraphicsState"
+      action_id: "set-line-dash"
+      preview:
+        kind: "property"
+        subject: "PureDraw.GraphicsState"
+        name: "dashPattern"
+    - id: "stroke.set-line-cap"
+      schema_subject: "PureDraw.GraphicsState"
+      action_id: "set-line-cap"
+      preview:
+        kind: "property"
+        subject: "PureDraw.GraphicsState"
+        name: "lineCap"
+    - id: "stroke.set-line-join"
+      schema_subject: "PureDraw.GraphicsState"
+      action_id: "set-line-join"
+      preview:
+        kind: "property"
+        subject: "PureDraw.GraphicsState"
+        name: "lineJoin"
+    - id: "path.move-to"
+      schema_subject: "PureDraw.PathConstruction"
+      action_id: "move-to"
+      preview:
+        kind: "property"
+        subject: "PureDraw.PathConstruction"
+        name: "currentPath"
+    - id: "path.add-line"
+      schema_subject: "PureDraw.PathConstruction"
+      action_id: "add-line"
+      preview:
+        kind: "property"
+        subject: "PureDraw.PathConstruction"
+        name: "currentPath"
+    - id: "path.add-curve"
+      schema_subject: "PureDraw.PathConstruction"
+      action_id: "add-curve"
+      preview:
+        kind: "property"
+        subject: "PureDraw.PathConstruction"
+        name: "currentPath"
+    - id: "path.close-subpath"
+      schema_subject: "PureDraw.PathConstruction"
+      action_id: "close-subpath"
+      preview:
+        kind: "property"
+        subject: "PureDraw.PathConstruction"
+        name: "currentPath"
+    - id: "path.add-rect"
+      schema_subject: "PureDraw.PathConstruction"
+      action_id: "add-rect"
+      preview:
+        kind: "property"
+        subject: "PureDraw.PathConstruction"
+        name: "currentPath"
+    - id: "path.add-ellipse"
+      schema_subject: "PureDraw.PathConstruction"
+      action_id: "add-ellipse"
+      preview:
+        kind: "property"
+        subject: "PureDraw.PathConstruction"
+        name: "currentPath"
+    - id: "path.add-arc"
+      schema_subject: "PureDraw.PathConstruction"
+      action_id: "add-arc"
+      preview:
+        kind: "property"
+        subject: "PureDraw.PathConstruction"
+        name: "currentPath"
+    - id: "draw.stroke-path"
+      schema_subject: "PureDraw.DrawingActions"
+      action_id: "stroke-path"
+      preview:
+        kind: "schema"
+        subject: "PureDraw.StrokeStyle"
+    - id: "draw.fill-path"
+      schema_subject: "PureDraw.DrawingActions"
+      action_id: "fill-path"
+      preview:
+        kind: "property"
+        subject: "PureDraw.GraphicsState"
+        name: "fillColor"
+    - id: "draw.stroke-rect"
+      schema_subject: "PureDraw.DrawingActions"
+      action_id: "stroke-rect"
+      preview:
+        kind: "schema"
+        subject: "PureDraw.StrokeStyle"
+    - id: "draw.fill-rect"
+      schema_subject: "PureDraw.DrawingActions"
+      action_id: "fill-rect"
+      preview:
+        kind: "property"
+        subject: "PureDraw.GraphicsState"
+        name: "fillColor"
+    - id: "gradient.linear"
+      schema_subject: "PureDraw.DrawingActions"
+      action_id: "draw-linear-gradient"
+      preview:
+        kind: "schema"
+        subject: "PureDraw.Gradient"
+    - id: "gradient.radial"
+      schema_subject: "PureDraw.DrawingActions"
+      action_id: "draw-radial-gradient"
+      preview:
+        kind: "schema"
+        subject: "PureDraw.Gradient"
+    - id: "clip.clip"
+      schema_subject: "PureDraw.DrawingActions"
+      action_id: "clip"
+      preview:
+        kind: "property"
+        subject: "PureDraw.GraphicsState"
+        name: "clipPaths"
+    - id: "draw.clear-rect"
+      schema_subject: "PureDraw.DrawingActions"
+      action_id: "clear-rect"
+      preview:
+        kind: "action"
+        id: "draw.clear-rect"
+  preview:
+    kind: "schema"
+    subject: "PureDraw.GraphicsState"
+  required_editors:
+    - "transform-matrix"
+    - "stroke-style"
+  editor_contracts:
+    - id: "transform-matrix"
+      title: "Transform Matrix"
+      target_subjects:
+        - "Geometry.AffineTransform"
+        - "Geometry.ProjectiveTransform"
+        - "PureDraw.GraphicsState"
+      compact_presentation:
+        - "matrix"
+        - "decomposition"
+        - "calculator"
+        - "preview"
+        - "code"
+      matrices:
+        - dimension: "affine2D"
+          field_order:
+            - "a"
+            - "b"
+            - "c"
+            - "d"
+            - "tx"
+            - "ty"
+          locked_cells:
+            - row: "0"
+              column: "2"
+              value: "0.0"
+            - row: "1"
+              column: "2"
+              value: "0.0"
+            - row: "2"
+              column: "2"
+              value: "1.0"
+          decomposition_fields:
+            - "tx"
+            - "ty"
+            - "rotation"
+            - "sx"
+            - "sy"
+            - "skewX"
+          operations:
+            - "translate"
+            - "rotate"
+            - "scale"
+            - "skew"
+            - "flip"
+            - "concatenate"
+            - "invert"
+            - "reset"
+            - "decompose"
+          presets:
+            - "identity"
+            - "rotate30"
+            - "scale1_5"
+            - "flipH"
+            - "shear"
+            - "cardTilt"
+          code_projections:
+            - "literal"
+            - "recipe"
+          preview: "true"
+          numeric_input: "exactFiniteDecimal"
+        - dimension: "projective3x3"
+          field_order:
+            - "m11"
+            - "m12"
+            - "m13"
+            - "m21"
+            - "m22"
+            - "m23"
+            - "m31"
+            - "m32"
+            - "m33"
+          locked_cells: []
+          decomposition_fields:
+            - "m11"
+            - "m12"
+            - "m13"
+            - "m21"
+            - "m22"
+            - "m23"
+            - "m31"
+            - "m32"
+            - "m33"
+          operations:
+            - "translate"
+            - "rotate"
+            - "scale"
+            - "skew"
+            - "perspective"
+            - "distort"
+            - "concatenate"
+            - "invert"
+            - "reset"
+            - "decompose"
+          presets:
+            - "identity"
+            - "perspectiveTilt"
+            - "cornerPin"
+            - "keystone"
+          code_projections:
+            - "literal"
+            - "recipe"
+          preview: "true"
+          numeric_input: "exactFiniteDecimal"
