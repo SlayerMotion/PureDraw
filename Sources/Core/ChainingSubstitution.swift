@@ -30,12 +30,18 @@ public struct ChainingSubstitution: Equatable, Sendable {
     public let lookahead: [Set<Int>]
     /// The substitutions to apply when the context matches.
     public let actions: [Action]
+    /// Whether the lookup skips mark glyphs when matching the context (the
+    /// `IgnoreMarks` or `UseMarkFilteringSet` lookup flag): a base before a fatha
+    /// still matches as the backtrack even when a mark sits between them. The
+    /// matcher skips marks accordingly; the glyph classification comes from GDEF.
+    public let ignoreMarks: Bool
 
-    public init(backtrack: [Set<Int>], input: [Set<Int>], lookahead: [Set<Int>], actions: [Action]) {
+    public init(backtrack: [Set<Int>], input: [Set<Int>], lookahead: [Set<Int>], actions: [Action], ignoreMarks: Bool = false) {
         self.backtrack = backtrack
         self.input = input
         self.lookahead = lookahead
         self.actions = actions
+        self.ignoreMarks = ignoreMarks
     }
 
     /// Whether `glyphs` match this rule with the input starting at `index`: each

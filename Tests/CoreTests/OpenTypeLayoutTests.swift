@@ -148,12 +148,22 @@ struct OpenTypeLayoutTests {
         #expect(rule.actions.count == 1)
         #expect(rule.actions[0].sequenceIndex == 0)
         #expect(rule.actions[0].mapping == [2: 9])
+        #expect(rule.ignoreMarks) // the lookup carries the IgnoreMarks flag
         // Glyph 2 substitutes to 9 only when preceded by glyph 1.
         #expect(rule.matches([1, 2], at: 1))
         #expect(!rule.matches([3, 2], at: 1))
         #expect(!rule.matches([2], at: 0))
         // A different feature carries no chaining rules.
         #expect(try Font(data: ChainContextFont.build()).chainingSubstitutions(feature: "rclt").isEmpty)
+    }
+
+    @Test("GDEF glyph class identifies mark glyphs")
+    func gdefMarkClass() throws {
+        let font = try Font(data: GdefFont.build())
+        #expect(font.isMarkGlyph(2)) // glyph 2 is class 3 (mark)
+        #expect(!font.isMarkGlyph(1)) // glyph 1 is class 1 (base)
+        #expect(!font.isMarkGlyph(0)) // unclassified
+        #expect(try !Font(data: MiniFont.build()).isMarkGlyph(2)) // no GDEF
     }
 
     @Test("GPOS cursive attachment yields entry and exit anchors")
@@ -429,6 +439,20 @@ private enum MarkMarkFont {
     }
 }
 
+private enum GdefFont {
+    static func build() -> [UInt8] {
+        // GDEF 1.0 with a GlyphClassDef (format 2): glyph 1 is a base (class 1),
+        // glyph 2 is a mark (class 3).
+        var gdef: [UInt8] = be16(1) + be16(0) // version 1.0
+        gdef += be16(12) // glyphClassDefOffset
+        gdef += be16(0) + be16(0) + be16(0) // attachList, ligCaretList, markAttachClassDef
+        gdef += be16(2) + be16(2) // ClassDef format 2, 2 ranges
+        gdef += be16(1) + be16(1) + be16(1) // glyph 1 -> class 1 (base)
+        gdef += be16(2) + be16(2) + be16(3) // glyph 2 -> class 3 (mark)
+        return assemble(extra: ("GDEF", gdef))
+    }
+}
+
 private enum ChainContextFont {
     static func build() -> [UInt8] {
         // GSUB with a `calt` feature -> one chaining-context lookup (type 6,
@@ -451,7 +475,7 @@ private enum ChainContextFont {
         gsub += be16(1) + Array("calt".utf8) + be16(8) // featureList: 'calt' -> feature at +8
         gsub += be16(0) + be16(1) + be16(0) // feature: lookupIndex 0
         gsub += be16(2) + be16(6) + be16(44) // lookupList: 2 lookups
-        gsub += be16(6) + be16(0) + be16(1) + be16(8) // lookup 0: type 6, subtable +8
+        gsub += be16(6) + be16(8) + be16(1) + be16(8) // lookup 0: type 6, IgnoreMarks flag, subtable +8
         gsub += be16(3) + be16(1) + be16(18) + be16(1) + be16(24) + be16(0) + be16(1) + be16(0) + be16(1) // chain fmt3
         gsub += be16(1) + be16(1) + be16(1) // backtrack coverage: glyph 1
         gsub += be16(1) + be16(1) + be16(2) // input coverage: glyph 2

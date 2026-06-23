@@ -474,7 +474,7 @@ public struct Font: Equatable, Sendable {
         // used for the Arabic lam-alef among others; `ccmp` composes glyphs, for
         // example combining an Arabic shadda and a vowel mark into one glyph.
         // Only the ligature (type 4) part of `ccmp` is read here.
-        forEachGSUBSubtable(matching: { $0 == "liga" || $0 == "rlig" || $0 == "ccmp" }) { subtable, effectiveType in
+        forEachGSUBSubtable(matching: { $0 == "liga" || $0 == "rlig" || $0 == "ccmp" }) { subtable, effectiveType, _ in
             if effectiveType == 4 {
                 parseLigatureSubst(subtable: subtable, into: &result)
             }
@@ -530,7 +530,7 @@ public struct Font: Equatable, Sendable {
     /// (from cursive joining) and applies the returned map.
     public func singleSubstitutions(feature: String) -> [Int: Int] {
         var result: [Int: Int] = [:]
-        forEachGSUBSubtable(matching: { $0 == feature }) { subtable, effectiveType in
+        forEachGSUBSubtable(matching: { $0 == feature }) { subtable, effectiveType, _ in
             if effectiveType == 1 {
                 parseSingleSubst(subtable: subtable, into: &result)
             }
@@ -546,19 +546,39 @@ public struct Font: Equatable, Sendable {
     /// 1 and 2 contexts, and nested lookups other than type 1, are not collected.
     public func chainingSubstitutions(feature: String) -> [ChainingSubstitution] {
         var result: [ChainingSubstitution] = []
-        forEachGSUBSubtable(matching: { $0 == feature }) { subtable, effectiveType in
+        forEachGSUBSubtable(matching: { $0 == feature }) { subtable, effectiveType, lookupFlag in
             if effectiveType == 6 {
-                parseChainContext(subtable: subtable, into: &result)
+                // IgnoreMarks (0x0008) skips all marks; UseMarkFilteringSet
+                // (0x0010) skips marks outside a named set. Both are treated as
+                // MARK: - skipping; the filtering-set refinement is approximated as
+
+                // skipping every mark, exact when the context's non-input
+                // positions are non-marks (a base-letter backtrack, for example).
+                let skipsMarks = lookupFlag & (0x0008 | 0x0010) != 0
+                parseChainContext(subtable: subtable, ignoreMarks: skipsMarks, into: &result)
             }
         }
         return result
     }
 
+    /// Whether `glyph` is a mark, per the GDEF GlyphClassDef (class 3). Used to
+    /// skip marks when a lookup carries the `IgnoreMarks` flag. False when the
+    /// font has no GDEF class definition.
+    public func isMarkGlyph(_ glyph: Int) -> Bool {
+        guard let gdef = tables["GDEF"],
+              let classDefOffset = Self.u16(data, at: gdef.offset + 4), classDefOffset != 0,
+              let classDef = OpenTypeClassDef(data: data, offset: gdef.offset + classDefOffset)
+        else {
+            return false
+        }
+        return classDef.classValue(forGlyph: glyph) == 3
+    }
+
     /// Walks every GSUB subtable of the lookups whose feature tag satisfies
     /// `matches`, resolving extension lookups (type 7) to their effective type,
-    /// and calls `body` with each subtable's byte offset and effective type. The
-    /// shared spine of the GSUB readers (single, ligature, chaining context).
-    private func forEachGSUBSubtable(matching: (String) -> Bool, _ body: (Int, Int) -> Void) {
+    /// and calls `body` with each subtable's byte offset, effective type, and the
+    /// lookup's flag word. The shared spine of the GSUB readers.
+    private func forEachGSUBSubtable(matching: (String) -> Bool, _ body: (Int, Int, Int) -> Void) {
         guard let gsub = tables["GSUB"] else { return }
         let base = gsub.offset
         guard let featureListOffset = Self.u16(data, at: base + 6) else { return }
@@ -590,7 +610,8 @@ public struct Font: Equatable, Sendable {
     /// Walks the subtables of one GSUB lookup, addressed by its index in the
     /// lookup list, resolving extension lookups (type 7). Used both for a
     /// feature's own lookups and for the nested lookups a chaining rule references.
-    private func forEachGSUBLookupSubtable(at index: Int, _ body: (Int, Int) -> Void) {
+    /// `body` receives the subtable offset, effective type, and the lookup flag.
+    private func forEachGSUBLookupSubtable(at index: Int, _ body: (Int, Int, Int) -> Void) {
         guard let gsub = tables["GSUB"], let lookupListOffset = Self.u16(data, at: gsub.offset + 8) else { return }
         let lookupList = gsub.offset + lookupListOffset
         guard let lookupCount = Self.u16(data, at: lookupList), index >= 0, index < lookupCount,
@@ -600,6 +621,7 @@ public struct Font: Equatable, Sendable {
         }
         let lookup = lookupList + lookupOffset
         guard let lookupType = Self.u16(data, at: lookup),
+              let lookupFlag = Self.u16(data, at: lookup + 2),
               let subtableCount = Self.u16(data, at: lookup + 4)
         else {
             return
@@ -618,7 +640,7 @@ public struct Font: Equatable, Sendable {
                 effectiveType = extensionType
                 subtable += extensionOffset
             }
-            body(subtable, effectiveType)
+            body(subtable, effectiveType, lookupFlag)
         }
     }
 
@@ -627,7 +649,7 @@ public struct Font: Equatable, Sendable {
     /// records that name nested lookups to apply. Each nested lookup is resolved;
     /// its type-1 single substitutions become the rule's actions. Formats 1 and 2
     /// are ignored.
-    private func parseChainContext(subtable: Int, into result: inout [ChainingSubstitution]) {
+    private func parseChainContext(subtable: Int, ignoreMarks: Bool, into result: inout [ChainingSubstitution]) {
         guard Self.u16(data, at: subtable) == 3 else { return }
         var cursor = subtable + 2
         guard let backtrack = readCoverageSequence(at: &cursor, subtableBase: subtable),
@@ -647,7 +669,7 @@ public struct Font: Equatable, Sendable {
             }
             cursor += 4
             var mapping: [Int: Int] = [:]
-            forEachGSUBLookupSubtable(at: lookupIndex) { nested, type in
+            forEachGSUBLookupSubtable(at: lookupIndex) { nested, type, _ in
                 if type == 1 {
                     parseSingleSubst(subtable: nested, into: &mapping)
                 }
@@ -657,7 +679,7 @@ public struct Font: Equatable, Sendable {
             }
         }
         guard !actions.isEmpty else { return }
-        result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, actions: actions))
+        result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, actions: actions, ignoreMarks: ignoreMarks))
     }
 
     /// Reads a count-prefixed list of coverage-table offsets (each relative to
