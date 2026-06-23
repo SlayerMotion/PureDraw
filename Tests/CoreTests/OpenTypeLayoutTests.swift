@@ -137,6 +137,25 @@ struct OpenTypeLayoutTests {
         #expect(try Font(data: MarkMarkFont.build()).markAttachment().isEmpty)
     }
 
+    @Test("GSUB chaining context substitution resolves nested single substitutions")
+    func gsubChainContext() throws {
+        let rules = try Font(data: ChainContextFont.build()).chainingSubstitutions(feature: "calt")
+        #expect(rules.count == 1)
+        let rule = rules[0]
+        #expect(rule.backtrack == [Set([1])])
+        #expect(rule.input == [Set([2])])
+        #expect(rule.lookahead.isEmpty)
+        #expect(rule.actions.count == 1)
+        #expect(rule.actions[0].sequenceIndex == 0)
+        #expect(rule.actions[0].mapping == [2: 9])
+        // Glyph 2 substitutes to 9 only when preceded by glyph 1.
+        #expect(rule.matches([1, 2], at: 1))
+        #expect(!rule.matches([3, 2], at: 1))
+        #expect(!rule.matches([2], at: 0))
+        // A different feature carries no chaining rules.
+        #expect(try Font(data: ChainContextFont.build()).chainingSubstitutions(feature: "rclt").isEmpty)
+    }
+
     @Test("GPOS cursive attachment yields entry and exit anchors")
     func gposCursive() throws {
         let cursive = try Font(data: CursiveFont.build()).cursiveAttachment()
@@ -407,6 +426,39 @@ private enum MarkMarkFont {
         gpos += be16(1) + be16(4) // mark2Array: count, anchorOffset 4
         gpos += be16(1) + be16(300) + be16(500) // mark2 anchor (format 1)
         return assemble(extra: ("GPOS", gpos))
+    }
+}
+
+private enum ChainContextFont {
+    static func build() -> [UInt8] {
+        // GSUB with a `calt` feature -> one chaining-context lookup (type 6,
+        // format 3): glyph 2, when preceded by glyph 1, is substituted by the
+        // nested single-substitution lookup (type 1) to glyph 9. Offsets are
+        // relative to each subtable's start. Byte map:
+        //   0  header(10)        scriptList 10, featureList 12, lookupList 26
+        //   10 scriptList(2)
+        //   12 featureList(14)   'calt' -> lookup index 0
+        //   26 lookupList(6)     lookup 0 (chain) at +6, lookup 1 (single) at +44
+        //   32 lookup 0          type 6, subtable at +8 (-> 40)
+        //   40 chain subtable    backtrack cov +18, input cov +24
+        //   58 backtrack cov     glyph 1
+        //   64 input cov         glyph 2
+        //   70 lookup 1          type 1, subtable at +8 (-> 78)
+        //   78 single subst      format 2, coverage +8, substitute glyph 9
+        //   86 single cov        glyph 2
+        var gsub: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gsub += be16(0) // scriptList
+        gsub += be16(1) + Array("calt".utf8) + be16(8) // featureList: 'calt' -> feature at +8
+        gsub += be16(0) + be16(1) + be16(0) // feature: lookupIndex 0
+        gsub += be16(2) + be16(6) + be16(44) // lookupList: 2 lookups
+        gsub += be16(6) + be16(0) + be16(1) + be16(8) // lookup 0: type 6, subtable +8
+        gsub += be16(3) + be16(1) + be16(18) + be16(1) + be16(24) + be16(0) + be16(1) + be16(0) + be16(1) // chain fmt3
+        gsub += be16(1) + be16(1) + be16(1) // backtrack coverage: glyph 1
+        gsub += be16(1) + be16(1) + be16(2) // input coverage: glyph 2
+        gsub += be16(1) + be16(0) + be16(1) + be16(8) // lookup 1: type 1, subtable +8
+        gsub += be16(2) + be16(8) + be16(1) + be16(9) // single subst format 2 -> glyph 9
+        gsub += be16(1) + be16(1) + be16(2) // single subst coverage: glyph 2
+        return assemble(extra: ("GSUB", gsub))
     }
 }
 

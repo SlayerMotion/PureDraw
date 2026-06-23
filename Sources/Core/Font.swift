@@ -470,64 +470,11 @@ public struct Font: Equatable, Sendable {
     }
 
     private func parseGSUBLigatures(into result: inout [LigatureSubstitution]) {
-        guard let gsub = tables["GSUB"] else { return }
-        let base = gsub.offset
-        guard let featureListOffset = Self.u16(data, at: base + 6),
-              let lookupListOffset = Self.u16(data, at: base + 8)
-        else {
-            return
-        }
-        let featureList = base + featureListOffset
-        let lookupList = base + lookupListOffset
-
-        var ligatureLookupIndices: Set<Int> = []
-        if let featureCount = Self.u16(data, at: featureList) {
-            for featureIndex in 0 ..< featureCount {
-                let record = featureList + 2 + featureIndex * 6
-                let tag = Self.tag(data, at: record)
-                // `liga` is the standard Latin ligatures; `rlig` is required
-                // ligatures, used for the Arabic lam-alef among others.
-                guard tag == "liga" || tag == "rlig",
-                      let featureOffset = Self.u16(data, at: record + 4)
-                else {
-                    continue
-                }
-                let feature = featureList + featureOffset
-                guard let lookupIndexCount = Self.u16(data, at: feature + 2) else { continue }
-                for lookupIndex in 0 ..< lookupIndexCount {
-                    if let index = Self.u16(data, at: feature + 4 + lookupIndex * 2) {
-                        ligatureLookupIndices.insert(index)
-                    }
-                }
-            }
-        }
-
-        guard let lookupCount = Self.u16(data, at: lookupList) else { return }
-        for index in ligatureLookupIndices where index < lookupCount {
-            guard let lookupOffset = Self.u16(data, at: lookupList + 2 + index * 2) else { continue }
-            let lookup = lookupList + lookupOffset
-            guard let lookupType = Self.u16(data, at: lookup),
-                  let subtableCount = Self.u16(data, at: lookup + 4)
-            else {
-                continue
-            }
-            for subtableIndex in 0 ..< subtableCount {
-                guard let subtableOffset = Self.u16(data, at: lookup + 6 + subtableIndex * 2) else { continue }
-                var subtable = lookup + subtableOffset
-                var effectiveType = lookupType
-                if lookupType == 7 {
-                    guard Self.u16(data, at: subtable) == 1,
-                          let extensionType = Self.u16(data, at: subtable + 2),
-                          let extensionOffset = Self.u32(data, at: subtable + 4)
-                    else {
-                        continue
-                    }
-                    effectiveType = extensionType
-                    subtable += extensionOffset
-                }
-                if effectiveType == 4 {
-                    parseLigatureSubst(subtable: subtable, into: &result)
-                }
+        // `liga` is the standard Latin ligatures; `rlig` is required ligatures,
+        // used for the Arabic lam-alef among others.
+        forEachGSUBSubtable(matching: { $0 == "liga" || $0 == "rlig" }) { subtable, effectiveType in
+            if effectiveType == 4 {
+                parseLigatureSubst(subtable: subtable, into: &result)
             }
         }
     }
@@ -581,21 +528,45 @@ public struct Font: Equatable, Sendable {
     /// (from cursive joining) and applies the returned map.
     public func singleSubstitutions(feature: String) -> [Int: Int] {
         var result: [Int: Int] = [:]
-        guard let gsub = tables["GSUB"] else { return result }
-        let base = gsub.offset
-        guard let featureListOffset = Self.u16(data, at: base + 6),
-              let lookupListOffset = Self.u16(data, at: base + 8)
-        else {
-            return result
+        forEachGSUBSubtable(matching: { $0 == feature }) { subtable, effectiveType in
+            if effectiveType == 1 {
+                parseSingleSubst(subtable: subtable, into: &result)
+            }
         }
+        return result
+    }
+
+    /// The font's GSUB chaining contextual substitutions (lookup type 6, format
+    /// 3) under `feature`, with nested type-1 single substitutions resolved into
+    /// the rules. These substitute a glyph only in a matching neighbourhood (an
+    /// Arabic `rclt` rule that lifts a vowel mark to a high variant after a base
+    /// letter). Empty when the font carries no such rules for the feature. Format
+    /// 1 and 2 contexts, and nested lookups other than type 1, are not collected.
+    public func chainingSubstitutions(feature: String) -> [ChainingSubstitution] {
+        var result: [ChainingSubstitution] = []
+        forEachGSUBSubtable(matching: { $0 == feature }) { subtable, effectiveType in
+            if effectiveType == 6 {
+                parseChainContext(subtable: subtable, into: &result)
+            }
+        }
+        return result
+    }
+
+    /// Walks every GSUB subtable of the lookups whose feature tag satisfies
+    /// `matches`, resolving extension lookups (type 7) to their effective type,
+    /// and calls `body` with each subtable's byte offset and effective type. The
+    /// shared spine of the GSUB readers (single, ligature, chaining context).
+    private func forEachGSUBSubtable(matching: (String) -> Bool, _ body: (Int, Int) -> Void) {
+        guard let gsub = tables["GSUB"] else { return }
+        let base = gsub.offset
+        guard let featureListOffset = Self.u16(data, at: base + 6) else { return }
         let featureList = base + featureListOffset
-        let lookupList = base + lookupListOffset
 
         var lookupIndices: Set<Int> = []
         if let featureCount = Self.u16(data, at: featureList) {
             for featureIndex in 0 ..< featureCount {
                 let record = featureList + 2 + featureIndex * 6
-                guard Self.tag(data, at: record) == feature,
+                guard matching(Self.tag(data, at: record) ?? ""),
                       let featureOffset = Self.u16(data, at: record + 4)
                 else {
                     continue
@@ -609,36 +580,101 @@ public struct Font: Equatable, Sendable {
                 }
             }
         }
+        for index in lookupIndices.sorted() {
+            forEachGSUBLookupSubtable(at: index, body)
+        }
+    }
 
-        guard let lookupCount = Self.u16(data, at: lookupList) else { return result }
-        for index in lookupIndices.sorted() where index < lookupCount {
-            guard let lookupOffset = Self.u16(data, at: lookupList + 2 + index * 2) else { continue }
-            let lookup = lookupList + lookupOffset
-            guard let lookupType = Self.u16(data, at: lookup),
-                  let subtableCount = Self.u16(data, at: lookup + 4)
-            else {
-                continue
+    /// Walks the subtables of one GSUB lookup, addressed by its index in the
+    /// lookup list, resolving extension lookups (type 7). Used both for a
+    /// feature's own lookups and for the nested lookups a chaining rule references.
+    private func forEachGSUBLookupSubtable(at index: Int, _ body: (Int, Int) -> Void) {
+        guard let gsub = tables["GSUB"], let lookupListOffset = Self.u16(data, at: gsub.offset + 8) else { return }
+        let lookupList = gsub.offset + lookupListOffset
+        guard let lookupCount = Self.u16(data, at: lookupList), index >= 0, index < lookupCount,
+              let lookupOffset = Self.u16(data, at: lookupList + 2 + index * 2)
+        else {
+            return
+        }
+        let lookup = lookupList + lookupOffset
+        guard let lookupType = Self.u16(data, at: lookup),
+              let subtableCount = Self.u16(data, at: lookup + 4)
+        else {
+            return
+        }
+        for subtableIndex in 0 ..< subtableCount {
+            guard let subtableOffset = Self.u16(data, at: lookup + 6 + subtableIndex * 2) else { continue }
+            var subtable = lookup + subtableOffset
+            var effectiveType = lookupType
+            if lookupType == 7 {
+                guard Self.u16(data, at: subtable) == 1,
+                      let extensionType = Self.u16(data, at: subtable + 2),
+                      let extensionOffset = Self.u32(data, at: subtable + 4)
+                else {
+                    continue
+                }
+                effectiveType = extensionType
+                subtable += extensionOffset
             }
-            for subtableIndex in 0 ..< subtableCount {
-                guard let subtableOffset = Self.u16(data, at: lookup + 6 + subtableIndex * 2) else { continue }
-                var subtable = lookup + subtableOffset
-                var effectiveType = lookupType
-                if lookupType == 7 {
-                    guard Self.u16(data, at: subtable) == 1,
-                          let extensionType = Self.u16(data, at: subtable + 2),
-                          let extensionOffset = Self.u32(data, at: subtable + 4)
-                    else {
-                        continue
-                    }
-                    effectiveType = extensionType
-                    subtable += extensionOffset
+            body(subtable, effectiveType)
+        }
+    }
+
+    /// Decodes a GSUB ChainContextSubstFormat3 (type 6, format 3) subtable: three
+    /// coverage sequences (backtrack, input, lookahead) and the sequence-lookup
+    /// records that name nested lookups to apply. Each nested lookup is resolved;
+    /// its type-1 single substitutions become the rule's actions. Formats 1 and 2
+    /// are ignored.
+    private func parseChainContext(subtable: Int, into result: inout [ChainingSubstitution]) {
+        guard Self.u16(data, at: subtable) == 3 else { return }
+        var cursor = subtable + 2
+        guard let backtrack = readCoverageSequence(at: &cursor, subtableBase: subtable),
+              let input = readCoverageSequence(at: &cursor, subtableBase: subtable),
+              let lookahead = readCoverageSequence(at: &cursor, subtableBase: subtable),
+              let recordCount = Self.u16(data, at: cursor)
+        else {
+            return
+        }
+        cursor += 2
+        var actions: [ChainingSubstitution.Action] = []
+        for _ in 0 ..< recordCount {
+            guard let sequenceIndex = Self.u16(data, at: cursor),
+                  let lookupIndex = Self.u16(data, at: cursor + 2)
+            else {
+                break
+            }
+            cursor += 4
+            var mapping: [Int: Int] = [:]
+            forEachGSUBLookupSubtable(at: lookupIndex) { nested, type in
+                if type == 1 {
+                    parseSingleSubst(subtable: nested, into: &mapping)
                 }
-                if effectiveType == 1 {
-                    parseSingleSubst(subtable: subtable, into: &result)
-                }
+            }
+            if !mapping.isEmpty {
+                actions.append(.init(sequenceIndex: sequenceIndex, mapping: mapping))
             }
         }
-        return result
+        guard !actions.isEmpty else { return }
+        result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, actions: actions))
+    }
+
+    /// Reads a count-prefixed list of coverage-table offsets (each relative to
+    /// `subtable`'s containing chain-context subtable) into glyph sets, advancing
+    /// `cursor` past the list. `cursor` starts at the count field.
+    private func readCoverageSequence(at cursor: inout Int, subtableBase: Int) -> [Set<Int>]? {
+        guard let count = Self.u16(data, at: cursor) else { return nil }
+        cursor += 2
+        var sequence: [Set<Int>] = []
+        for _ in 0 ..< count {
+            guard let coverageOffset = Self.u16(data, at: cursor),
+                  let coverage = OpenTypeCoverage(data: data, offset: subtableBase + coverageOffset)
+            else {
+                return nil
+            }
+            sequence.append(coverage.coveredGlyphs)
+            cursor += 2
+        }
+        return sequence
     }
 
     /// Decodes a GSUB single substitution (type 1) subtable into `result`.
