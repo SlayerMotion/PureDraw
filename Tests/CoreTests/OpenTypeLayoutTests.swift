@@ -137,10 +137,22 @@ struct OpenTypeLayoutTests {
         #expect(try Font(data: MarkMarkFont.build()).markAttachment().isEmpty)
     }
 
+    @Test("GPOS cursive attachment yields entry and exit anchors")
+    func gposCursive() throws {
+        let cursive = try Font(data: CursiveFont.build()).cursiveAttachment()
+        #expect(!cursive.isEmpty)
+        #expect(cursive.exit(1) == CursiveAttachment.Point(x: 700, y: 50)) // glyph 1 exits here
+        #expect(cursive.entry(2) == CursiveAttachment.Point(x: 0, y: 50)) // glyph 2 enters here
+        #expect(cursive.entry(1) == nil) // glyph 1 has a null entry
+        #expect(cursive.exit(2) == nil) // glyph 2 has a null exit
+        #expect(cursive.entry(99) == nil)
+    }
+
     @Test("a font without GPOS mark positioning has empty attachment")
     func noMarks() throws {
         #expect(try Font(data: MiniFont.build()).markAttachment().isEmpty)
         #expect(try Font(data: MiniFont.build()).markMarkAttachment().isEmpty)
+        #expect(try Font(data: MiniFont.build()).cursiveAttachment().isEmpty)
     }
 
     @Test("a font without a kern table has an empty kerning map")
@@ -394,6 +406,27 @@ private enum MarkMarkFont {
         gpos += be16(1) + be16(100) + be16(200) // mark1 anchor (format 1)
         gpos += be16(1) + be16(4) // mark2Array: count, anchorOffset 4
         gpos += be16(1) + be16(300) + be16(500) // mark2 anchor (format 1)
+        return assemble(extra: ("GPOS", gpos))
+    }
+}
+
+private enum CursiveFont {
+    static func build() -> [UInt8] {
+        // GPOS with one CursivePos (type 3) subtable covering glyphs 1 and 2:
+        // glyph 1 exits at (700, 50) with a null entry; glyph 2 enters at (0, 50)
+        // with a null exit. Offsets are relative to the subtable start (byte 38).
+        var gpos: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gpos += be16(0) // scriptList
+        gpos += be16(1) + Array("curs".utf8) + be16(8) // featureList: 'curs' -> lookup 0
+        gpos += be16(0) + be16(1) + be16(0) // feature
+        gpos += be16(1) + be16(4) // lookupList
+        gpos += be16(3) + be16(0) + be16(1) + be16(8) // lookup: type 3
+        gpos += be16(1) + be16(14) + be16(2) // CursivePos: format, coverage +14, entryExitCount 2
+        gpos += be16(0) + be16(22) // glyph 1: entry null, exit +22
+        gpos += be16(28) + be16(0) // glyph 2: entry +28, exit null
+        gpos += be16(1) + be16(2) + be16(1) + be16(2) // coverage: glyphs 1, 2
+        gpos += be16(1) + be16(700) + be16(50) // glyph 1 exit anchor
+        gpos += be16(1) + be16(0) + be16(50) // glyph 2 entry anchor
         return assemble(extra: ("GPOS", gpos))
     }
 }

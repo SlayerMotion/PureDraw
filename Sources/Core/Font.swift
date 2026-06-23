@@ -688,20 +688,48 @@ public struct Font: Equatable, Sendable {
         collectMarkAttachment(feature: "mkmk", lookupType: 6)
     }
 
+    /// The font's GPOS cursive attachment (the `curs` feature, lookup type 3):
+    /// the entry and exit anchors that join glyphs along a flowing baseline, so a
+    /// connected script links one glyph's exit to the next glyph's entry. Empty
+    /// when the font carries no cursive attachment. PureDraw parses the GPOS
+    /// table; this forwards the typed result for the shaper to connect glyphs.
+    public func cursiveAttachment() -> CursiveAttachment {
+        var entries: [Int: CursiveAttachment.Point] = [:]
+        var exits: [Int: CursiveAttachment.Point] = [:]
+        forEachGPOSSubtable(feature: "curs") { subtable, effectiveType in
+            if effectiveType == 3 {
+                parseCursivePos(subtable: subtable, entries: &entries, exits: &exits)
+            }
+        }
+        return CursiveAttachment(entries: entries, exits: exits)
+    }
+
     /// Gathers the anchor data of a GPOS mark-attachment feature into a typed
     /// ``MarkAttachment``. `lookupType` is 4 for mark-to-base (the `mark`
     /// feature) and 6 for mark-to-mark (the `mkmk` feature); the two share the
-    /// same subtable layout, so one parser serves both. Extension lookups (type
-    /// 9) are resolved to their effective type before matching.
+    /// same subtable layout, so one parser serves both.
     private func collectMarkAttachment(feature wanted: String, lookupType wantedType: Int) -> MarkAttachment {
         var marks: [Int: MarkAttachment.Mark] = [:]
         var bases: [Int: [Int: MarkAttachment.Point]] = [:]
-        guard let gpos = tables["GPOS"] else { return MarkAttachment(marks: marks, bases: bases) }
+        forEachGPOSSubtable(feature: wanted) { subtable, effectiveType in
+            if effectiveType == wantedType {
+                parseMarkAnchorSubtable(subtable: subtable, marks: &marks, bases: &bases)
+            }
+        }
+        return MarkAttachment(marks: marks, bases: bases)
+    }
+
+    /// Walks every GPOS subtable of the lookups a feature references, resolving
+    /// extension lookups (type 9) to their effective type, and calls `body` with
+    /// each subtable's byte offset and effective lookup type. The shared spine of
+    /// the GPOS readers (mark, mark-to-mark, cursive).
+    private func forEachGPOSSubtable(feature wanted: String, _ body: (Int, Int) -> Void) {
+        guard let gpos = tables["GPOS"] else { return }
         let base = gpos.offset
         guard let featureListOffset = Self.u16(data, at: base + 6),
               let lookupListOffset = Self.u16(data, at: base + 8)
         else {
-            return MarkAttachment(marks: marks, bases: bases)
+            return
         }
         let featureList = base + featureListOffset
         let lookupList = base + lookupListOffset
@@ -725,9 +753,7 @@ public struct Font: Equatable, Sendable {
             }
         }
 
-        guard let lookupCount = Self.u16(data, at: lookupList) else {
-            return MarkAttachment(marks: marks, bases: bases)
-        }
+        guard let lookupCount = Self.u16(data, at: lookupList) else { return }
         for index in lookupIndices.sorted() where index < lookupCount {
             guard let lookupOffset = Self.u16(data, at: lookupList + 2 + index * 2) else { continue }
             let lookup = lookupList + lookupOffset
@@ -750,12 +776,40 @@ public struct Font: Equatable, Sendable {
                     effectiveType = extensionType
                     subtable += extensionOffset
                 }
-                if effectiveType == wantedType {
-                    parseMarkAnchorSubtable(subtable: subtable, marks: &marks, bases: &bases)
-                }
+                body(subtable, effectiveType)
             }
         }
-        return MarkAttachment(marks: marks, bases: bases)
+    }
+
+    /// Decodes a GPOS CursivePos (type 3) subtable into the per-glyph entry and
+    /// exit anchors. An entry-exit record with a null (zero) anchor offset leaves
+    /// that side absent.
+    private func parseCursivePos(
+        subtable: Int,
+        entries: inout [Int: CursiveAttachment.Point],
+        exits: inout [Int: CursiveAttachment.Point]
+    ) {
+        guard Self.u16(data, at: subtable) == 1,
+              let coverageOffset = Self.u16(data, at: subtable + 2),
+              let entryExitCount = Self.u16(data, at: subtable + 4),
+              let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+        else {
+            return
+        }
+        for index in 0 ..< entryExitCount {
+            guard let glyph = coverage.glyph(atIndex: index) else { continue }
+            let record = subtable + 6 + index * 4
+            if let entryOffset = Self.u16(data, at: record), entryOffset != 0,
+               let point = anchorCoordinates(at: subtable + entryOffset)
+            {
+                entries[glyph] = CursiveAttachment.Point(x: point.x, y: point.y)
+            }
+            if let exitOffset = Self.u16(data, at: record + 2), exitOffset != 0,
+               let point = anchorCoordinates(at: subtable + exitOffset)
+            {
+                exits[glyph] = CursiveAttachment.Point(x: point.x, y: point.y)
+            }
+        }
     }
 
     /// Decodes a GPOS mark-attachment subtable (MarkBasePos type 4 or MarkMarkPos
@@ -819,14 +873,20 @@ public struct Font: Equatable, Sendable {
     /// Reads an Anchor table's coordinates. Formats 1, 2, and 3 all store the x
     /// and y coordinates at the same offsets; the point-index and device-table
     /// refinements are ignored.
-    private func anchor(at offset: Int) -> MarkAttachment.Point? {
+    private func anchorCoordinates(at offset: Int) -> (x: Int, y: Int)? {
         guard Self.u16(data, at: offset) != nil,
               let x = Self.i16(data, at: offset + 2),
               let y = Self.i16(data, at: offset + 4)
         else {
             return nil
         }
-        return MarkAttachment.Point(x: x, y: y)
+        return (x, y)
+    }
+
+    /// An Anchor table's coordinates as a ``MarkAttachment/Point``.
+    private func anchor(at offset: Int) -> MarkAttachment.Point? {
+        guard let point = anchorCoordinates(at: offset) else { return nil }
+        return MarkAttachment.Point(x: point.x, y: point.y)
     }
 
     // MARK: - Outlines
