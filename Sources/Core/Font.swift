@@ -669,6 +669,145 @@ public struct Font: Equatable, Sendable {
         }
     }
 
+    /// The font's mark-to-base attachment (GPOS lookup type 4) under the `mark`
+    /// feature, for the shaping tier to seat combining marks over their bases
+    /// (Arabic vowel marks, for example). Extension lookups (type 9) are
+    /// resolved. Empty when the font carries no mark positioning.
+    public func markAttachment() -> MarkAttachment {
+        var marks: [Int: MarkAttachment.Mark] = [:]
+        var bases: [Int: [Int: MarkAttachment.Point]] = [:]
+        guard let gpos = tables["GPOS"] else { return MarkAttachment(marks: marks, bases: bases) }
+        let base = gpos.offset
+        guard let featureListOffset = Self.u16(data, at: base + 6),
+              let lookupListOffset = Self.u16(data, at: base + 8)
+        else {
+            return MarkAttachment(marks: marks, bases: bases)
+        }
+        let featureList = base + featureListOffset
+        let lookupList = base + lookupListOffset
+
+        var lookupIndices: Set<Int> = []
+        if let featureCount = Self.u16(data, at: featureList) {
+            for featureIndex in 0 ..< featureCount {
+                let record = featureList + 2 + featureIndex * 6
+                guard Self.tag(data, at: record) == "mark",
+                      let featureOffset = Self.u16(data, at: record + 4)
+                else {
+                    continue
+                }
+                let feature = featureList + featureOffset
+                guard let lookupIndexCount = Self.u16(data, at: feature + 2) else { continue }
+                for lookupIndex in 0 ..< lookupIndexCount {
+                    if let index = Self.u16(data, at: feature + 4 + lookupIndex * 2) {
+                        lookupIndices.insert(index)
+                    }
+                }
+            }
+        }
+
+        guard let lookupCount = Self.u16(data, at: lookupList) else {
+            return MarkAttachment(marks: marks, bases: bases)
+        }
+        for index in lookupIndices.sorted() where index < lookupCount {
+            guard let lookupOffset = Self.u16(data, at: lookupList + 2 + index * 2) else { continue }
+            let lookup = lookupList + lookupOffset
+            guard let lookupType = Self.u16(data, at: lookup),
+                  let subtableCount = Self.u16(data, at: lookup + 4)
+            else {
+                continue
+            }
+            for subtableIndex in 0 ..< subtableCount {
+                guard let subtableOffset = Self.u16(data, at: lookup + 6 + subtableIndex * 2) else { continue }
+                var subtable = lookup + subtableOffset
+                var effectiveType = lookupType
+                if lookupType == 9 {
+                    guard Self.u16(data, at: subtable) == 1,
+                          let extensionType = Self.u16(data, at: subtable + 2),
+                          let extensionOffset = Self.u32(data, at: subtable + 4)
+                    else {
+                        continue
+                    }
+                    effectiveType = extensionType
+                    subtable += extensionOffset
+                }
+                if effectiveType == 4 {
+                    parseMarkBasePos(subtable: subtable, marks: &marks, bases: &bases)
+                }
+            }
+        }
+        return MarkAttachment(marks: marks, bases: bases)
+    }
+
+    /// Decodes a GPOS MarkBasePos (type 4) subtable into the mark and base anchor
+    /// maps. Anchor coordinates are read from all anchor formats (1, 2, and 3);
+    /// the device and contour-point refinements of formats 2 and 3 are not
+    /// applied.
+    private func parseMarkBasePos(
+        subtable: Int,
+        marks: inout [Int: MarkAttachment.Mark],
+        bases: inout [Int: [Int: MarkAttachment.Point]]
+    ) {
+        guard Self.u16(data, at: subtable) == 1,
+              let markCoverageOffset = Self.u16(data, at: subtable + 2),
+              let baseCoverageOffset = Self.u16(data, at: subtable + 4),
+              let markClassCount = Self.u16(data, at: subtable + 6),
+              let markArrayOffset = Self.u16(data, at: subtable + 8),
+              let baseArrayOffset = Self.u16(data, at: subtable + 10),
+              let markCoverage = OpenTypeCoverage(data: data, offset: subtable + markCoverageOffset),
+              let baseCoverage = OpenTypeCoverage(data: data, offset: subtable + baseCoverageOffset)
+        else {
+            return
+        }
+
+        let markArray = subtable + markArrayOffset
+        if let markCount = Self.u16(data, at: markArray) {
+            for index in 0 ..< markCount {
+                let record = markArray + 2 + index * 4
+                guard let markGlyph = markCoverage.glyph(atIndex: index),
+                      let markClass = Self.u16(data, at: record),
+                      let anchorOffset = Self.u16(data, at: record + 2),
+                      let anchor = anchor(at: markArray + anchorOffset)
+                else {
+                    continue
+                }
+                marks[markGlyph] = MarkAttachment.Mark(markClass: markClass, anchor: anchor)
+            }
+        }
+
+        let baseArray = subtable + baseArrayOffset
+        if let baseCount = Self.u16(data, at: baseArray) {
+            for index in 0 ..< baseCount {
+                guard let baseGlyph = baseCoverage.glyph(atIndex: index) else { continue }
+                var classAnchors: [Int: MarkAttachment.Point] = [:]
+                for markClass in 0 ..< markClassCount {
+                    let offsetPosition = baseArray + 2 + (index * markClassCount + markClass) * 2
+                    guard let anchorOffset = Self.u16(data, at: offsetPosition), anchorOffset != 0,
+                          let anchor = anchor(at: baseArray + anchorOffset)
+                    else {
+                        continue
+                    }
+                    classAnchors[markClass] = anchor
+                }
+                if !classAnchors.isEmpty {
+                    bases[baseGlyph] = classAnchors
+                }
+            }
+        }
+    }
+
+    /// Reads an Anchor table's coordinates. Formats 1, 2, and 3 all store the x
+    /// and y coordinates at the same offsets; the point-index and device-table
+    /// refinements are ignored.
+    private func anchor(at offset: Int) -> MarkAttachment.Point? {
+        guard Self.u16(data, at: offset) != nil,
+              let x = Self.i16(data, at: offset + 2),
+              let y = Self.i16(data, at: offset + 4)
+        else {
+            return nil
+        }
+        return MarkAttachment.Point(x: x, y: y)
+    }
+
     // MARK: - Outlines
 
     /// The glyph outline as a path in font units (y up), or `nil` for empty

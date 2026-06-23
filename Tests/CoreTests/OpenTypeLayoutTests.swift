@@ -111,6 +111,23 @@ struct OpenTypeLayoutTests {
         #expect(font.ligatures() == [LigatureSubstitution(components: [1, 2], ligatureGlyph: 3)])
     }
 
+    @Test("GPOS mark-to-base attachment yields anchor offsets")
+    func gposMarkBase() throws {
+        let marks = try Font(data: MarkFont.build()).markAttachment()
+        #expect(!marks.isEmpty)
+        #expect(marks.isMark(3))
+        #expect(!marks.isMark(1))
+        // base anchor (300, 500) minus mark anchor (100, 200) = (200, 300).
+        #expect(marks.offset(base: 1, mark: 3) == MarkAttachment.Point(x: 200, y: 300))
+        #expect(marks.offset(base: 1, mark: 99) == nil) // unknown mark
+        #expect(marks.offset(base: 99, mark: 3) == nil) // unknown base
+    }
+
+    @Test("a font without GPOS mark positioning has empty attachment")
+    func noMarks() throws {
+        #expect(try Font(data: MiniFont.build()).markAttachment().isEmpty)
+    }
+
     @Test("a font without a kern table has an empty kerning map")
     func noKern() throws {
         let font = try Font(data: MiniFont.build())
@@ -311,6 +328,35 @@ private enum GsubSingleFont1 {
         gsub += be16(1) + be16(6) + be16(4) // SingleSubst f1: format, coverage offset, delta 4
         gsub += be16(1) + be16(1) + be16(1) // coverage f1: glyph 1
         return assemble(extra: ("GSUB", gsub))
+    }
+}
+
+/// A minimal TrueType font with a GPOS `mark` feature whose type-4 lookup is a
+/// MarkBasePos subtable: mark glyph 3 (class 0, anchor 100,200) attaches to base
+/// glyph 1 (class-0 anchor 300,500), so the offset is (200, 300).
+private enum MarkFont {
+    static func build() -> [UInt8] {
+        // GPOS layout (offsets relative to the table start):
+        //   0  header (10)        scriptList=10, featureList=12, lookupList=26
+        //   10 scriptList (2)
+        //   12 featureList (14)   feature 'mark' -> lookup 0
+        //   26 lookupList (12)    lookup type 4, subtable at +8 (->38)
+        //   38 MarkBasePos        header(12), markCov +12, baseCov +18,
+        //                         markArray +24, baseArray +36
+        var gpos: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gpos += be16(0)
+        gpos += be16(1) + Array("mark".utf8) + be16(8)
+        gpos += be16(0) + be16(1) + be16(0)
+        gpos += be16(1) + be16(4)
+        gpos += be16(4) + be16(0) + be16(1) + be16(8) // lookup: type 4
+        gpos += be16(1) + be16(12) + be16(18) + be16(1) + be16(24) + be16(36) // MarkBasePos header
+        gpos += be16(1) + be16(1) + be16(3) // markCoverage: glyph 3
+        gpos += be16(1) + be16(1) + be16(1) // baseCoverage: glyph 1
+        gpos += be16(1) + be16(0) + be16(6) // markArray: count, class 0, anchorOffset 6
+        gpos += be16(1) + be16(100) + be16(200) // mark anchor (format 1)
+        gpos += be16(1) + be16(4) // baseArray: count, anchorOffset 4
+        gpos += be16(1) + be16(300) + be16(500) // base anchor (format 1)
+        return assemble(extra: ("GPOS", gpos))
     }
 }
 
