@@ -245,6 +245,56 @@ public struct Font: Equatable, Sendable {
         return Double(advance)
     }
 
+    // MARK: - Kerning
+
+    /// The font's pairwise kerning, for the shaping tier to apply.
+    ///
+    /// This first slice reads the legacy TrueType `kern` table (the Microsoft
+    /// format 0 horizontal subtable). The OpenType `GPOS` pair-positioning
+    /// lookups (the modern kerning source) and the `GSUB` substitution lookups
+    /// are the next slices of SlayerMotion/PureDraw#140; the reusable Coverage
+    /// and ClassDef parsers they need already ship in this package.
+    public func kerningMap() -> KerningMap {
+        var pairs: [UInt64: Int] = [:]
+        parseLegacyKern(into: &pairs)
+        return KerningMap(adjustments: pairs)
+    }
+
+    /// Reads the legacy `kern` table (Microsoft format 0) into `pairs`.
+    private func parseLegacyKern(into pairs: inout [UInt64: Int]) {
+        guard let kern = tables["kern"],
+              Self.u16(data, at: kern.offset) == 0,
+              let subtableCount = Self.u16(data, at: kern.offset + 2)
+        else {
+            return
+        }
+        var subtableOffset = kern.offset + 4
+        for _ in 0 ..< subtableCount {
+            guard let length = Self.u16(data, at: subtableOffset + 2),
+                  let coverage = Self.u16(data, at: subtableOffset + 4),
+                  length > 0
+            else {
+                return
+            }
+            let format = (coverage >> 8) & 0xFF
+            let isHorizontal = (coverage & 0x0001) != 0
+            if format == 0, isHorizontal, let pairCount = Self.u16(data, at: subtableOffset + 6) {
+                let pairsStart = subtableOffset + 14 // header(6) + nPairs/searchRange/entrySelector/rangeShift(8)
+                for pairIndex in 0 ..< pairCount {
+                    let record = pairsStart + pairIndex * 6
+                    guard let left = Self.u16(data, at: record),
+                          let right = Self.u16(data, at: record + 2),
+                          let value = Self.i16(data, at: record + 4)
+                    else {
+                        break
+                    }
+                    pairs[KerningMap.key(firstGlyph: left, secondGlyph: right)] = value
+                }
+            }
+            subtableOffset += length
+        }
+    }
+
     // MARK: - Outlines
 
     /// The glyph outline as a path in font units (y up), or `nil` for empty
