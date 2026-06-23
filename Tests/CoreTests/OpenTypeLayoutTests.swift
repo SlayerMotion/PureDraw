@@ -123,9 +123,24 @@ struct OpenTypeLayoutTests {
         #expect(marks.offset(base: 99, mark: 3) == nil) // unknown base
     }
 
+    @Test("GPOS mark-to-mark attachment yields anchor offsets")
+    func gposMarkMark() throws {
+        let marks = try Font(data: MarkMarkFont.build()).markMarkAttachment()
+        #expect(!marks.isEmpty)
+        #expect(marks.isMark(3)) // the attaching (second) mark
+        #expect(!marks.isMark(2)) // the mark it rides on is a base here
+        // riding-mark anchor (300, 500) minus attaching-mark anchor (100, 200) = (200, 300).
+        #expect(marks.offset(base: 2, mark: 3) == MarkAttachment.Point(x: 200, y: 300))
+        #expect(marks.offset(base: 2, mark: 99) == nil)
+        #expect(marks.offset(base: 99, mark: 3) == nil)
+        // The mark feature is separate: a mkmk-only font carries no mark-to-base.
+        #expect(try Font(data: MarkMarkFont.build()).markAttachment().isEmpty)
+    }
+
     @Test("a font without GPOS mark positioning has empty attachment")
     func noMarks() throws {
         #expect(try Font(data: MiniFont.build()).markAttachment().isEmpty)
+        #expect(try Font(data: MiniFont.build()).markMarkAttachment().isEmpty)
     }
 
     @Test("a font without a kern table has an empty kerning map")
@@ -356,6 +371,29 @@ private enum MarkFont {
         gpos += be16(1) + be16(100) + be16(200) // mark anchor (format 1)
         gpos += be16(1) + be16(4) // baseArray: count, anchorOffset 4
         gpos += be16(1) + be16(300) + be16(500) // base anchor (format 1)
+        return assemble(extra: ("GPOS", gpos))
+    }
+}
+
+private enum MarkMarkFont {
+    static func build() -> [UInt8] {
+        // Same layout as MarkFont, but the feature is 'mkmk' and the lookup is
+        // type 6 (MarkMarkPos), which shares format 1 with MarkBasePos. mark1 is
+        // the attaching (second) mark, glyph 3; mark2 is the mark it rides on,
+        // glyph 2.
+        var gpos: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gpos += be16(0)
+        gpos += be16(1) + Array("mkmk".utf8) + be16(8)
+        gpos += be16(0) + be16(1) + be16(0)
+        gpos += be16(1) + be16(4)
+        gpos += be16(6) + be16(0) + be16(1) + be16(8) // lookup: type 6
+        gpos += be16(1) + be16(12) + be16(18) + be16(1) + be16(24) + be16(36) // MarkMarkPos header
+        gpos += be16(1) + be16(1) + be16(3) // mark1Coverage: glyph 3
+        gpos += be16(1) + be16(1) + be16(2) // mark2Coverage: glyph 2
+        gpos += be16(1) + be16(0) + be16(6) // mark1Array: count, class 0, anchorOffset 6
+        gpos += be16(1) + be16(100) + be16(200) // mark1 anchor (format 1)
+        gpos += be16(1) + be16(4) // mark2Array: count, anchorOffset 4
+        gpos += be16(1) + be16(300) + be16(500) // mark2 anchor (format 1)
         return assemble(extra: ("GPOS", gpos))
     }
 }

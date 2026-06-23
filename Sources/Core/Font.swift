@@ -674,6 +674,26 @@ public struct Font: Equatable, Sendable {
     /// (Arabic vowel marks, for example). Extension lookups (type 9) are
     /// resolved. Empty when the font carries no mark positioning.
     public func markAttachment() -> MarkAttachment {
+        collectMarkAttachment(feature: "mark", lookupType: 4)
+    }
+
+    /// The font's GPOS mark-to-mark attachment (the `mkmk` feature, lookup type
+    /// 6): where a combining mark sits over the mark that precedes it, so a
+    /// second diacritic stacks above the first (an Arabic vowel over a shadda,
+    /// stacked tone and vowel marks). The returned ``MarkAttachment`` treats the
+    /// attaching mark as its `marks` and the preceding mark it rides on as its
+    /// `bases`, so ``MarkAttachment/offset(base:mark:)`` reads the same way as
+    /// for mark-to-base. Empty when the font carries no mark-to-mark attachment.
+    public func markMarkAttachment() -> MarkAttachment {
+        collectMarkAttachment(feature: "mkmk", lookupType: 6)
+    }
+
+    /// Gathers the anchor data of a GPOS mark-attachment feature into a typed
+    /// ``MarkAttachment``. `lookupType` is 4 for mark-to-base (the `mark`
+    /// feature) and 6 for mark-to-mark (the `mkmk` feature); the two share the
+    /// same subtable layout, so one parser serves both. Extension lookups (type
+    /// 9) are resolved to their effective type before matching.
+    private func collectMarkAttachment(feature wanted: String, lookupType wantedType: Int) -> MarkAttachment {
         var marks: [Int: MarkAttachment.Mark] = [:]
         var bases: [Int: [Int: MarkAttachment.Point]] = [:]
         guard let gpos = tables["GPOS"] else { return MarkAttachment(marks: marks, bases: bases) }
@@ -690,7 +710,7 @@ public struct Font: Equatable, Sendable {
         if let featureCount = Self.u16(data, at: featureList) {
             for featureIndex in 0 ..< featureCount {
                 let record = featureList + 2 + featureIndex * 6
-                guard Self.tag(data, at: record) == "mark",
+                guard Self.tag(data, at: record) == wanted,
                       let featureOffset = Self.u16(data, at: record + 4)
                 else {
                     continue
@@ -730,19 +750,20 @@ public struct Font: Equatable, Sendable {
                     effectiveType = extensionType
                     subtable += extensionOffset
                 }
-                if effectiveType == 4 {
-                    parseMarkBasePos(subtable: subtable, marks: &marks, bases: &bases)
+                if effectiveType == wantedType {
+                    parseMarkAnchorSubtable(subtable: subtable, marks: &marks, bases: &bases)
                 }
             }
         }
         return MarkAttachment(marks: marks, bases: bases)
     }
 
-    /// Decodes a GPOS MarkBasePos (type 4) subtable into the mark and base anchor
-    /// maps. Anchor coordinates are read from all anchor formats (1, 2, and 3);
-    /// the device and contour-point refinements of formats 2 and 3 are not
-    /// applied.
-    private func parseMarkBasePos(
+    /// Decodes a GPOS mark-attachment subtable (MarkBasePos type 4 or MarkMarkPos
+    /// type 6, which share format 1) into the mark and base anchor maps. For
+    /// mark-to-mark the "base" array is the Mark2Array of preceding marks. Anchor
+    /// coordinates are read from all anchor formats (1, 2, and 3); the device and
+    /// contour-point refinements of formats 2 and 3 are not applied.
+    private func parseMarkAnchorSubtable(
         subtable: Int,
         marks: inout [Int: MarkAttachment.Mark],
         bases: inout [Int: [Int: MarkAttachment.Point]]
