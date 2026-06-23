@@ -2045,6 +2045,7 @@ surface:
         - "calculator"
         - "preview"
         - "code"
+      field_contracts: []
       matrices:
         - dimension: "affine2D"
           field_order:
@@ -2136,3 +2137,56 @@ surface:
             - "recipe"
           preview: "true"
           numeric_input: "exactFiniteDecimal"
+    - id: "stroke-style"
+      title: "Stroke Style"
+      target_subjects:
+        - "PureDraw.StrokeStyle"
+      compact_presentation:
+        - "fields"
+        - "preview"
+      field_contracts:
+        - name: "lineWidth"
+          semantic:
+            kind: "distance"
+          range:
+            min: "0.0"
+            max: "256.0"
+          validations:
+            - kind: "finiteNumber"
+          required: "true"
+        - name: "lineCap"
+          semantic:
+            kind: "lineCap"
+          range: null
+          validations: []
+          required: "true"
+        - name: "lineJoin"
+          semantic:
+            kind: "lineJoin"
+          range: null
+          validations: []
+          required: "true"
+        - name: "miterLimit"
+          semantic:
+            kind: "distance"
+          range:
+            min: "0.0"
+            max: "256.0"
+          validations:
+            - kind: "finiteNumber"
+          required: "true"
+        - name: "dashPattern"
+          semantic:
+            kind: "dashPattern"
+          range: null
+          validations:
+            - kind: "finiteNumberList"
+          required: "true"
+        - name: "dashPhase"
+          semantic:
+            kind: "distance"
+          range: null
+          validations:
+            - kind: "finiteNumber"
+          required: "true"
+      matrices: []

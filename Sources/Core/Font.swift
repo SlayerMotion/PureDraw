@@ -460,8 +460,8 @@ public struct Font: Equatable, Sendable {
     ///
     /// This reads GSUB ligature substitution (lookup type 4) under the standard
     /// `liga` feature, resolving extension lookups (type 7). Single substitution
-    /// (type 1) and the contextual lookups are the next slices of
-    /// SlayerMotion/PureDraw#140.
+    /// (type 1) is ``singleSubstitutions(feature:)``; the contextual lookups are
+    /// the next slices of SlayerMotion/PureDraw#140.
     public func ligatures() -> [LigatureSubstitution] {
         var result: [LigatureSubstitution] = []
         parseGSUBLigatures(into: &result)
@@ -566,6 +566,101 @@ public struct Font: Equatable, Sendable {
                 if valid {
                     result.append(LigatureSubstitution(components: components, ligatureGlyph: ligatureGlyph))
                 }
+            }
+        }
+    }
+
+    /// The font's single-substitution map (GSUB lookup type 1) for a feature tag,
+    /// for example `init`, `medi`, `fina`, and `isol` for Arabic positional
+    /// forms: each input glyph maps to its substitute glyph. Extension lookups
+    /// (type 7) are resolved. The shaping tier selects a feature per character
+    /// (from cursive joining) and applies the returned map.
+    public func singleSubstitutions(feature: String) -> [Int: Int] {
+        var result: [Int: Int] = [:]
+        guard let gsub = tables["GSUB"] else { return result }
+        let base = gsub.offset
+        guard let featureListOffset = Self.u16(data, at: base + 6),
+              let lookupListOffset = Self.u16(data, at: base + 8)
+        else {
+            return result
+        }
+        let featureList = base + featureListOffset
+        let lookupList = base + lookupListOffset
+
+        var lookupIndices: Set<Int> = []
+        if let featureCount = Self.u16(data, at: featureList) {
+            for featureIndex in 0 ..< featureCount {
+                let record = featureList + 2 + featureIndex * 6
+                guard Self.tag(data, at: record) == feature,
+                      let featureOffset = Self.u16(data, at: record + 4)
+                else {
+                    continue
+                }
+                let featureTable = featureList + featureOffset
+                guard let lookupIndexCount = Self.u16(data, at: featureTable + 2) else { continue }
+                for lookupIndex in 0 ..< lookupIndexCount {
+                    if let index = Self.u16(data, at: featureTable + 4 + lookupIndex * 2) {
+                        lookupIndices.insert(index)
+                    }
+                }
+            }
+        }
+
+        guard let lookupCount = Self.u16(data, at: lookupList) else { return result }
+        for index in lookupIndices.sorted() where index < lookupCount {
+            guard let lookupOffset = Self.u16(data, at: lookupList + 2 + index * 2) else { continue }
+            let lookup = lookupList + lookupOffset
+            guard let lookupType = Self.u16(data, at: lookup),
+                  let subtableCount = Self.u16(data, at: lookup + 4)
+            else {
+                continue
+            }
+            for subtableIndex in 0 ..< subtableCount {
+                guard let subtableOffset = Self.u16(data, at: lookup + 6 + subtableIndex * 2) else { continue }
+                var subtable = lookup + subtableOffset
+                var effectiveType = lookupType
+                if lookupType == 7 {
+                    guard Self.u16(data, at: subtable) == 1,
+                          let extensionType = Self.u16(data, at: subtable + 2),
+                          let extensionOffset = Self.u32(data, at: subtable + 4)
+                    else {
+                        continue
+                    }
+                    effectiveType = extensionType
+                    subtable += extensionOffset
+                }
+                if effectiveType == 1 {
+                    parseSingleSubst(subtable: subtable, into: &result)
+                }
+            }
+        }
+        return result
+    }
+
+    /// Decodes a GSUB single substitution (type 1) subtable into `result`.
+    /// Format 1 adds a signed delta to each covered glyph; format 2 lists an
+    /// explicit substitute per covered glyph in coverage order.
+    private func parseSingleSubst(subtable: Int, into result: inout [Int: Int]) {
+        guard let format = Self.u16(data, at: subtable),
+              let coverageOffset = Self.u16(data, at: subtable + 2),
+              let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+        else {
+            return
+        }
+        if format == 1 {
+            guard let delta = Self.i16(data, at: subtable + 4) else { return }
+            for glyph in coverage.coveredGlyphs {
+                result[glyph] = (glyph + delta) & 0xFFFF
+            }
+        } else if format == 2 {
+            guard let glyphCount = Self.u16(data, at: subtable + 4) else { return }
+            for index in 0 ..< glyphCount {
+                guard let glyph = coverage.glyph(atIndex: index),
+                      let substitute = Self.u16(data, at: subtable + 6 + index * 2)
+                else {
+                    continue
+                }
+                result[glyph] = substitute
             }
         }
     }

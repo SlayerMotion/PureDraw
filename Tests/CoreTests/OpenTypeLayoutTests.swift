@@ -87,6 +87,24 @@ struct OpenTypeLayoutTests {
         #expect(font.ligatures().isEmpty)
     }
 
+    @Test("GSUB single substitution format 2 maps glyphs for a feature")
+    func gsubSingleFormat2() throws {
+        let font = try Font(data: GsubSingleFont.build())
+        #expect(font.singleSubstitutions(feature: "init") == [1: 5])
+        #expect(font.singleSubstitutions(feature: "medi").isEmpty) // feature absent
+    }
+
+    @Test("GSUB single substitution format 1 adds a delta")
+    func gsubSingleFormat1() throws {
+        let font = try Font(data: GsubSingleFont1.build())
+        #expect(font.singleSubstitutions(feature: "init") == [1: 5])
+    }
+
+    @Test("a font without GSUB has no single substitutions")
+    func noSingleSubstitutions() throws {
+        #expect(try Font(data: MiniFont.build()).singleSubstitutions(feature: "init").isEmpty)
+    }
+
     @Test("a font without a kern table has an empty kerning map")
     func noKern() throws {
         let font = try Font(data: MiniFont.build())
@@ -228,6 +246,46 @@ private enum GsubFont {
         gsub += be16(1) + be16(4) // ligatureSet: count, ligature offset
         gsub += be16(3) + be16(2) + be16(2) // ligature: glyph 3, componentCount 2, component 2
 
+        return assemble(extra: ("GSUB", gsub))
+    }
+}
+
+/// A minimal TrueType font with a GSUB `init` feature whose type-1 lookup is a
+/// SingleSubst format 2 subtable: glyph 1 substitutes to glyph 5.
+private enum GsubSingleFont {
+    static func build() -> [UInt8] {
+        // GSUB layout (offsets relative to the table start):
+        //   0  header (10)        scriptList=10, featureList=12, lookupList=26
+        //   10 scriptList (2)
+        //   12 featureList (14)   feature 'init' -> lookup 0
+        //   26 lookupList (12)    lookup type 1, subtable at +8 (->38)
+        //   38 SingleSubst f2 (8) coverage +8, glyphCount 1, substitute 5
+        //   46 coverage (6)       glyph 1
+        var gsub: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gsub += be16(0)
+        gsub += be16(1) + Array("init".utf8) + be16(8)
+        gsub += be16(0) + be16(1) + be16(0)
+        gsub += be16(1) + be16(4)
+        gsub += be16(1) + be16(0) + be16(1) + be16(8) // lookup: type 1, flag, subtableCount, offset
+        gsub += be16(2) + be16(8) + be16(1) + be16(5) // SingleSubst f2: format, coverage, glyphCount, substitute
+        gsub += be16(1) + be16(1) + be16(1) // coverage f1: glyph 1
+        return assemble(extra: ("GSUB", gsub))
+    }
+}
+
+/// A minimal TrueType font with a GSUB `init` feature whose type-1 lookup is a
+/// SingleSubst format 1 subtable: a delta of 4 maps glyph 1 to glyph 5.
+private enum GsubSingleFont1 {
+    static func build() -> [UInt8] {
+        // As GsubSingleFont, but the subtable is format 1 (6 bytes), coverage +6.
+        var gsub: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gsub += be16(0)
+        gsub += be16(1) + Array("init".utf8) + be16(8)
+        gsub += be16(0) + be16(1) + be16(0)
+        gsub += be16(1) + be16(4)
+        gsub += be16(1) + be16(0) + be16(1) + be16(8)
+        gsub += be16(1) + be16(6) + be16(4) // SingleSubst f1: format, coverage offset, delta 4
+        gsub += be16(1) + be16(1) + be16(1) // coverage f1: glyph 1
         return assemble(extra: ("GSUB", gsub))
     }
 }
