@@ -249,15 +249,124 @@ public struct Font: Equatable, Sendable {
 
     /// The font's pairwise kerning, for the shaping tier to apply.
     ///
-    /// This first slice reads the legacy TrueType `kern` table (the Microsoft
-    /// format 0 horizontal subtable). The OpenType `GPOS` pair-positioning
-    /// lookups (the modern kerning source) and the `GSUB` substitution lookups
-    /// are the next slices of SlayerMotion/PureDraw#140; the reusable Coverage
-    /// and ClassDef parsers they need already ship in this package.
+    /// It reads the OpenType `GPOS` pair-positioning lookups (the modern kerning
+    /// source) for the `kern` feature, and falls back to the legacy TrueType
+    /// `kern` table when a font carries no GPOS kerning. GPOS PairPos format 1
+    /// (explicit pairs) is decoded here; PairPos format 2 (class-based pairs),
+    /// the GSUB substitution lookups, and GDEF are the next slices of
+    /// SlayerMotion/PureDraw#140.
     public func kerningMap() -> KerningMap {
         var pairs: [UInt64: Int] = [:]
-        parseLegacyKern(into: &pairs)
+        parseGPOSKern(into: &pairs)
+        if pairs.isEmpty {
+            parseLegacyKern(into: &pairs)
+        }
         return KerningMap(adjustments: pairs)
+    }
+
+    /// Reads GPOS `kern`-feature pair positioning (PairPos format 1) into `pairs`.
+    ///
+    /// Simplification (disclosed): the `kern` feature's lookups are gathered from
+    /// the FeatureList directly, without per-script or per-language selection,
+    /// which matches the common single-`kern`-feature font. Extension lookups
+    /// (type 9) wrapping pair positioning are resolved.
+    private func parseGPOSKern(into pairs: inout [UInt64: Int]) {
+        guard let gpos = tables["GPOS"] else { return }
+        let base = gpos.offset
+        guard let featureListOffset = Self.u16(data, at: base + 6),
+              let lookupListOffset = Self.u16(data, at: base + 8)
+        else {
+            return
+        }
+        let featureList = base + featureListOffset
+        let lookupList = base + lookupListOffset
+
+        var kernLookupIndices: Set<Int> = []
+        if let featureCount = Self.u16(data, at: featureList) {
+            for featureIndex in 0 ..< featureCount {
+                let record = featureList + 2 + featureIndex * 6
+                guard Self.tag(data, at: record) == "kern",
+                      let featureOffset = Self.u16(data, at: record + 4)
+                else {
+                    continue
+                }
+                let feature = featureList + featureOffset
+                guard let lookupIndexCount = Self.u16(data, at: feature + 2) else { continue }
+                for lookupIndex in 0 ..< lookupIndexCount {
+                    if let index = Self.u16(data, at: feature + 4 + lookupIndex * 2) {
+                        kernLookupIndices.insert(index)
+                    }
+                }
+            }
+        }
+
+        guard let lookupCount = Self.u16(data, at: lookupList) else { return }
+        for index in kernLookupIndices where index < lookupCount {
+            guard let lookupOffset = Self.u16(data, at: lookupList + 2 + index * 2) else { continue }
+            let lookup = lookupList + lookupOffset
+            guard let lookupType = Self.u16(data, at: lookup),
+                  let subtableCount = Self.u16(data, at: lookup + 4)
+            else {
+                continue
+            }
+            for subtableIndex in 0 ..< subtableCount {
+                guard let subtableOffset = Self.u16(data, at: lookup + 6 + subtableIndex * 2) else { continue }
+                var subtable = lookup + subtableOffset
+                var effectiveType = lookupType
+                if lookupType == 9 {
+                    guard Self.u16(data, at: subtable) == 1,
+                          let extensionType = Self.u16(data, at: subtable + 2),
+                          let extensionOffset = Self.u32(data, at: subtable + 4)
+                    else {
+                        continue
+                    }
+                    effectiveType = extensionType
+                    subtable += extensionOffset
+                }
+                if effectiveType == 2 {
+                    parsePairPosFormat1(subtable: subtable, into: &pairs)
+                }
+            }
+        }
+    }
+
+    /// Decodes a GPOS PairPos format 1 (explicit pair) subtable into `pairs`,
+    /// extracting the first value record's x advance as the kerning amount.
+    private func parsePairPosFormat1(subtable: Int, into pairs: inout [UInt64: Int]) {
+        guard Self.u16(data, at: subtable) == 1,
+              let coverageOffset = Self.u16(data, at: subtable + 2),
+              let valueFormat1 = Self.u16(data, at: subtable + 4),
+              let valueFormat2 = Self.u16(data, at: subtable + 6),
+              let pairSetCount = Self.u16(data, at: subtable + 8),
+              let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+        else {
+            return
+        }
+        guard valueFormat1 & 0x0004 != 0 else { return } // no x advance to read
+        let value1Size = (valueFormat1 & 0xFF).nonzeroBitCount * 2
+        let value2Size = (valueFormat2 & 0xFF).nonzeroBitCount * 2
+        let xAdvanceOffset = (valueFormat1 & 0x0003).nonzeroBitCount * 2
+        let recordSize = 2 + value1Size + value2Size
+        for pairSetIndex in 0 ..< pairSetCount {
+            guard let firstGlyph = coverage.glyph(atIndex: pairSetIndex),
+                  let pairSetOffset = Self.u16(data, at: subtable + 10 + pairSetIndex * 2)
+            else {
+                continue
+            }
+            let pairSet = subtable + pairSetOffset
+            guard let pairValueCount = Self.u16(data, at: pairSet) else { continue }
+            for pairIndex in 0 ..< pairValueCount {
+                let record = pairSet + 2 + pairIndex * recordSize
+                guard let secondGlyph = Self.u16(data, at: record),
+                      let xAdvance = Self.i16(data, at: record + 2 + xAdvanceOffset)
+                else {
+                    break
+                }
+                if xAdvance != 0 {
+                    pairs[KerningMap.key(firstGlyph: firstGlyph, secondGlyph: secondGlyph)] = xAdvance
+                }
+            }
+        }
     }
 
     /// Reads the legacy `kern` table (Microsoft format 0) into `pairs`.

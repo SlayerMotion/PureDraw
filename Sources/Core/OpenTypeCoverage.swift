@@ -40,11 +40,25 @@ struct OpenTypeCoverage: Equatable {
             return nil
         }
         indexByGlyph = map
+        var ordered = [Int](repeating: 0, count: map.count)
+        for (glyph, index) in map where index >= 0 && index < map.count {
+            ordered[index] = glyph
+        }
+        glyphsByIndex = ordered
     }
+
+    private let glyphsByIndex: [Int]
 
     /// The coverage index of `glyph`, or `nil` if the glyph is not covered.
     func index(forGlyph glyph: Int) -> Int? {
         indexByGlyph[glyph]
+    }
+
+    /// The glyph at a coverage index, or `nil` if out of range. Lets a lookup
+    /// walk its per-coverage-index records (for example PairPos format 1).
+    func glyph(atIndex index: Int) -> Int? {
+        guard index >= 0, index < glyphsByIndex.count else { return nil }
+        return glyphsByIndex[index]
     }
 
     /// The number of glyphs covered.

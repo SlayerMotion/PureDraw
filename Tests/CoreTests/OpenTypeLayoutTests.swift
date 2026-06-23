@@ -56,6 +56,15 @@ struct OpenTypeLayoutTests {
         #expect(kerning.adjustment(firstGlyph: 1, secondGlyph: 0) == 0) // unkerned pair
     }
 
+    @Test("GPOS PairPos format 1 yields pair adjustments and is preferred")
+    func gposPairPos() throws {
+        let font = try Font(data: GposFont.build())
+        let kerning = font.kerningMap()
+        #expect(!kerning.isEmpty)
+        #expect(kerning.adjustment(firstGlyph: 1, secondGlyph: 2) == -30)
+        #expect(kerning.adjustment(firstGlyph: 2, secondGlyph: 1) == 0)
+    }
+
     @Test("a font without a kern table has an empty kerning map")
     func noKern() throws {
         let font = try Font(data: MiniFont.build())
@@ -111,21 +120,84 @@ private enum KernFont {
         kern += be16(1) + be16(6) + be16(0) + be16(0) // nPairs, searchRange, entrySelector, rangeShift
         kern += be16(1) + be16(1) + be16(0xFFD8) // left, right, value (-40)
 
-        let tables: [(tag: String, data: [UInt8])] = [
-            ("cmap", cmap), ("glyf", glyf), ("head", head), ("hhea", hhea),
-            ("hmtx", hmtx), ("kern", kern), ("loca", loca), ("maxp", maxp),
-        ]
-
-        var font: [UInt8] = be32(0x0001_0000)
-        font += be16(tables.count) + be16(0) + be16(0) + be16(0)
-        var offset = 12 + tables.count * 16
-        for table in tables {
-            font += Array(table.tag.utf8) + be32(0) + be32(offset) + be32(table.data.count)
-            offset += table.data.count
-        }
-        for table in tables {
-            font += table.data
-        }
-        return font
+        return assemble(extra: ("kern", kern))
     }
+}
+
+/// A minimal TrueType font carrying a GPOS table with one `kern` feature whose
+/// single type-2 lookup is a PairPos format 1 subtable: pair (glyph 1, glyph 2)
+/// with x advance -30 font units. Offsets are laid out by hand (see comments).
+private enum GposFont {
+    static func build() -> [UInt8] {
+        // GPOS layout (offsets relative to the table start):
+        //   0  header (10)         scriptList=10, featureList=12, lookupList=26
+        //   10 scriptList (2)      scriptCount = 0
+        //   12 featureList (14)    feature 'kern' -> table at +8, lookup index 0
+        //   26 lookupList (12)     lookup at +4: type 2, one subtable at +8
+        //   38 PairPos f1 (12)     coverage at +12, pairSet at +18, valueFormat1 = x advance
+        //   50 coverage (6)        format 1, glyph 1
+        //   56 pairSet (6)         second glyph 2, x advance -30
+        var gpos: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gpos += be16(0) // scriptList: scriptCount 0
+        gpos += be16(1) + Array("kern".utf8) + be16(8) // featureList: count, record tag + offset
+        gpos += be16(0) + be16(1) + be16(0) // feature: params, lookupIndexCount, index 0
+        gpos += be16(1) + be16(4) // lookupList: count, lookup offset
+        gpos += be16(2) + be16(0) + be16(1) + be16(8) // lookup: type 2, flag, subtableCount, offset
+        gpos += be16(1) + be16(12) + be16(0x0004) + be16(0) + be16(1) + be16(18) // PairPos f1
+        gpos += be16(1) + be16(1) + be16(1) // coverage f1: format, count, glyph 1
+        gpos += be16(1) + be16(2) + be16(0xFFE2) // pairSet: count, second glyph 2, x advance -30
+
+        return assemble(extra: ("GPOS", gpos))
+    }
+}
+
+/// Builds a minimal valid TrueType font (two glyphs, 'A' mapped) plus one extra
+/// table, shared by the kern and GPOS fixtures.
+private func assemble(extra: (tag: String, data: [UInt8])) -> [UInt8] {
+    var head: [UInt8] = []
+    head += be32(0x0001_0000) + be32(0) + be32(0) + be32(0x5F0F_3CF5)
+    head += be16(0) + be16(1000)
+    head += [UInt8](repeating: 0, count: 16)
+    head += be16(0) + be16(0) + be16(500) + be16(500)
+    head += be16(0) + be16(8) + be16(2) + be16(0) + be16(0)
+
+    var maxp: [UInt8] = be32(0x0001_0000) + be16(2)
+    maxp += [UInt8](repeating: 0, count: 26)
+
+    var hhea: [UInt8] = be32(0x0001_0000) + be16(800) + be16(0xFF38)
+    hhea += [UInt8](repeating: 0, count: 24) + be16(2)
+
+    let hmtx = be16(500) + be16(0) + be16(600) + be16(0)
+
+    var cmap: [UInt8] = be16(0) + be16(1)
+    cmap += be16(3) + be16(1) + be32(12)
+    cmap += be16(4) + be16(32) + be16(0)
+    cmap += be16(4) + be16(4) + be16(1) + be16(0)
+    cmap += be16(0x41) + be16(0xFFFF) + be16(0) + be16(0x41) + be16(0xFFFF)
+    cmap += be16(0xFFC0) + be16(1) + be16(0) + be16(0)
+
+    var glyf: [UInt8] = be16(1) + be16(0) + be16(0) + be16(500) + be16(500)
+    glyf += be16(3) + be16(0) + [1, 1, 1, 1]
+    glyf += be16(0) + be16(500) + be16(0) + be16(0xFE0C) + be16(0) + be16(0) + be16(500) + be16(0)
+
+    let loca = be16(0) + be16(0) + be16(glyf.count / 2)
+
+    var tables: [(tag: String, data: [UInt8])] = [
+        ("cmap", cmap), ("glyf", glyf), ("head", head), ("hhea", hhea),
+        ("hmtx", hmtx), ("loca", loca), ("maxp", maxp),
+    ]
+    tables.append(extra)
+    tables.sort { $0.tag < $1.tag }
+
+    var font: [UInt8] = be32(0x0001_0000)
+    font += be16(tables.count) + be16(0) + be16(0) + be16(0)
+    var offset = 12 + tables.count * 16
+    for table in tables {
+        font += Array(table.tag.utf8) + be32(0) + be32(offset) + be32(table.data.count)
+        offset += table.data.count
+    }
+    for table in tables {
+        font += table.data
+    }
+    return font
 }
