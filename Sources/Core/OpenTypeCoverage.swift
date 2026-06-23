@@ -65,4 +65,9 @@ struct OpenTypeCoverage: Equatable {
     var count: Int {
         indexByGlyph.count
     }
+
+    /// The set of covered glyphs, for class-based lookups that gate on coverage.
+    var coveredGlyphs: Set<Int> {
+        Set(indexByGlyph.keys)
+    }
 }

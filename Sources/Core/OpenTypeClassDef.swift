@@ -53,4 +53,9 @@ struct OpenTypeClassDef: Equatable {
     func classValue(forGlyph glyph: Int) -> Int {
         classByGlyph[glyph] ?? 0
     }
+
+    /// The non-zero class assignments, for building class-based lookup tables.
+    var assignments: [Int: Int] {
+        classByGlyph
+    }
 }

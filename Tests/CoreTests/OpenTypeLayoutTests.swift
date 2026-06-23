@@ -65,6 +65,15 @@ struct OpenTypeLayoutTests {
         #expect(kerning.adjustment(firstGlyph: 2, secondGlyph: 1) == 0)
     }
 
+    @Test("GPOS PairPos format 2 resolves class-based pair adjustments")
+    func gposPairPosFormat2() throws {
+        let font = try Font(data: GposFont2.build())
+        let kerning = font.kerningMap()
+        #expect(!kerning.isEmpty)
+        #expect(kerning.adjustment(firstGlyph: 1, secondGlyph: 2) == -25)
+        #expect(kerning.adjustment(firstGlyph: 2, secondGlyph: 1) == 0) // glyph 2 not covered as first
+    }
+
     @Test("a font without a kern table has an empty kerning map")
     func noKern() throws {
         let font = try Font(data: MiniFont.build())
@@ -146,6 +155,37 @@ private enum GposFont {
         gpos += be16(1) + be16(12) + be16(0x0004) + be16(0) + be16(1) + be16(18) // PairPos f1
         gpos += be16(1) + be16(1) + be16(1) // coverage f1: format, count, glyph 1
         gpos += be16(1) + be16(2) + be16(0xFFE2) // pairSet: count, second glyph 2, x advance -30
+
+        return assemble(extra: ("GPOS", gpos))
+    }
+}
+
+/// A minimal TrueType font with a GPOS `kern` feature whose type-2 lookup is a
+/// PairPos format 2 (class-based) subtable: first glyph 1 (class 1), second
+/// glyph 2 (class 1), class pair (1,1) = x advance -25 font units.
+private enum GposFont2 {
+    static func build() -> [UInt8] {
+        // GPOS layout (offsets relative to the table start):
+        //   0  header (10)        scriptList=10, featureList=12, lookupList=26
+        //   10 scriptList (2)
+        //   12 featureList (14)   feature 'kern' -> lookup 0
+        //   26 lookupList (12)    lookup type 2, subtable at +8 (->38)
+        //   38 PairPos f2 (16)    coverage +24, classDef1 +30, classDef2 +38, 2x2 classes
+        //   54 matrix (8)         class pair (1,1) = -25
+        //   62 coverage (6)       glyph 1
+        //   68 classDef1 (8)      glyph 1 -> class 1
+        //   76 classDef2 (8)      glyph 2 -> class 1
+        var gpos: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gpos += be16(0)
+        gpos += be16(1) + Array("kern".utf8) + be16(8)
+        gpos += be16(0) + be16(1) + be16(0)
+        gpos += be16(1) + be16(4)
+        gpos += be16(2) + be16(0) + be16(1) + be16(8)
+        gpos += be16(2) + be16(24) + be16(0x0004) + be16(0) + be16(30) + be16(38) + be16(2) + be16(2)
+        gpos += be16(0) + be16(0) + be16(0) + be16(0xFFE7) // matrix: (0,0),(0,1),(1,0),(1,1)=-25
+        gpos += be16(1) + be16(1) + be16(1) // coverage f1: glyph 1
+        gpos += be16(1) + be16(1) + be16(1) + be16(1) // classDef1 f1: glyph 1 -> class 1
+        gpos += be16(1) + be16(2) + be16(1) + be16(1) // classDef2 f1: glyph 2 -> class 1
 
         return assemble(extra: ("GPOS", gpos))
     }

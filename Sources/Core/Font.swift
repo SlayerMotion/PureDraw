@@ -257,11 +257,12 @@ public struct Font: Equatable, Sendable {
     /// SlayerMotion/PureDraw#140.
     public func kerningMap() -> KerningMap {
         var pairs: [UInt64: Int] = [:]
-        parseGPOSKern(into: &pairs)
-        if pairs.isEmpty {
+        var classSubtables: [KerningClassSubtable] = []
+        parseGPOSKern(into: &pairs, classSubtables: &classSubtables)
+        if pairs.isEmpty, classSubtables.isEmpty {
             parseLegacyKern(into: &pairs)
         }
-        return KerningMap(adjustments: pairs)
+        return KerningMap(adjustments: pairs, classSubtables: classSubtables)
     }
 
     /// Reads GPOS `kern`-feature pair positioning (PairPos format 1) into `pairs`.
@@ -270,7 +271,7 @@ public struct Font: Equatable, Sendable {
     /// the FeatureList directly, without per-script or per-language selection,
     /// which matches the common single-`kern`-feature font. Extension lookups
     /// (type 9) wrapping pair positioning are resolved.
-    private func parseGPOSKern(into pairs: inout [UInt64: Int]) {
+    private func parseGPOSKern(into pairs: inout [UInt64: Int], classSubtables: inout [KerningClassSubtable]) {
         guard let gpos = tables["GPOS"] else { return }
         let base = gpos.offset
         guard let featureListOffset = Self.u16(data, at: base + 6),
@@ -324,10 +325,58 @@ public struct Font: Equatable, Sendable {
                     subtable += extensionOffset
                 }
                 if effectiveType == 2 {
-                    parsePairPosFormat1(subtable: subtable, into: &pairs)
+                    guard let posFormat = Self.u16(data, at: subtable) else { continue }
+                    if posFormat == 1 {
+                        parsePairPosFormat1(subtable: subtable, into: &pairs)
+                    } else if posFormat == 2 {
+                        parsePairPosFormat2(subtable: subtable, into: &classSubtables)
+                    }
                 }
             }
         }
+    }
+
+    /// Decodes a GPOS PairPos format 2 (class-based pair) subtable into a
+    /// ``KerningClassSubtable``, reusing the Coverage and ClassDef parsers.
+    private func parsePairPosFormat2(subtable: Int, into classSubtables: inout [KerningClassSubtable]) {
+        guard let coverageOffset = Self.u16(data, at: subtable + 2),
+              let valueFormat1 = Self.u16(data, at: subtable + 4),
+              let valueFormat2 = Self.u16(data, at: subtable + 6),
+              let classDef1Offset = Self.u16(data, at: subtable + 8),
+              let classDef2Offset = Self.u16(data, at: subtable + 10),
+              let class1Count = Self.u16(data, at: subtable + 12),
+              let class2Count = Self.u16(data, at: subtable + 14),
+              let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset),
+              let classDef1 = OpenTypeClassDef(data: data, offset: subtable + classDef1Offset),
+              let classDef2 = OpenTypeClassDef(data: data, offset: subtable + classDef2Offset)
+        else {
+            return
+        }
+        guard valueFormat1 & 0x0004 != 0, class1Count > 0, class2Count > 0 else { return }
+        let value1Size = (valueFormat1 & 0xFF).nonzeroBitCount * 2
+        let value2Size = (valueFormat2 & 0xFF).nonzeroBitCount * 2
+        let recordSize = value1Size + value2Size
+        let xAdvanceOffset = (valueFormat1 & 0x0003).nonzeroBitCount * 2
+        let matrixBase = subtable + 16
+        var xAdvances = [Int](repeating: 0, count: class1Count * class2Count)
+        for firstClass in 0 ..< class1Count {
+            for secondClass in 0 ..< class2Count {
+                let cell = firstClass * class2Count + secondClass
+                let record = matrixBase + cell * recordSize
+                if let xAdvance = Self.i16(data, at: record + xAdvanceOffset) {
+                    xAdvances[cell] = xAdvance
+                }
+            }
+        }
+        classSubtables.append(
+            KerningClassSubtable(
+                coveredFirstGlyphs: coverage.coveredGlyphs,
+                firstClasses: classDef1.assignments,
+                secondClasses: classDef2.assignments,
+                secondClassCount: class2Count,
+                xAdvances: xAdvances
+            )
+        )
     }
 
     /// Decodes a GPOS PairPos format 1 (explicit pair) subtable into `pairs`,
