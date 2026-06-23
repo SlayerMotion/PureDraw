@@ -105,6 +105,12 @@ struct OpenTypeLayoutTests {
         #expect(try Font(data: MiniFont.build()).singleSubstitutions(feature: "init").isEmpty)
     }
 
+    @Test("required ligatures under rlig are read like liga")
+    func gsubRligLigature() throws {
+        let font = try Font(data: GsubRligFont.build())
+        #expect(font.ligatures() == [LigatureSubstitution(components: [1, 2], ligatureGlyph: 3)])
+    }
+
     @Test("a font without a kern table has an empty kerning map")
     func noKern() throws {
         let font = try Font(data: MiniFont.build())
@@ -246,6 +252,24 @@ private enum GsubFont {
         gsub += be16(1) + be16(4) // ligatureSet: count, ligature offset
         gsub += be16(3) + be16(2) + be16(2) // ligature: glyph 3, componentCount 2, component 2
 
+        return assemble(extra: ("GSUB", gsub))
+    }
+}
+
+/// As GsubFont, but the feature is `rlig` (required ligatures) instead of
+/// `liga`, to confirm both feature tags are read.
+private enum GsubRligFont {
+    static func build() -> [UInt8] {
+        var gsub: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gsub += be16(0)
+        gsub += be16(1) + Array("rlig".utf8) + be16(8)
+        gsub += be16(0) + be16(1) + be16(0)
+        gsub += be16(1) + be16(4)
+        gsub += be16(4) + be16(0) + be16(1) + be16(8)
+        gsub += be16(1) + be16(8) + be16(1) + be16(14)
+        gsub += be16(1) + be16(1) + be16(1)
+        gsub += be16(1) + be16(4)
+        gsub += be16(3) + be16(2) + be16(2)
         return assemble(extra: ("GSUB", gsub))
     }
 }

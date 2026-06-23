@@ -458,10 +458,11 @@ public struct Font: Equatable, Sendable {
     /// The font's `liga` ligature substitution rules, for the shaping tier to
     /// apply (for example `f` `i` becoming the `fi` ligature).
     ///
-    /// This reads GSUB ligature substitution (lookup type 4) under the standard
-    /// `liga` feature, resolving extension lookups (type 7). Single substitution
-    /// (type 1) is ``singleSubstitutions(feature:)``; the contextual lookups are
-    /// the next slices of SlayerMotion/PureDraw#140.
+    /// This reads GSUB ligature substitution (lookup type 4) under the `liga`
+    /// (standard) and `rlig` (required, the Arabic lam-alef) features, resolving
+    /// extension lookups (type 7). Single substitution (type 1) is
+    /// ``singleSubstitutions(feature:)``; the contextual lookups are the next
+    /// slices of SlayerMotion/PureDraw#140.
     public func ligatures() -> [LigatureSubstitution] {
         var result: [LigatureSubstitution] = []
         parseGSUBLigatures(into: &result)
@@ -483,7 +484,10 @@ public struct Font: Equatable, Sendable {
         if let featureCount = Self.u16(data, at: featureList) {
             for featureIndex in 0 ..< featureCount {
                 let record = featureList + 2 + featureIndex * 6
-                guard Self.tag(data, at: record) == "liga",
+                let tag = Self.tag(data, at: record)
+                // `liga` is the standard Latin ligatures; `rlig` is required
+                // ligatures, used for the Arabic lam-alef among others.
+                guard tag == "liga" || tag == "rlig",
                       let featureOffset = Self.u16(data, at: record + 4)
                 else {
                     continue
