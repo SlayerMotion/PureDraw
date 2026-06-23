@@ -471,8 +471,10 @@ public struct Font: Equatable, Sendable {
 
     private func parseGSUBLigatures(into result: inout [LigatureSubstitution]) {
         // `liga` is the standard Latin ligatures; `rlig` is required ligatures,
-        // used for the Arabic lam-alef among others.
-        forEachGSUBSubtable(matching: { $0 == "liga" || $0 == "rlig" }) { subtable, effectiveType in
+        // used for the Arabic lam-alef among others; `ccmp` composes glyphs, for
+        // example combining an Arabic shadda and a vowel mark into one glyph.
+        // Only the ligature (type 4) part of `ccmp` is read here.
+        forEachGSUBSubtable(matching: { $0 == "liga" || $0 == "rlig" || $0 == "ccmp" }) { subtable, effectiveType in
             if effectiveType == 4 {
                 parseLigatureSubst(subtable: subtable, into: &result)
             }
