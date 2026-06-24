@@ -13,7 +13,9 @@ import Testing
 struct AffineDecompositionTests {
     private typealias AT = Geometry.AffineTransform
 
-    private func approx(_ x: Double, _ y: Double, _ tol: Double = 1e-9) -> Bool { abs(x - y) <= tol }
+    private func approx(_ x: Double, _ y: Double, _ tol: Double = 1e-9) -> Bool {
+        abs(x - y) <= tol
+    }
 
     private func same(_ lhs: AT, _ rhs: AT, _ tol: Double = 1e-9) -> Bool {
         approx(lhs.a, rhs.a, tol) && approx(lhs.b, rhs.b, tol) && approx(lhs.c, rhs.c, tol)
