@@ -1078,6 +1078,132 @@ public struct Font: Equatable, Sendable {
         return GlyphAdjustment(xPlacement: xPlacement, yPlacement: yPlacement, xAdvance: xAdvance, yAdvance: yAdvance)
     }
 
+    /// The font's GPOS contextual positioning rules under `feature`: chained
+    /// (lookup type 8) and plain contextual (type 7) positioning, format 3, with
+    /// nested type-1 single-adjustment lookups resolved into per-position
+    /// adjustments. Empty when the font carries none. Extension lookups (type 9)
+    /// are resolved. The shaping tier applies these during positioning.
+    public func contextualPositioning(feature: String) -> [ContextualPositioning] {
+        var result: [ContextualPositioning] = []
+        forEachGPOSSubtable(feature: feature) { subtable, effectiveType in
+            if effectiveType == 8 {
+                parseChainedContextPos(subtable: subtable, into: &result)
+            } else if effectiveType == 7 {
+                parseContextPos(subtable: subtable, into: &result)
+            }
+        }
+        return result
+    }
+
+    /// Walks the subtables of one GPOS lookup, addressed by its index in the lookup
+    /// list, resolving extension lookups (type 9). Used to resolve the nested
+    /// lookups a contextual positioning rule references. `body` receives the
+    /// subtable offset and effective type.
+    private func forEachGPOSLookupSubtable(at index: Int, _ body: (Int, Int) -> Void) {
+        guard let gpos = tables["GPOS"], let lookupListOffset = Self.u16(data, at: gpos.offset + 8) else { return }
+        let lookupList = gpos.offset + lookupListOffset
+        guard let lookupCount = Self.u16(data, at: lookupList), index >= 0, index < lookupCount,
+              let lookupOffset = Self.u16(data, at: lookupList + 2 + index * 2)
+        else {
+            return
+        }
+        let lookup = lookupList + lookupOffset
+        guard let lookupType = Self.u16(data, at: lookup),
+              let subtableCount = Self.u16(data, at: lookup + 4)
+        else {
+            return
+        }
+        for subtableIndex in 0 ..< subtableCount {
+            guard let subtableOffset = Self.u16(data, at: lookup + 6 + subtableIndex * 2) else { continue }
+            var subtable = lookup + subtableOffset
+            var effectiveType = lookupType
+            if lookupType == 9 {
+                guard Self.u16(data, at: subtable) == 1,
+                      let extensionType = Self.u16(data, at: subtable + 2),
+                      let extensionOffset = Self.u32(data, at: subtable + 4)
+                else {
+                    continue
+                }
+                effectiveType = extensionType
+                subtable += extensionOffset
+            }
+            body(subtable, effectiveType)
+        }
+    }
+
+    /// Decodes a GPOS ChainedSequenceContextFormat3 (type 8, format 3) subtable:
+    /// backtrack, input, and lookahead coverage sequences and the sequence-lookup
+    /// records that name nested positioning lookups. Each nested lookup is
+    /// resolved; its type-1 single adjustments become the rule's actions.
+    private func parseChainedContextPos(subtable: Int, into result: inout [ContextualPositioning]) {
+        guard Self.u16(data, at: subtable) == 3 else { return }
+        var cursor = subtable + 2
+        guard let backtrack = readCoverageSequence(at: &cursor, subtableBase: subtable),
+              let input = readCoverageSequence(at: &cursor, subtableBase: subtable),
+              let lookahead = readCoverageSequence(at: &cursor, subtableBase: subtable),
+              let recordCount = Self.u16(data, at: cursor)
+        else {
+            return
+        }
+        cursor += 2
+        let actions = readPositioningActions(at: &cursor, recordCount: recordCount)
+        guard !actions.isEmpty else { return }
+        result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, actions: actions))
+    }
+
+    /// Decodes a GPOS SequenceContextFormat3 (type 7, format 3) subtable: an input
+    /// coverage sequence and nested positioning records, with no backtrack or
+    /// lookahead. Represented as a ``ContextualPositioning`` with empty backtrack
+    /// and lookahead.
+    private func parseContextPos(subtable: Int, into result: inout [ContextualPositioning]) {
+        guard Self.u16(data, at: subtable) == 3,
+              let glyphCount = Self.u16(data, at: subtable + 2),
+              let recordCount = Self.u16(data, at: subtable + 4)
+        else {
+            return
+        }
+        var cursor = subtable + 6
+        var input: [Set<Int>] = []
+        for _ in 0 ..< glyphCount {
+            guard let coverageOffset = Self.u16(data, at: cursor),
+                  let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+            else {
+                return
+            }
+            input.append(coverage.coveredGlyphs)
+            cursor += 2
+        }
+        let actions = readPositioningActions(at: &cursor, recordCount: recordCount)
+        guard !actions.isEmpty else { return }
+        result.append(.init(backtrack: [], input: input, lookahead: [], actions: actions))
+    }
+
+    /// Reads `recordCount` sequence-lookup records starting at `cursor` (each a
+    /// sequence index and a lookup-list index), resolving each referenced GPOS
+    /// lookup's type-1 single adjustments into an action. Advances `cursor` past
+    /// the records.
+    private func readPositioningActions(at cursor: inout Int, recordCount: Int) -> [ContextualPositioning.Action] {
+        var actions: [ContextualPositioning.Action] = []
+        for _ in 0 ..< recordCount {
+            guard let sequenceIndex = Self.u16(data, at: cursor),
+                  let lookupIndex = Self.u16(data, at: cursor + 2)
+            else {
+                break
+            }
+            cursor += 4
+            var adjustments: [Int: GlyphAdjustment] = [:]
+            forEachGPOSLookupSubtable(at: lookupIndex) { nested, type in
+                if type == 1 {
+                    parseSinglePos(subtable: nested, into: &adjustments)
+                }
+            }
+            if !adjustments.isEmpty {
+                actions.append(.init(sequenceIndex: sequenceIndex, adjustments: adjustments))
+            }
+        }
+        return actions
+    }
+
     /// The font's mark-to-base attachment (GPOS lookup type 4) under the `mark`
     /// feature, for the shaping tier to seat combining marks over their bases
     /// (Arabic vowel marks, for example). Extension lookups (type 9) are

@@ -293,6 +293,20 @@ struct OpenTypeLayoutTests {
         #expect(attach.offset(ligature: 9, component: 0, mark: 3) == nil) // unknown ligature
     }
 
+    @Test("GPOS contextual positioning (type 8) resolves nested single adjustments")
+    func gposContextualPositioning() throws {
+        let rules = try Font(data: ContextPosFont.build()).contextualPositioning(feature: "kern")
+        #expect(rules.count == 1)
+        let rule = rules[0]
+        #expect(rule.backtrack == [Set([1])]) // glyph 2 is adjusted only after glyph 1
+        #expect(rule.input == [Set([2])])
+        #expect(rule.lookahead.isEmpty)
+        #expect(rule.actions == [.init(sequenceIndex: 0, adjustments: [2: GlyphAdjustment(xAdvance: -40)])])
+        #expect(rule.matches([1, 2], at: 1))
+        #expect(!rule.matches([3, 2], at: 1))
+        #expect(try Font(data: ContextPosFont.build()).contextualPositioning(feature: "liga").isEmpty)
+    }
+
     @Test("a font without a kern table has an empty kerning map")
     func noKern() throws {
         let font = try Font(data: MiniFont.build())
@@ -686,6 +700,39 @@ private enum MarkLigatureFont {
         gpos += be16(2) + be16(6) + be16(12) // LigatureAttach: componentCount 2, comp0 anchor +6, comp1 anchor +12
         gpos += be16(1) + be16(300) + be16(500) // component 0 anchor
         gpos += be16(1) + be16(400) + be16(600) // component 1 anchor
+        return assemble(extra: ("GPOS", gpos))
+    }
+}
+
+/// A minimal TrueType font with a GPOS `kern` feature whose type-8 lookup is a
+/// ChainedSequenceContextFormat3 subtable: glyph 2, when preceded by glyph 1, is
+/// adjusted by a nested type-1 single positioning (xAdvance -40). The positioning
+/// analogue of ChainContextFont.
+private enum ContextPosFont {
+    static func build() -> [UInt8] {
+        // GPOS byte map (offsets relative to the table start):
+        //   0  header(10)        scriptList 10, featureList 12, lookupList 26
+        //   12 featureList(14)   'kern' -> feature +8 (->20), lookup index 0
+        //   26 lookupList(6)     lookup 0 (chained ctx) +6 (->32), lookup 1 (single) +44 (->70)
+        //   32 lookup 0          type 8, subtable +8 (->40)
+        //   40 chained ctx f3    backtrack cov +18 (->58), input cov +24 (->64), record (seq 0, lookup 1)
+        //   58 backtrack cov     glyph 1
+        //   64 input cov         glyph 2
+        //   70 lookup 1          type 1, subtable +8 (->78)
+        //   78 SinglePos f1      coverage +8 (->86), valueFormat 0x0004, xAdvance -40
+        //   86 single cov        glyph 2
+        var gpos: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gpos += be16(0) // scriptList
+        gpos += be16(1) + Array("kern".utf8) + be16(8) // featureList: 'kern' -> feature +8
+        gpos += be16(0) + be16(1) + be16(0) // feature: lookup 0
+        gpos += be16(2) + be16(6) + be16(44) // lookupList: 2 lookups
+        gpos += be16(8) + be16(0) + be16(1) + be16(8) // lookup 0: type 8, flag, subtable +8
+        gpos += be16(3) + be16(1) + be16(18) + be16(1) + be16(24) + be16(0) + be16(1) + be16(0) + be16(1) // chained ctx f3
+        gpos += be16(1) + be16(1) + be16(1) // backtrack coverage: glyph 1
+        gpos += be16(1) + be16(1) + be16(2) // input coverage: glyph 2
+        gpos += be16(1) + be16(0) + be16(1) + be16(8) // lookup 1: type 1, subtable +8
+        gpos += be16(1) + be16(8) + be16(0x0004) + be16(0xFFD8) // SinglePos f1: coverage +8, valueFormat xAdvance, -40
+        gpos += be16(1) + be16(1) + be16(2) // single positioning coverage: glyph 2
         return assemble(extra: ("GPOS", gpos))
     }
 }
