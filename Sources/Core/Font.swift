@@ -463,18 +463,18 @@ public struct Font: Equatable, Sendable {
     /// extension lookups (type 7). Single substitution (type 1) is
     /// ``singleSubstitutions(feature:)``; the contextual lookups are the next
     /// slices of SlayerMotion/PureDraw#140.
-    public func ligatures() -> [LigatureSubstitution] {
+    public func ligatures(restrictTo activeFeatures: Set<Int>? = nil) -> [LigatureSubstitution] {
         var result: [LigatureSubstitution] = []
-        parseGSUBLigatures(into: &result)
+        parseGSUBLigatures(into: &result, restrictTo: activeFeatures)
         return result
     }
 
-    private func parseGSUBLigatures(into result: inout [LigatureSubstitution]) {
+    private func parseGSUBLigatures(into result: inout [LigatureSubstitution], restrictTo activeFeatures: Set<Int>?) {
         // `liga` is the standard Latin ligatures; `rlig` is required ligatures,
         // used for the Arabic lam-alef among others; `ccmp` composes glyphs, for
         // example combining an Arabic shadda and a vowel mark into one glyph.
         // Only the ligature (type 4) part of `ccmp` is read here.
-        forEachGSUBSubtable(matching: { $0 == "liga" || $0 == "rlig" || $0 == "ccmp" }) { subtable, effectiveType, _ in
+        forEachGSUBSubtable(matching: { $0 == "liga" || $0 == "rlig" || $0 == "ccmp" }, restrictTo: activeFeatures) { subtable, effectiveType, _ in
             if effectiveType == 4 {
                 parseLigatureSubst(subtable: subtable, into: &result)
             }
@@ -528,11 +528,44 @@ public struct Font: Equatable, Sendable {
     /// forms: each input glyph maps to its substitute glyph. Extension lookups
     /// (type 7) are resolved. The shaping tier selects a feature per character
     /// (from cursive joining) and applies the returned map.
-    public func singleSubstitutions(feature: String) -> [Int: Int] {
+    public func singleSubstitutions(feature: String, restrictTo activeFeatures: Set<Int>? = nil) -> [Int: Int] {
         var result: [Int: Int] = [:]
-        forEachGSUBSubtable(matching: { $0 == feature }) { subtable, effectiveType, _ in
+        forEachGSUBSubtable(matching: { $0 == feature }, restrictTo: activeFeatures) { subtable, effectiveType, _ in
             if effectiveType == 1 {
                 parseSingleSubst(subtable: subtable, into: &result)
+            }
+        }
+        return result
+    }
+
+    /// The font's multiple-substitution map (GSUB lookup type 2) for a feature
+    /// tag: each covered glyph maps to the ordered sequence of glyphs it expands
+    /// into, for example a precomposed glyph decomposed into a base plus a
+    /// combining mark under `ccmp`. Extension lookups (type 7) are resolved.
+    /// (OpenType GSUB: Lookup Type 2, "Multiple Substitution Subtable",
+    /// MultipleSubstFormat1.)
+    public func multipleSubstitutions(feature: String, restrictTo activeFeatures: Set<Int>? = nil) -> [Int: [Int]] {
+        var result: [Int: [Int]] = [:]
+        forEachGSUBSubtable(matching: { $0 == feature }, restrictTo: activeFeatures) { subtable, effectiveType, _ in
+            if effectiveType == 2 {
+                parseSequenceSubst(subtable: subtable, into: &result)
+            }
+        }
+        return result
+    }
+
+    /// The font's alternate-substitution map (GSUB lookup type 3) for a feature
+    /// tag: each covered glyph maps to its list of alternate glyphs, in the order
+    /// the font lists them. Which alternate is used is a user selection (the
+    /// `aalt`/`salt`/`cvNN` feature value), so this accessor exposes the choices
+    /// and the shaping tier applies a requested index rather than picking one
+    /// here. Extension lookups (type 7) are resolved. (OpenType GSUB: Lookup Type
+    /// 3, "Alternate Substitution Subtable", AlternateSubstFormat1.)
+    public func alternateSubstitutions(feature: String, restrictTo activeFeatures: Set<Int>? = nil) -> [Int: [Int]] {
+        var result: [Int: [Int]] = [:]
+        forEachGSUBSubtable(matching: { $0 == feature }, restrictTo: activeFeatures) { subtable, effectiveType, _ in
+            if effectiveType == 3 {
+                parseSequenceSubst(subtable: subtable, into: &result)
             }
         }
         return result
@@ -544,21 +577,172 @@ public struct Font: Equatable, Sendable {
     /// Arabic `rclt` rule that lifts a vowel mark to a high variant after a base
     /// letter). Empty when the font carries no such rules for the feature. Format
     /// 1 and 2 contexts, and nested lookups other than type 1, are not collected.
-    public func chainingSubstitutions(feature: String) -> [ChainingSubstitution] {
+    public func chainingSubstitutions(feature: String, restrictTo activeFeatures: Set<Int>? = nil) -> [ChainingSubstitution] {
         var result: [ChainingSubstitution] = []
-        forEachGSUBSubtable(matching: { $0 == feature }) { subtable, effectiveType, lookupFlag in
+        forEachGSUBSubtable(matching: { $0 == feature }, restrictTo: activeFeatures) { subtable, effectiveType, lookupFlag in
+            // IgnoreMarks (0x0008) skips all marks; UseMarkFilteringSet (0x0010)
+            // skips marks outside a named set. Both are treated as skipping; the
+            // filtering-set refinement is approximated as skipping every mark,
+            // exact when the context's non-input positions are non-marks (a
+            // base-letter backtrack, for example).
+            let skipsMarks = lookupFlag & (0x0008 | 0x0010) != 0
             if effectiveType == 6 {
-                // IgnoreMarks (0x0008) skips all marks; UseMarkFilteringSet
-                // (0x0010) skips marks outside a named set. Both are treated as
-                // MARK: - skipping; the filtering-set refinement is approximated as
-
-                // skipping every mark, exact when the context's non-input
-                // positions are non-marks (a base-letter backtrack, for example).
-                let skipsMarks = lookupFlag & (0x0008 | 0x0010) != 0
                 parseChainContext(subtable: subtable, ignoreMarks: skipsMarks, into: &result)
+            } else if effectiveType == 5 {
+                parseContext(subtable: subtable, ignoreMarks: skipsMarks, into: &result)
             }
         }
         return result
+    }
+
+    /// The font's GSUB reverse chaining single substitutions (lookup type 8) under
+    /// `feature`: a covered glyph becomes a fixed substitute when its backtrack and
+    /// lookahead match. The shaping tier applies these to a run in reverse. Empty
+    /// when the font carries no such rules for the feature; extension lookups (type
+    /// 7) are resolved. `restrictTo` filters by a script's active feature indices.
+    public func reverseChainingSubstitutions(feature: String, restrictTo activeFeatures: Set<Int>? = nil) -> [ReverseChainingSubstitution] {
+        var result: [ReverseChainingSubstitution] = []
+        forEachGSUBSubtable(matching: { $0 == feature }, restrictTo: activeFeatures) { subtable, effectiveType, lookupFlag in
+            if effectiveType == 8 {
+                let skipsMarks = lookupFlag & (0x0008 | 0x0010) != 0
+                parseReverseChainSubst(subtable: subtable, ignoreMarks: skipsMarks, into: &result)
+            }
+        }
+        return result
+    }
+
+    /// Decodes a GSUB ReverseChainSingleSubstFormat1 (type 8) subtable: an input
+    /// coverage with an aligned array of substitute glyphs, framed by backtrack and
+    /// lookahead coverage sequences. The substitute for the covered glyph at index
+    /// i is `substituteGlyphIDs[i]`.
+    private func parseReverseChainSubst(subtable: Int, ignoreMarks: Bool, into result: inout [ReverseChainingSubstitution]) {
+        guard Self.u16(data, at: subtable) == 1,
+              let coverageOffset = Self.u16(data, at: subtable + 2),
+              let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+        else {
+            return
+        }
+        var cursor = subtable + 4
+        guard let backtrack = readCoverageSequence(at: &cursor, subtableBase: subtable),
+              let lookahead = readCoverageSequence(at: &cursor, subtableBase: subtable),
+              let glyphCount = Self.u16(data, at: cursor)
+        else {
+            return
+        }
+        cursor += 2
+        var mapping: [Int: Int] = [:]
+        for index in 0 ..< glyphCount {
+            guard let inputGlyph = coverage.glyph(atIndex: index),
+                  let substitute = Self.u16(data, at: cursor + index * 2)
+            else {
+                continue
+            }
+            mapping[inputGlyph] = substitute
+        }
+        guard !mapping.isEmpty else { return }
+        result.append(.init(backtrack: backtrack, lookahead: lookahead, mapping: mapping, ignoreMarks: ignoreMarks))
+    }
+
+    // MARK: - Feature selection (ScriptList -> Script -> LangSys)
+
+    /// The GSUB feature indices active for an OpenType `script` tag (`latn`,
+    /// `arab`, `DFLT`, ...) and an optional `language` system tag, resolved
+    /// through the ScriptList. This is the selection layer the OpenType spec puts
+    /// in front of the feature list: a feature applies only when the run's script
+    /// (and language) reaches it, not merely because the font carries a record
+    /// with that tag. When the script is absent the `DFLT` script is tried; when
+    /// the language is absent or unknown the script's default language system is
+    /// used; an unset required feature (0xFFFF) is omitted. Empty when the font
+    /// has no GSUB, no matching (or `DFLT`) script, or no default language system.
+    /// (OpenType Layout Common Table Formats: ScriptList, Script, LangSys.)
+    public func gsubFeatureIndices(script: String, language: String? = nil) -> Set<Int> {
+        gsubFeatureIndices(scripts: [script], language: language)
+    }
+
+    /// As ``gsubFeatureIndices(script:language:)`` but trying several script tags
+    /// in order: the first tag the font's ScriptList actually carries selects the
+    /// features (so a modern v2 tag is preferred to its v1 fallback), and `DFLT`
+    /// is used when none of them is present.
+    public func gsubFeatureIndices(scripts: [String], language: String? = nil) -> Set<Int> {
+        layoutFeatureIndices(tableTag: "GSUB", scripts: scripts, language: language)
+    }
+
+    /// The GPOS feature indices active for an OpenType `script` and optional
+    /// `language`, resolved through the ScriptList exactly as
+    /// ``gsubFeatureIndices(script:language:)``.
+    public func gposFeatureIndices(script: String, language: String? = nil) -> Set<Int> {
+        gposFeatureIndices(scripts: [script], language: language)
+    }
+
+    /// As ``gposFeatureIndices(script:language:)`` but trying several script tags
+    /// in order, like ``gsubFeatureIndices(scripts:language:)``.
+    public func gposFeatureIndices(scripts: [String], language: String? = nil) -> Set<Int> {
+        layoutFeatureIndices(tableTag: "GPOS", scripts: scripts, language: language)
+    }
+
+    /// Resolves the active feature indices for `tableTag` (`GSUB`/`GPOS`) by
+    /// walking ScriptList -> Script -> LangSys. The first of `scripts` whose Script
+    /// table is present wins; otherwise the `DFLT` script is tried. The language's
+    /// named system is used when present, otherwise the default language system.
+    private func layoutFeatureIndices(tableTag: String, scripts: [String], language: String?) -> Set<Int> {
+        guard let table = tables[tableTag], let scriptListOffset = Self.u16(data, at: table.offset + 4) else { return [] }
+        let scriptList = table.offset + scriptListOffset
+        let present = scripts.lazy.compactMap { scriptTableOffset(in: scriptList, tag: $0) }.first
+        guard let scriptRelative = present ?? scriptTableOffset(in: scriptList, tag: "DFLT") else { return [] }
+        let scriptTable = scriptList + scriptRelative
+        guard let langSysRelative = langSysTableOffset(in: scriptTable, language: language) else { return [] }
+        return featureIndices(atLangSys: scriptTable + langSysRelative)
+    }
+
+    /// The offset, relative to the ScriptList, of the Script table for `tag`, or
+    /// `nil` when the ScriptList has no such script. Each ScriptRecord is a 4-byte
+    /// tag and a 2-byte offset.
+    private func scriptTableOffset(in scriptList: Int, tag: String) -> Int? {
+        guard let count = Self.u16(data, at: scriptList) else { return nil }
+        for index in 0 ..< count {
+            let record = scriptList + 2 + index * 6
+            if Self.tag(data, at: record) == tag {
+                return Self.u16(data, at: record + 4)
+            }
+        }
+        return nil
+    }
+
+    /// The offset, relative to the Script table, of the selected LangSys: the
+    /// named system for `language` when the Script lists it, otherwise the default
+    /// language system. `nil` when neither the requested language nor a default is
+    /// present (a Script may carry only named systems). Each LangSysRecord is a
+    /// 4-byte tag and a 2-byte offset; the default offset sits at the Script table
+    /// start and is `0` when absent.
+    private func langSysTableOffset(in scriptTable: Int, language: String?) -> Int? {
+        if let language, let count = Self.u16(data, at: scriptTable + 2) {
+            for index in 0 ..< count {
+                let record = scriptTable + 4 + index * 6
+                if Self.tag(data, at: record) == language {
+                    return Self.u16(data, at: record + 4)
+                }
+            }
+        }
+        guard let defaultOffset = Self.u16(data, at: scriptTable), defaultOffset != 0 else { return nil }
+        return defaultOffset
+    }
+
+    /// The feature indices a LangSys lists, including its required feature when
+    /// set (`requiredFeatureIndex` other than 0xFFFF). The LangSys layout is
+    /// `lookupOrderOffset`, `requiredFeatureIndex`, `featureIndexCount`, then the
+    /// `featureIndices` array.
+    private func featureIndices(atLangSys langSys: Int) -> Set<Int> {
+        var indices: Set<Int> = []
+        if let required = Self.u16(data, at: langSys + 2), required != 0xFFFF {
+            indices.insert(required)
+        }
+        guard let count = Self.u16(data, at: langSys + 4) else { return indices }
+        for index in 0 ..< count {
+            if let featureIndex = Self.u16(data, at: langSys + 6 + index * 2) {
+                indices.insert(featureIndex)
+            }
+        }
+        return indices
     }
 
     /// Whether `glyph` is a mark, per the GDEF GlyphClassDef (class 3). Used to
@@ -578,7 +762,11 @@ public struct Font: Equatable, Sendable {
     /// `matches`, resolving extension lookups (type 7) to their effective type,
     /// and calls `body` with each subtable's byte offset, effective type, and the
     /// lookup's flag word. The shared spine of the GSUB readers.
-    private func forEachGSUBSubtable(matching: (String) -> Bool, _ body: (Int, Int, Int) -> Void) {
+    private func forEachGSUBSubtable(
+        matching: (String) -> Bool,
+        restrictTo activeFeatures: Set<Int>? = nil,
+        _ body: (Int, Int, Int) -> Void
+    ) {
         guard let gsub = tables["GSUB"] else { return }
         let base = gsub.offset
         guard let featureListOffset = Self.u16(data, at: base + 6) else { return }
@@ -587,6 +775,10 @@ public struct Font: Equatable, Sendable {
         var lookupIndices: Set<Int> = []
         if let featureCount = Self.u16(data, at: featureList) {
             for featureIndex in 0 ..< featureCount {
+                // When a script's active feature set is given, gather only the
+                // records that set selects; otherwise gather by tag across the
+                // whole feature list (the script-agnostic fallback).
+                if let activeFeatures, !activeFeatures.contains(featureIndex) { continue }
                 let record = featureList + 2 + featureIndex * 6
                 guard matching(Self.tag(data, at: record) ?? ""),
                       let featureOffset = Self.u16(data, at: record + 4)
@@ -682,6 +874,52 @@ public struct Font: Equatable, Sendable {
         result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, actions: actions, ignoreMarks: ignoreMarks))
     }
 
+    /// Decodes a GSUB ContextSubstFormat3 (type 5, format 3) subtable: an input
+    /// coverage sequence and the nested lookup records to apply, with neither
+    /// backtrack nor lookahead. It is the chaining rule's simpler sibling, so it is
+    /// represented as a ``ChainingSubstitution`` with empty backtrack and lookahead
+    /// and matched by the same shaper logic. Nested type-1 single substitutions
+    /// become the rule's actions; formats 1 and 2 are ignored, as for chaining.
+    private func parseContext(subtable: Int, ignoreMarks: Bool, into result: inout [ChainingSubstitution]) {
+        guard Self.u16(data, at: subtable) == 3,
+              let glyphCount = Self.u16(data, at: subtable + 2),
+              let recordCount = Self.u16(data, at: subtable + 4)
+        else {
+            return
+        }
+        var cursor = subtable + 6
+        var input: [Set<Int>] = []
+        for _ in 0 ..< glyphCount {
+            guard let coverageOffset = Self.u16(data, at: cursor),
+                  let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+            else {
+                return
+            }
+            input.append(coverage.coveredGlyphs)
+            cursor += 2
+        }
+        var actions: [ChainingSubstitution.Action] = []
+        for _ in 0 ..< recordCount {
+            guard let sequenceIndex = Self.u16(data, at: cursor),
+                  let lookupIndex = Self.u16(data, at: cursor + 2)
+            else {
+                break
+            }
+            cursor += 4
+            var mapping: [Int: Int] = [:]
+            forEachGSUBLookupSubtable(at: lookupIndex) { nested, type, _ in
+                if type == 1 {
+                    parseSingleSubst(subtable: nested, into: &mapping)
+                }
+            }
+            if !mapping.isEmpty {
+                actions.append(.init(sequenceIndex: sequenceIndex, mapping: mapping))
+            }
+        }
+        guard !actions.isEmpty else { return }
+        result.append(.init(backtrack: [], input: input, lookahead: [], actions: actions, ignoreMarks: ignoreMarks))
+    }
+
     /// Reads a count-prefixed list of coverage-table offsets (each relative to
     /// `subtable`'s containing chain-context subtable) into glyph sets, advancing
     /// `cursor` past the list. `cursor` starts at the count field.
@@ -727,6 +965,117 @@ public struct Font: Equatable, Sendable {
                 result[glyph] = substitute
             }
         }
+    }
+
+    /// Decodes a GSUB subtable whose Format 1 layout is a Coverage table followed
+    /// by a count-prefixed list of offsets, each pointing at a count-prefixed
+    /// glyph array. Multiple Substitution (type 2, where the array is an ordered
+    /// replacement Sequence) and Alternate Substitution (type 3, where the array
+    /// is an AlternateSet) share this exact on-disk shape, so one decoder serves
+    /// both and the caller's lookup type fixes the meaning. The covered glyph at
+    /// coverage index i takes the i-th list. A glyph that maps to an empty list is
+    /// kept as an empty array (a type-2 deletion); the shaping tier decides what
+    /// an empty expansion means. (OpenType GSUB: MultipleSubstFormat1 /
+    /// AlternateSubstFormat1.)
+    private func parseSequenceSubst(subtable: Int, into result: inout [Int: [Int]]) {
+        guard Self.u16(data, at: subtable) == 1,
+              let coverageOffset = Self.u16(data, at: subtable + 2),
+              let listCount = Self.u16(data, at: subtable + 4),
+              let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+        else {
+            return
+        }
+        for listIndex in 0 ..< listCount {
+            guard let glyph = coverage.glyph(atIndex: listIndex),
+                  let listOffset = Self.u16(data, at: subtable + 6 + listIndex * 2)
+            else {
+                continue
+            }
+            let list = subtable + listOffset
+            guard let glyphCount = Self.u16(data, at: list) else { continue }
+            var substitutes: [Int] = []
+            substitutes.reserveCapacity(glyphCount)
+            var valid = true
+            for glyphIndex in 0 ..< glyphCount {
+                guard let substitute = Self.u16(data, at: list + 2 + glyphIndex * 2) else {
+                    valid = false
+                    break
+                }
+                substitutes.append(substitute)
+            }
+            if valid {
+                result[glyph] = substitutes
+            }
+        }
+    }
+
+    /// The font's GPOS single positioning adjustments (lookup type 1) under
+    /// `feature`: each covered glyph maps to the placement shift and advance change
+    /// the font specifies for it, in font units. Extension lookups (type 9) are
+    /// resolved. Empty when the font carries no single positioning for the feature.
+    /// (OpenType GPOS: Lookup Type 1, "Single Adjustment Positioning Subtable",
+    /// formats 1 and 2.)
+    public func singleAdjustments(feature: String) -> [Int: GlyphAdjustment] {
+        var result: [Int: GlyphAdjustment] = [:]
+        forEachGPOSSubtable(feature: feature) { subtable, effectiveType in
+            if effectiveType == 1 {
+                parseSinglePos(subtable: subtable, into: &result)
+            }
+        }
+        return result
+    }
+
+    /// Decodes a GPOS SinglePos subtable. Format 1 applies one value record to
+    /// every covered glyph; format 2 lists a value record per covered glyph, in
+    /// coverage order. The value record's fields appear in the fixed order
+    /// xPlacement, yPlacement, xAdvance, yAdvance (then device/variation offsets,
+    /// which are sized but not applied), each present only when its `valueFormat`
+    /// bit is set.
+    private func parseSinglePos(subtable: Int, into result: inout [Int: GlyphAdjustment]) {
+        guard let format = Self.u16(data, at: subtable),
+              let coverageOffset = Self.u16(data, at: subtable + 2),
+              let valueFormat = Self.u16(data, at: subtable + 4),
+              let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+        else {
+            return
+        }
+        if format == 1 {
+            let adjustment = readValueRecord(at: subtable + 6, valueFormat: valueFormat)
+            guard !adjustment.isZero else { return }
+            for glyph in coverage.coveredGlyphs {
+                result[glyph] = adjustment
+            }
+        } else if format == 2 {
+            guard let valueCount = Self.u16(data, at: subtable + 6) else { return }
+            let recordSize = (valueFormat & 0xFF).nonzeroBitCount * 2
+            for index in 0 ..< valueCount {
+                guard let glyph = coverage.glyph(atIndex: index) else { continue }
+                let adjustment = readValueRecord(at: subtable + 8 + index * recordSize, valueFormat: valueFormat)
+                if !adjustment.isZero {
+                    result[glyph] = adjustment
+                }
+            }
+        }
+    }
+
+    /// Reads a GPOS ValueRecord into a ``GlyphAdjustment``, taking only the
+    /// placement and advance fields. Each field is a 2-byte signed value present
+    /// only when its `valueFormat` bit is set, and they are packed in the fixed
+    /// order below, so reading sequentially when a bit is set lands on the right
+    /// bytes. Device and variation fields (bits 0x0010 and up) are not applied.
+    private func readValueRecord(at offset: Int, valueFormat: Int) -> GlyphAdjustment {
+        var cursor = offset
+        func field(_ bit: Int) -> Int {
+            guard valueFormat & bit != 0 else { return 0 }
+            let value = Self.i16(data, at: cursor) ?? 0
+            cursor += 2
+            return value
+        }
+        let xPlacement = field(0x0001)
+        let yPlacement = field(0x0002)
+        let xAdvance = field(0x0004)
+        let yAdvance = field(0x0008)
+        return GlyphAdjustment(xPlacement: xPlacement, yPlacement: yPlacement, xAdvance: xAdvance, yAdvance: yAdvance)
     }
 
     /// The font's mark-to-base attachment (GPOS lookup type 4) under the `mark`

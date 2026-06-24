@@ -1,9 +1,12 @@
-/// A GSUB chaining contextual substitution rule (lookup type 6, format 3): a
-/// glyph is substituted only when its neighbours match a context. The rule holds
-/// three coverage sequences and the nested substitutions to apply when they all
-/// match. This is the typed boundary the shaping tier consumes: PureDraw parses
-/// the GSUB table and resolves the nested lookups, this value answers whether a
-/// position matches and what to substitute.
+/// A GSUB contextual substitution rule, format 3: a glyph is substituted only
+/// when a context matches. It represents both the chaining rule (lookup type 6:
+/// backtrack, input, and lookahead coverage sequences) and the plain contextual
+/// rule (lookup type 5: an input sequence with empty backtrack and lookahead, the
+/// chaining rule without surrounding context). The rule holds the coverage
+/// sequences and the nested substitutions to apply when they all match. This is
+/// the typed boundary the shaping tier consumes: PureDraw parses the GSUB table
+/// and resolves the nested lookups, this value answers whether a position matches
+/// and what to substitute.
 ///
 /// Bounded to format 3 (each context position is a coverage set) with nested
 /// type-1 single substitutions, the common case (an Arabic `rclt` rule that lifts

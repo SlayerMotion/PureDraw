@@ -105,6 +105,77 @@ struct OpenTypeLayoutTests {
         #expect(try Font(data: MiniFont.build()).singleSubstitutions(feature: "init").isEmpty)
     }
 
+    @Test("GSUB multiple substitution expands a glyph into a sequence")
+    func gsubMultiple() throws {
+        let font = try Font(data: GsubMultipleFont.build())
+        #expect(font.multipleSubstitutions(feature: "ccmp") == [1: [4, 5]])
+        #expect(font.multipleSubstitutions(feature: "liga").isEmpty) // feature absent
+    }
+
+    @Test("GSUB alternate substitution lists a glyph's alternates in order")
+    func gsubAlternate() throws {
+        let font = try Font(data: GsubAlternateFont.build())
+        #expect(font.alternateSubstitutions(feature: "aalt") == [1: [7, 8]])
+        #expect(font.alternateSubstitutions(feature: "salt").isEmpty) // feature absent
+    }
+
+    @Test("a font without GSUB has no multiple or alternate substitutions")
+    func noSequenceSubstitutions() throws {
+        let font = try Font(data: MiniFont.build())
+        #expect(font.multipleSubstitutions(feature: "ccmp").isEmpty)
+        #expect(font.alternateSubstitutions(feature: "aalt").isEmpty)
+    }
+
+    @Test("a script's default language system selects its listed feature indices")
+    func featureIndicesDefaultLangSys() throws {
+        let font = try Font(data: LangSysFont.build())
+        #expect(font.gsubFeatureIndices(script: "latn") == [0, 1])
+    }
+
+    @Test("a named language system selects its features plus the required feature")
+    func featureIndicesNamedLangSys() throws {
+        let font = try Font(data: LangSysFont.build())
+        #expect(font.gsubFeatureIndices(script: "latn", language: "TRK ") == [0, 2])
+    }
+
+    @Test("an unknown language falls back to the script's default language system")
+    func featureIndicesUnknownLanguage() throws {
+        let font = try Font(data: LangSysFont.build())
+        #expect(font.gsubFeatureIndices(script: "latn", language: "ZZZ ") == [0, 1])
+    }
+
+    @Test("an absent script falls back to the DFLT script")
+    func featureIndicesDfltFallback() throws {
+        let font = try Font(data: LangSysFont.build())
+        #expect(font.gsubFeatureIndices(script: "grek") == [0]) // grek absent -> DFLT
+        #expect(font.gsubFeatureIndices(script: "DFLT") == [0])
+    }
+
+    @Test("a font with no GSUB or GPOS has no active feature indices")
+    func featureIndicesNoTable() throws {
+        let font = try Font(data: MiniFont.build())
+        #expect(font.gsubFeatureIndices(script: "latn").isEmpty)
+        #expect(font.gposFeatureIndices(script: "latn").isEmpty)
+    }
+
+    @Test("several script tags resolve to the first one the font carries, else DFLT")
+    func featureIndicesScriptOrder() throws {
+        let font = try Font(data: LangSysFont.build())
+        #expect(font.gsubFeatureIndices(scripts: ["grek", "latn"]) == [0, 1]) // grek absent -> latn present
+        #expect(font.gsubFeatureIndices(scripts: ["latn", "grek"]) == [0, 1]) // latn present first
+        #expect(font.gsubFeatureIndices(scripts: ["grek", "armn"]) == [0]) // both absent -> DFLT
+    }
+
+    @Test("GSUB gathering restricted to an active feature-index set drops the rest")
+    func gsubFeatureRestriction() throws {
+        let font = try Font(data: GsubFont.build()) // one `liga` feature at index 0
+        let rule = LigatureSubstitution(components: [1, 2], ligatureGlyph: 3)
+        #expect(font.ligatures() == [rule]) // unrestricted: by-tag
+        #expect(font.ligatures(restrictTo: [0]) == [rule]) // feature 0 is active
+        #expect(font.ligatures(restrictTo: [7]).isEmpty) // feature 0 not active -> dropped
+        #expect(font.ligatures(restrictTo: []).isEmpty) // nothing active -> dropped
+    }
+
     @Test("required ligatures under rlig are read like liga")
     func gsubRligLigature() throws {
         let font = try Font(data: GsubRligFont.build())
@@ -157,6 +228,31 @@ struct OpenTypeLayoutTests {
         #expect(try Font(data: ChainContextFont.build()).chainingSubstitutions(feature: "rclt").isEmpty)
     }
 
+    @Test("GSUB contextual substitution (type 5) resolves nested single substitutions")
+    func gsubContext() throws {
+        let rules = try Font(data: ContextFont.build()).chainingSubstitutions(feature: "calt")
+        #expect(rules.count == 1)
+        let rule = rules[0]
+        #expect(rule.backtrack.isEmpty) // type 5 has no surrounding context
+        #expect(rule.lookahead.isEmpty)
+        #expect(rule.input == [Set([1]), Set([2])])
+        #expect(rule.actions == [ChainingSubstitution.Action(sequenceIndex: 1, mapping: [2: 9])])
+        // Glyph 2 substitutes to 9 only as the second glyph of the input (1, 2).
+        #expect(rule.matches([1, 2], at: 0))
+        #expect(!rule.matches([3, 2], at: 0))
+    }
+
+    @Test("GSUB reverse chaining single substitution (type 8) parses its context and substitutes")
+    func gsubReverseChain() throws {
+        let rules = try Font(data: ReverseChainFont.build()).reverseChainingSubstitutions(feature: "calt")
+        #expect(rules.count == 1)
+        let rule = rules[0]
+        #expect(rule.backtrack == [Set([1])]) // glyph 2 substitutes only after glyph 1
+        #expect(rule.lookahead.isEmpty)
+        #expect(rule.mapping == [2: 9])
+        #expect(try Font(data: ReverseChainFont.build()).reverseChainingSubstitutions(feature: "rclt").isEmpty)
+    }
+
     @Test("GDEF glyph class identifies mark glyphs")
     func gdefMarkClass() throws {
         let font = try Font(data: GdefFont.build())
@@ -188,6 +284,24 @@ struct OpenTypeLayoutTests {
     func noKern() throws {
         let font = try Font(data: MiniFont.build())
         #expect(font.kerningMap().isEmpty)
+    }
+
+    @Test("GPOS single adjustment format 1 applies one value record to every covered glyph")
+    func gposSingleFormat1() throws {
+        let font = try Font(data: SinglePosFont1.build())
+        #expect(font.singleAdjustments(feature: "kern") == [1: GlyphAdjustment(xPlacement: 30, xAdvance: -20)])
+        #expect(font.singleAdjustments(feature: "liga").isEmpty) // feature absent
+    }
+
+    @Test("GPOS single adjustment format 2 applies a value record per covered glyph")
+    func gposSingleFormat2() throws {
+        let font = try Font(data: SinglePosFont2.build())
+        #expect(font.singleAdjustments(feature: "kern") == [1: GlyphAdjustment(xAdvance: 10), 2: GlyphAdjustment(xAdvance: -10)])
+    }
+
+    @Test("a font with no GPOS has no single adjustments")
+    func noSinglePos() throws {
+        #expect(try Font(data: MiniFont.build()).singleAdjustments(feature: "kern").isEmpty)
     }
 }
 
@@ -387,6 +501,94 @@ private enum GsubSingleFont1 {
     }
 }
 
+/// A minimal TrueType font with a GSUB `ccmp` feature whose type-2 lookup is a
+/// MultipleSubst format 1 subtable: glyph 1 expands into the sequence (4, 5).
+private enum GsubMultipleFont {
+    static func build() -> [UInt8] {
+        // GSUB layout (offsets relative to the table start):
+        //   0  header (10)         scriptList=10, featureList=12, lookupList=26
+        //   10 scriptList (2)
+        //   12 featureList (14)    feature 'ccmp' -> lookup 0
+        //   26 lookupList (12)     lookup type 2, subtable at +8 (->38)
+        //   38 MultipleSubst f1 (8) coverage +8, sequenceCount 1, sequence +14
+        //   46 coverage (6)        glyph 1
+        //   52 sequence (6)        glyphCount 2, glyphs 4, 5
+        var gsub: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gsub += be16(0)
+        gsub += be16(1) + Array("ccmp".utf8) + be16(8)
+        gsub += be16(0) + be16(1) + be16(0)
+        gsub += be16(1) + be16(4)
+        gsub += be16(2) + be16(0) + be16(1) + be16(8) // lookup: type 2, flag, subtableCount, offset
+        gsub += be16(1) + be16(8) + be16(1) + be16(14) // MultipleSubst f1: format, coverage, seqCount, seqOffset
+        gsub += be16(1) + be16(1) + be16(1) // coverage f1: glyph 1
+        gsub += be16(2) + be16(4) + be16(5) // sequence: glyphCount 2, glyphs 4, 5
+        return assemble(extra: ("GSUB", gsub))
+    }
+}
+
+/// A minimal TrueType font with a GSUB `aalt` feature whose type-3 lookup is an
+/// AlternateSubst format 1 subtable: glyph 1 has the alternates (7, 8). The
+/// on-disk layout is identical to MultipleSubst format 1; only the lookup type
+/// and the meaning of the glyph array differ.
+private enum GsubAlternateFont {
+    static func build() -> [UInt8] {
+        // GSUB layout (offsets relative to the table start):
+        //   0  header (10)          scriptList=10, featureList=12, lookupList=26
+        //   10 scriptList (2)
+        //   12 featureList (14)     feature 'aalt' -> lookup 0
+        //   26 lookupList (12)      lookup type 3, subtable at +8 (->38)
+        //   38 AlternateSubst f1 (8) coverage +8, alternateSetCount 1, set +14
+        //   46 coverage (6)         glyph 1
+        //   52 alternateSet (6)     glyphCount 2, alternates 7, 8
+        var gsub: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gsub += be16(0)
+        gsub += be16(1) + Array("aalt".utf8) + be16(8)
+        gsub += be16(0) + be16(1) + be16(0)
+        gsub += be16(1) + be16(4)
+        gsub += be16(3) + be16(0) + be16(1) + be16(8) // lookup: type 3, flag, subtableCount, offset
+        gsub += be16(1) + be16(8) + be16(1) + be16(14) // AlternateSubst f1: format, coverage, altSetCount, setOffset
+        gsub += be16(1) + be16(1) + be16(1) // coverage f1: glyph 1
+        gsub += be16(2) + be16(7) + be16(8) // alternateSet: glyphCount 2, alternates 7, 8
+        return assemble(extra: ("GSUB", gsub))
+    }
+}
+
+/// A minimal TrueType font whose GSUB carries a populated ScriptList, for testing
+/// feature selection (there are no lookups; the FeatureList and LookupList are
+/// empty stubs, since the resolver returns feature *indices*). Two scripts:
+///
+///   - `DFLT`: a default language system listing feature index 0.
+///   - `latn`: a default language system listing indices 0 and 1, and a named
+///     `TRK ` language system with required feature 2 and listed index 0.
+///
+/// All offsets are relative to the GSUB table start (byte map in comments).
+private enum LangSysFont {
+    static func build() -> [UInt8] {
+        // GSUB byte map (offsets relative to the table start):
+        //   0  header (10)        scriptList 10, featureList 64, lookupList 66
+        //   10 ScriptList (14)    DFLT -> Script +14 (->24), latn -> Script +26 (->36)
+        //   24 DFLT Script (12)   defaultLangSys +4 (->28), langSysCount 0
+        //   28 DFLT default (8)   required 0xFFFF, features [0]
+        //   36 latn Script (10)   defaultLangSys +10 (->46), 1 record TRK -> +20 (->56)
+        //   46 latn default (10)  required 0xFFFF, features [0, 1]
+        //   56 TRK LangSys (8)    required 2, features [0]
+        //   64 FeatureList (2)    featureCount 0
+        //   66 LookupList (2)     lookupCount 0
+        var gsub: [UInt8] = be16(1) + be16(0) + be16(10) + be16(64) + be16(66)
+        gsub += be16(2) // ScriptList: scriptCount
+        gsub += Array("DFLT".utf8) + be16(14) // ScriptRecord: DFLT -> Script at +14
+        gsub += Array("latn".utf8) + be16(26) // ScriptRecord: latn -> Script at +26
+        gsub += be16(4) + be16(0) // DFLT Script: defaultLangSysOffset 4, langSysCount 0
+        gsub += be16(0) + be16(0xFFFF) + be16(1) + be16(0) // DFLT default LangSys: required none, features [0]
+        gsub += be16(10) + be16(1) + Array("TRK ".utf8) + be16(20) // latn Script: defaultLangSys +10, TRK record -> +20
+        gsub += be16(0) + be16(0xFFFF) + be16(2) + be16(0) + be16(1) // latn default LangSys: required none, features [0, 1]
+        gsub += be16(0) + be16(2) + be16(1) + be16(0) // TRK LangSys: required 2, features [0]
+        gsub += be16(0) // FeatureList: featureCount 0
+        gsub += be16(0) // LookupList: lookupCount 0
+        return assemble(extra: ("GSUB", gsub))
+    }
+}
+
 /// A minimal TrueType font with a GPOS `mark` feature whose type-4 lookup is a
 /// MarkBasePos subtable: mark glyph 3 (class 0, anchor 100,200) attaches to base
 /// glyph 1 (class-0 anchor 300,500), so the offset is (200, 300).
@@ -482,6 +684,118 @@ private enum ChainContextFont {
         gsub += be16(1) + be16(0) + be16(1) + be16(8) // lookup 1: type 1, subtable +8
         gsub += be16(2) + be16(8) + be16(1) + be16(9) // single subst format 2 -> glyph 9
         gsub += be16(1) + be16(1) + be16(2) // single subst coverage: glyph 2
+        return assemble(extra: ("GSUB", gsub))
+    }
+}
+
+/// A minimal TrueType font with a GPOS `kern` feature whose type-1 lookup is a
+/// SinglePosFormat1 subtable: glyph 1 takes xPlacement 30 and xAdvance -20 font
+/// units (valueFormat 0x0005 = xPlacement + xAdvance).
+private enum SinglePosFont1 {
+    static func build() -> [UInt8] {
+        // GPOS byte map (offsets relative to the table start):
+        //   0  header(10)        scriptList 10, featureList 12, lookupList 26
+        //   12 featureList(14)   'kern' -> feature +8 (->20), lookup index 0
+        //   26 lookupList(6)     lookup 0 at +4 (->30)
+        //   30 lookup 0          type 1, subtable +8 (->38)
+        //   38 SinglePos f1      coverage +10 (->48), valueFormat 0x0005, value record
+        //   44 value record      xPlacement 30, xAdvance -20
+        //   48 coverage          glyph 1
+        var gpos: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gpos += be16(0)
+        gpos += be16(1) + Array("kern".utf8) + be16(8)
+        gpos += be16(0) + be16(1) + be16(0)
+        gpos += be16(1) + be16(4)
+        gpos += be16(1) + be16(0) + be16(1) + be16(8) // lookup 0: type 1
+        gpos += be16(1) + be16(10) + be16(0x0005) // SinglePos f1: format, coverage +10, valueFormat
+        gpos += be16(30) + be16(0xFFEC) // value record: xPlacement 30, xAdvance -20
+        gpos += be16(1) + be16(1) + be16(1) // coverage f1: glyph 1
+        return assemble(extra: ("GPOS", gpos))
+    }
+}
+
+/// A minimal TrueType font with a GPOS `kern` feature whose type-1 lookup is a
+/// SinglePosFormat2 subtable: glyph 1 takes xAdvance +10, glyph 2 takes -10
+/// (valueFormat 0x0004 = xAdvance only).
+private enum SinglePosFont2 {
+    static func build() -> [UInt8] {
+        // GPOS byte map (offsets relative to the table start):
+        //   38 SinglePos f2      coverage +12 (->50), valueFormat 0x0004, valueCount 2
+        //   46 value records     glyph idx 0 xAdvance 10, idx 1 xAdvance -10
+        //   50 coverage          glyph 1, glyph 2
+        var gpos: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gpos += be16(0)
+        gpos += be16(1) + Array("kern".utf8) + be16(8)
+        gpos += be16(0) + be16(1) + be16(0)
+        gpos += be16(1) + be16(4)
+        gpos += be16(1) + be16(0) + be16(1) + be16(8) // lookup 0: type 1
+        gpos += be16(2) + be16(12) + be16(0x0004) + be16(2) // SinglePos f2: format, coverage +12, valueFormat, valueCount
+        gpos += be16(10) + be16(0xFFF6) // value records: xAdvance 10, xAdvance -10
+        gpos += be16(1) + be16(2) + be16(1) + be16(2) // coverage f1: glyph 1, glyph 2
+        return assemble(extra: ("GPOS", gpos))
+    }
+}
+
+/// A minimal TrueType font with a GSUB `calt` feature whose type-5 lookup is a
+/// ContextSubstFormat3 subtable: the input sequence (glyph 1, glyph 2) substitutes
+/// glyph 2 (at sequence index 1) to glyph 9 through a nested type-1 lookup, with no
+/// backtrack or lookahead. The sibling of ChainContextFont without the context.
+private enum ContextFont {
+    static func build() -> [UInt8] {
+        // GSUB byte map (offsets relative to the table start):
+        //   0  header(10)        scriptList 10, featureList 12, lookupList 26
+        //   12 featureList(14)   'calt' -> feature +8 (->20), lookup index 0
+        //   26 lookupList(6)     lookup 0 (context) +6 (->32), lookup 1 (single) +40 (->66)
+        //   32 lookup 0          type 5, subtable +8 (->40)
+        //   40 context subtable  format 3, glyphCount 2, seqLookupCount 1
+        //   54 input cov 0       glyph 1
+        //   60 input cov 1       glyph 2
+        //   66 lookup 1          type 1, subtable +8 (->74)
+        //   74 single subst      format 2, coverage +8, substitute glyph 9
+        //   82 single cov        glyph 2
+        var gsub: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gsub += be16(0) // scriptList
+        gsub += be16(1) + Array("calt".utf8) + be16(8) // featureList: 'calt' -> feature at +8
+        gsub += be16(0) + be16(1) + be16(0) // feature: lookupIndex 0
+        gsub += be16(2) + be16(6) + be16(40) // lookupList: lookup 0 +6, lookup 1 +40
+        gsub += be16(5) + be16(0) + be16(1) + be16(8) // lookup 0: type 5, flag, subtable +8
+        gsub += be16(3) + be16(2) + be16(1) // context fmt3: format, glyphCount 2, seqLookupCount 1
+        gsub += be16(14) + be16(20) // input coverage offsets: +14, +20
+        gsub += be16(1) + be16(1) // record: sequenceIndex 1, lookupIndex 1
+        gsub += be16(1) + be16(1) + be16(1) // input cov 0: glyph 1
+        gsub += be16(1) + be16(1) + be16(2) // input cov 1: glyph 2
+        gsub += be16(1) + be16(0) + be16(1) + be16(8) // lookup 1: type 1, subtable +8
+        gsub += be16(2) + be16(8) + be16(1) + be16(9) // single subst format 2 -> glyph 9
+        gsub += be16(1) + be16(1) + be16(2) // single subst coverage: glyph 2
+        return assemble(extra: ("GSUB", gsub))
+    }
+}
+
+/// A minimal TrueType font with a GSUB `calt` feature whose type-8 lookup is a
+/// ReverseChainSingleSubstFormat1 subtable: glyph 2 is substituted by glyph 9 when
+/// preceded by glyph 1 (one backtrack coverage, no lookahead).
+private enum ReverseChainFont {
+    static func build() -> [UInt8] {
+        // GSUB byte map (offsets relative to the table start):
+        //   0  header(10)        scriptList 10, featureList 12, lookupList 26
+        //   12 featureList(14)   'calt' -> feature +8 (->20), lookup index 0
+        //   26 lookupList(6)     lookup 0 +4 (->30)
+        //   30 lookup 0          type 8, subtable +8 (->38)
+        //   38 ReverseChainSubst input cov +14 (->52), 1 backtrack cov +20 (->58),
+        //                        0 lookahead, substitute glyph 9
+        //   52 input coverage    glyph 2
+        //   58 backtrack cov     glyph 1
+        var gsub: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gsub += be16(0)
+        gsub += be16(1) + Array("calt".utf8) + be16(8)
+        gsub += be16(0) + be16(1) + be16(0)
+        gsub += be16(1) + be16(4)
+        gsub += be16(8) + be16(0) + be16(1) + be16(8) // lookup 0: type 8, flag, subCount, +8
+        // ReverseChainSubst f1: format, coverage +14, backtrackCount 1, backtrack
+        // cov +20, lookaheadCount 0, glyphCount 1, substitute glyph 9.
+        gsub += be16(1) + be16(14) + be16(1) + be16(20) + be16(0) + be16(1) + be16(9)
+        gsub += be16(1) + be16(1) + be16(2) // input coverage: glyph 2
+        gsub += be16(1) + be16(1) + be16(1) // backtrack coverage: glyph 1
         return assemble(extra: ("GSUB", gsub))
     }
 }
