@@ -19,6 +19,10 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Select newest Xcode (raw-identifier test names need Swift 6.2)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
       - name: Format, lint, build, test
         run: |
           if [ ! -f Package.swift ]; then
