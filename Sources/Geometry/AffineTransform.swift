@@ -134,3 +134,80 @@ public extension AffineTransform {
             .validating(.matrixIsFinite)
     }
 }
+
+public extension AffineTransform {
+    /// The motions an affine transform is built from: a translation, a rotation, a scale on each axis,
+    /// and a shear. `rotation` and `skew` are in radians, matching the rest of this type.
+    struct Decomposed: Equatable, Sendable {
+        public var translationX, translationY: Double
+        public var rotation: Double
+        public var scaleX, scaleY: Double
+        public var skew: Double
+
+        public init(translationX: Double, translationY: Double, rotation: Double, scaleX: Double, scaleY: Double, skew: Double) {
+            self.translationX = translationX
+            self.translationY = translationY
+            self.rotation = rotation
+            self.scaleX = scaleX
+            self.scaleY = scaleY
+            self.skew = skew
+        }
+    }
+
+    /// Factor the transform into rotation, scale, and shear by Gram-Schmidt (QR factorization) of the
+    /// 2x2 linear part, reading translation straight off `tx, ty`.
+    ///
+    /// The rows of the linear part are `row0 = (a, b)` and `row1 = (c, d)`; a point p maps to p · M.
+    /// We recover M = R(theta) · S(sx, sy) · K(k), a rotation, an axis scale, then a unit shear
+    /// K = | 1 0 ; k 1 |:
+    ///
+    ///   1. `sx = |row0| = hypot(a, b)`. The unit row `u = row0 / sx = (a1, b1)` is the image of the
+    ///      x-axis, so `theta = atan2(b1, a1)`.
+    ///   2. The shear is row1's component along u: `shear = u . row1 = a1*c + b1*d`.
+    ///   3. Orthogonalize: `row1' = row1 - shear*u`; then `sy = |row1'|` and the shear factor is
+    ///      `k = shear / sy`, giving `skew = atan(k)`.
+    ///   4. A reflection (`determinant < 0`) is not a rotation+scale, so fold it into `sx`: negate sx,
+    ///      u, and shear. This keeps theta clean and puts the flip on one axis.
+    ///
+    /// The inverse is `recomposed(_:)`, and `recomposed(decomposed())` reproduces the matrix to within
+    /// floating-point dust (asserted by the round-trip test).
+    func decomposed() -> Decomposed {
+        let determinant = (a * d) - (b * c)
+        var scaleX = ((a * a) + (b * b)).squareRoot()
+        var unitA = scaleX != 0 ? a / scaleX : 0
+        var unitB = scaleX != 0 ? b / scaleX : 0
+        var shear = (unitA * c) + (unitB * d)
+        let orthoC = c - (unitA * shear)
+        let orthoD = d - (unitB * shear)
+        let scaleY = ((orthoC * orthoC) + (orthoD * orthoD)).squareRoot()
+        if scaleY != 0 { shear /= scaleY }
+        if determinant < 0 {
+            scaleX = -scaleX
+            unitA = -unitA
+            unitB = -unitB
+            shear = -shear
+        }
+        return Decomposed(
+            translationX: tx, translationY: ty,
+            rotation: atan2(unitB, unitA),
+            scaleX: scaleX, scaleY: scaleY,
+            skew: atan(shear)
+        )
+    }
+
+    /// Rebuild a transform from its decomposition. With `c0 = cos(rotation)`, `s0 = sin(rotation)`, and
+    /// `t = tan(skew)`: `a = sx*c0`, `b = sx*s0`, `c = sy*(c0*t - s0)`, `d = sy*(s0*t + c0)`.
+    static func recomposed(_ parts: Decomposed) -> AffineTransform {
+        let c0 = cos(parts.rotation)
+        let s0 = sin(parts.rotation)
+        let t = tan(parts.skew)
+        return AffineTransform(
+            a: parts.scaleX * c0,
+            b: parts.scaleX * s0,
+            c: parts.scaleY * ((c0 * t) - s0),
+            d: parts.scaleY * ((s0 * t) + c0),
+            tx: parts.translationX,
+            ty: parts.translationY
+        )
+    }
+}
