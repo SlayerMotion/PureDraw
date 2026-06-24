@@ -1097,6 +1097,86 @@ public struct Font: Equatable, Sendable {
         collectMarkAttachment(feature: "mkmk", lookupType: 6)
     }
 
+    /// The font's GPOS mark-to-ligature attachment (the `mark` feature, lookup type
+    /// 5): per-component anchors that seat a combining mark over the right part of a
+    /// ligature. Extension lookups (type 9) are resolved. Empty when the font
+    /// carries no mark-to-ligature attachment.
+    public func markLigatureAttachment() -> MarkLigatureAttachment {
+        var marks: [Int: MarkAttachment.Mark] = [:]
+        var ligatures: [Int: [[Int: MarkAttachment.Point]]] = [:]
+        forEachGPOSSubtable(feature: "mark") { subtable, effectiveType in
+            if effectiveType == 5 {
+                parseMarkLigatureSubtable(subtable: subtable, marks: &marks, ligatures: &ligatures)
+            }
+        }
+        return MarkLigatureAttachment(marks: marks, ligatures: ligatures)
+    }
+
+    /// Decodes a GPOS MarkLigPosFormat1 subtable. The mark array is identical to
+    /// mark-to-base; the ligature array replaces the base array with, per ligature,
+    /// a LigatureAttach of `componentCount` components, each carrying one anchor
+    /// offset per mark class (0 meaning the component offers no anchor for that
+    /// class). Anchor offsets in a LigatureAttach are relative to that table.
+    private func parseMarkLigatureSubtable(
+        subtable: Int,
+        marks: inout [Int: MarkAttachment.Mark],
+        ligatures: inout [Int: [[Int: MarkAttachment.Point]]]
+    ) {
+        guard Self.u16(data, at: subtable) == 1,
+              let markCoverageOffset = Self.u16(data, at: subtable + 2),
+              let ligatureCoverageOffset = Self.u16(data, at: subtable + 4),
+              let markClassCount = Self.u16(data, at: subtable + 6),
+              let markArrayOffset = Self.u16(data, at: subtable + 8),
+              let ligatureArrayOffset = Self.u16(data, at: subtable + 10),
+              let markCoverage = OpenTypeCoverage(data: data, offset: subtable + markCoverageOffset),
+              let ligatureCoverage = OpenTypeCoverage(data: data, offset: subtable + ligatureCoverageOffset)
+        else {
+            return
+        }
+
+        let markArray = subtable + markArrayOffset
+        if let markCount = Self.u16(data, at: markArray) {
+            for index in 0 ..< markCount {
+                let record = markArray + 2 + index * 4
+                guard let markGlyph = markCoverage.glyph(atIndex: index),
+                      let markClass = Self.u16(data, at: record),
+                      let anchorOffset = Self.u16(data, at: record + 2),
+                      let anchor = anchor(at: markArray + anchorOffset)
+                else {
+                    continue
+                }
+                marks[markGlyph] = MarkAttachment.Mark(markClass: markClass, anchor: anchor)
+            }
+        }
+
+        let ligatureArray = subtable + ligatureArrayOffset
+        guard let ligatureCount = Self.u16(data, at: ligatureArray) else { return }
+        for index in 0 ..< ligatureCount {
+            guard let ligatureGlyph = ligatureCoverage.glyph(atIndex: index),
+                  let attachOffset = Self.u16(data, at: ligatureArray + 2 + index * 2)
+            else {
+                continue
+            }
+            let attach = ligatureArray + attachOffset
+            guard let componentCount = Self.u16(data, at: attach) else { continue }
+            var components: [[Int: MarkAttachment.Point]] = []
+            for component in 0 ..< componentCount {
+                var classAnchors: [Int: MarkAttachment.Point] = [:]
+                for markClass in 0 ..< markClassCount {
+                    let offsetPosition = attach + 2 + (component * markClassCount + markClass) * 2
+                    guard let anchorOffset = Self.u16(data, at: offsetPosition), anchorOffset != 0,
+                          let anchor = anchor(at: attach + anchorOffset)
+                    else {
+                        continue
+                    }
+                    classAnchors[markClass] = anchor
+                }
+                components.append(classAnchors)
+            }
+            ligatures[ligatureGlyph] = components
+        }
+    }
+
     /// The font's GPOS cursive attachment (the `curs` feature, lookup type 3):
     /// the entry and exit anchors that join glyphs along a flowing baseline, so a
     /// connected script links one glyph's exit to the next glyph's entry. Empty

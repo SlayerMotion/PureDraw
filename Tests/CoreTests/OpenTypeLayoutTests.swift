@@ -278,6 +278,19 @@ struct OpenTypeLayoutTests {
         #expect(try Font(data: MiniFont.build()).markAttachment().isEmpty)
         #expect(try Font(data: MiniFont.build()).markMarkAttachment().isEmpty)
         #expect(try Font(data: MiniFont.build()).cursiveAttachment().isEmpty)
+        #expect(try Font(data: MiniFont.build()).markLigatureAttachment().isEmpty)
+    }
+
+    @Test("GPOS mark-to-ligature attachment yields per-component anchor offsets")
+    func gposMarkLigature() throws {
+        let attach = try Font(data: MarkLigatureFont.build()).markLigatureAttachment()
+        #expect(!attach.isEmpty)
+        // Mark 3 (anchor 100,200) on ligature 4: component 0 anchor 300,500 gives
+        // offset (200,300); component 1 anchor 400,600 gives (300,400).
+        #expect(attach.offset(ligature: 4, component: 0, mark: 3) == MarkAttachment.Point(x: 200, y: 300))
+        #expect(attach.offset(ligature: 4, component: 1, mark: 3) == MarkAttachment.Point(x: 300, y: 400))
+        #expect(attach.offset(ligature: 4, component: 2, mark: 3) == nil) // component out of range
+        #expect(attach.offset(ligature: 9, component: 0, mark: 3) == nil) // unknown ligature
     }
 
     @Test("a font without a kern table has an empty kerning map")
@@ -637,6 +650,42 @@ private enum MarkMarkFont {
         gpos += be16(1) + be16(100) + be16(200) // mark1 anchor (format 1)
         gpos += be16(1) + be16(4) // mark2Array: count, anchorOffset 4
         gpos += be16(1) + be16(300) + be16(500) // mark2 anchor (format 1)
+        return assemble(extra: ("GPOS", gpos))
+    }
+}
+
+/// A minimal TrueType font with a GPOS `mark` feature whose type-5 lookup is a
+/// MarkLigPos subtable: mark glyph 3 (class 0, anchor 100,200) attaches to ligature
+/// glyph 4, whose two components anchor class 0 at (300,500) and (400,600).
+private enum MarkLigatureFont {
+    static func build() -> [UInt8] {
+        // GPOS layout (offsets relative to the table start):
+        //   0  header(10)        scriptList 10, featureList 12, lookupList 26
+        //   26 lookupList(6)     lookup type 5, subtable at +8 (->38)
+        //   38 MarkLigPos(12)    markCov +12, ligCov +18, markClassCount 1,
+        //                        markArray +24, ligatureArray +36
+        //   50 markCoverage      glyph 3
+        //   56 ligatureCoverage  glyph 4
+        //   62 markArray         count 1, class 0, anchor +6; anchor 100,200
+        //   74 ligatureArray     count 1, ligatureAttach +4
+        //   78 LigatureAttach    componentCount 2, comp0 anchor +6, comp1 anchor +12
+        //   84 component 0 anchor 300,500
+        //   90 component 1 anchor 400,600
+        var gpos: [UInt8] = be16(1) + be16(0) + be16(10) + be16(12) + be16(26)
+        gpos += be16(0)
+        gpos += be16(1) + Array("mark".utf8) + be16(8)
+        gpos += be16(0) + be16(1) + be16(0)
+        gpos += be16(1) + be16(4)
+        gpos += be16(5) + be16(0) + be16(1) + be16(8) // lookup: type 5
+        gpos += be16(1) + be16(12) + be16(18) + be16(1) + be16(24) + be16(36) // MarkLigPos header
+        gpos += be16(1) + be16(1) + be16(3) // markCoverage: glyph 3
+        gpos += be16(1) + be16(1) + be16(4) // ligatureCoverage: glyph 4
+        gpos += be16(1) + be16(0) + be16(6) // markArray: count, class 0, anchorOffset 6
+        gpos += be16(1) + be16(100) + be16(200) // mark anchor (format 1)
+        gpos += be16(1) + be16(4) // ligatureArray: ligatureCount 1, ligatureAttach +4
+        gpos += be16(2) + be16(6) + be16(12) // LigatureAttach: componentCount 2, comp0 anchor +6, comp1 anchor +12
+        gpos += be16(1) + be16(300) + be16(500) // component 0 anchor
+        gpos += be16(1) + be16(400) + be16(600) // component 1 anchor
         return assemble(extra: ("GPOS", gpos))
     }
 }
