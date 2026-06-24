@@ -255,10 +255,10 @@ public struct Font: Equatable, Sendable {
     /// (explicit pairs) is decoded here; PairPos format 2 (class-based pairs),
     /// the GSUB substitution lookups, and GDEF are the next slices of
     /// SlayerMotion/PureDraw#140.
-    public func kerningMap() -> KerningMap {
+    public func kerningMap(restrictTo activeFeatures: Set<Int>? = nil) -> KerningMap {
         var pairs: [UInt64: Int] = [:]
         var classSubtables: [KerningClassSubtable] = []
-        parseGPOSKern(into: &pairs, classSubtables: &classSubtables)
+        parseGPOSKern(into: &pairs, classSubtables: &classSubtables, restrictTo: activeFeatures)
         if pairs.isEmpty, classSubtables.isEmpty {
             parseLegacyKern(into: &pairs)
         }
@@ -271,7 +271,7 @@ public struct Font: Equatable, Sendable {
     /// the FeatureList directly, without per-script or per-language selection,
     /// which matches the common single-`kern`-feature font. Extension lookups
     /// (type 9) wrapping pair positioning are resolved.
-    private func parseGPOSKern(into pairs: inout [UInt64: Int], classSubtables: inout [KerningClassSubtable]) {
+    private func parseGPOSKern(into pairs: inout [UInt64: Int], classSubtables: inout [KerningClassSubtable], restrictTo activeFeatures: Set<Int>? = nil) {
         guard let gpos = tables["GPOS"] else { return }
         let base = gpos.offset
         guard let featureListOffset = Self.u16(data, at: base + 6),
@@ -285,6 +285,7 @@ public struct Font: Equatable, Sendable {
         var kernLookupIndices: Set<Int> = []
         if let featureCount = Self.u16(data, at: featureList) {
             for featureIndex in 0 ..< featureCount {
+                if let activeFeatures, !activeFeatures.contains(featureIndex) { continue }
                 let record = featureList + 2 + featureIndex * 6
                 guard Self.tag(data, at: record) == "kern",
                       let featureOffset = Self.u16(data, at: record + 4)
@@ -1015,9 +1016,9 @@ public struct Font: Equatable, Sendable {
     /// resolved. Empty when the font carries no single positioning for the feature.
     /// (OpenType GPOS: Lookup Type 1, "Single Adjustment Positioning Subtable",
     /// formats 1 and 2.)
-    public func singleAdjustments(feature: String) -> [Int: GlyphAdjustment] {
+    public func singleAdjustments(feature: String, restrictTo activeFeatures: Set<Int>? = nil) -> [Int: GlyphAdjustment] {
         var result: [Int: GlyphAdjustment] = [:]
-        forEachGPOSSubtable(feature: feature) { subtable, effectiveType in
+        forEachGPOSSubtable(feature: feature, restrictTo: activeFeatures) { subtable, effectiveType in
             if effectiveType == 1 {
                 parseSinglePos(subtable: subtable, into: &result)
             }
@@ -1083,9 +1084,9 @@ public struct Font: Equatable, Sendable {
     /// nested type-1 single-adjustment lookups resolved into per-position
     /// adjustments. Empty when the font carries none. Extension lookups (type 9)
     /// are resolved. The shaping tier applies these during positioning.
-    public func contextualPositioning(feature: String) -> [ContextualPositioning] {
+    public func contextualPositioning(feature: String, restrictTo activeFeatures: Set<Int>? = nil) -> [ContextualPositioning] {
         var result: [ContextualPositioning] = []
-        forEachGPOSSubtable(feature: feature) { subtable, effectiveType in
+        forEachGPOSSubtable(feature: feature, restrictTo: activeFeatures) { subtable, effectiveType in
             if effectiveType == 8 {
                 parseChainedContextPos(subtable: subtable, into: &result)
             } else if effectiveType == 7 {
@@ -1308,10 +1309,10 @@ public struct Font: Equatable, Sendable {
     /// connected script links one glyph's exit to the next glyph's entry. Empty
     /// when the font carries no cursive attachment. PureDraw parses the GPOS
     /// table; this forwards the typed result for the shaper to connect glyphs.
-    public func cursiveAttachment() -> CursiveAttachment {
+    public func cursiveAttachment(restrictTo activeFeatures: Set<Int>? = nil) -> CursiveAttachment {
         var entries: [Int: CursiveAttachment.Point] = [:]
         var exits: [Int: CursiveAttachment.Point] = [:]
-        forEachGPOSSubtable(feature: "curs") { subtable, effectiveType in
+        forEachGPOSSubtable(feature: "curs", restrictTo: activeFeatures) { subtable, effectiveType in
             if effectiveType == 3 {
                 parseCursivePos(subtable: subtable, entries: &entries, exits: &exits)
             }
@@ -1338,7 +1339,7 @@ public struct Font: Equatable, Sendable {
     /// extension lookups (type 9) to their effective type, and calls `body` with
     /// each subtable's byte offset and effective lookup type. The shared spine of
     /// the GPOS readers (mark, mark-to-mark, cursive).
-    private func forEachGPOSSubtable(feature wanted: String, _ body: (Int, Int) -> Void) {
+    private func forEachGPOSSubtable(feature wanted: String, restrictTo activeFeatures: Set<Int>? = nil, _ body: (Int, Int) -> Void) {
         guard let gpos = tables["GPOS"] else { return }
         let base = gpos.offset
         guard let featureListOffset = Self.u16(data, at: base + 6),
@@ -1352,6 +1353,10 @@ public struct Font: Equatable, Sendable {
         var lookupIndices: Set<Int> = []
         if let featureCount = Self.u16(data, at: featureList) {
             for featureIndex in 0 ..< featureCount {
+                // When a script's active feature set is given, gather only the
+                // records that set selects; otherwise gather by tag (the
+                // script-agnostic fallback), as for GSUB.
+                if let activeFeatures, !activeFeatures.contains(featureIndex) { continue }
                 let record = featureList + 2 + featureIndex * 6
                 guard Self.tag(data, at: record) == wanted,
                       let featureOffset = Self.u16(data, at: record + 4)

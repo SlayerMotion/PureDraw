@@ -176,6 +176,15 @@ struct OpenTypeLayoutTests {
         #expect(font.ligatures(restrictTo: []).isEmpty) // nothing active -> dropped
     }
 
+    @Test("GPOS gathering restricted to an active feature-index set drops the rest")
+    func gposFeatureRestriction() throws {
+        let font = try Font(data: GposFont.build()) // one `kern` feature at index 0
+        #expect(!font.kerningMap().isEmpty) // unrestricted: by-tag
+        #expect(!font.kerningMap(restrictTo: [0]).isEmpty) // feature 0 is active
+        #expect(font.kerningMap(restrictTo: [7]).isEmpty) // feature 0 not active -> dropped
+        #expect(font.kerningMap(restrictTo: []).isEmpty) // nothing active -> dropped
+    }
+
     @Test("required ligatures under rlig are read like liga")
     func gsubRligLigature() throws {
         let font = try Font(data: GsubRligFont.build())
