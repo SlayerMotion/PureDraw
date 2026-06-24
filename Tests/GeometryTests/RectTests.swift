@@ -146,4 +146,28 @@ struct RectTests {
         #expect(n.intersects(r1) == false)
         #expect(inf.intersects(r1) == true)
     }
+
+    @Test func applyingTranslationShiftsTheRect() {
+        let rect = Rect(x: 0, y: 0, width: 2, height: 2).applying(.translation(x: 5, y: 3))
+        #expect(rect == Rect(x: 5, y: 3, width: 2, height: 2))
+    }
+
+    @Test func applyingScaleResizesTheRect() {
+        let rect = Rect(x: 0, y: 0, width: 2, height: 2).applying(.scale(x: 2, y: 3))
+        #expect(rect == Rect(x: 0, y: 0, width: 4, height: 6))
+    }
+
+    @Test func applyingAReflectionKeepsAPositiveBoundingBox() {
+        // A negative x scale flips the rect across the y axis; the bounding box stays positively sized.
+        let rect = Rect(x: 0, y: 0, width: 2, height: 2).applying(.scale(x: -1, y: 1))
+        #expect(rect == Rect(x: -2, y: 0, width: 2, height: 2))
+    }
+
+    @Test func applyingAQuarterTurnSwapsTheBoundingBoxDimensions() {
+        // A 2x4 rectangle rotated 90 degrees bounds a 4x2 box.
+        let rect = Rect(x: 0, y: 0, width: 2, height: 4).applying(.rotation(angle: .pi / 2))
+        let tolerance = 1e-9
+        #expect(abs(rect.width - 4) < tolerance && abs(rect.height - 2) < tolerance)
+        #expect(abs(rect.origin.x + 4) < tolerance && abs(rect.origin.y) < tolerance)
+    }
 }
