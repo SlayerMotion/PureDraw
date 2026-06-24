@@ -30,6 +30,9 @@ public struct Font: Equatable, Sendable {
     private let tables: [String: (offset: Int, length: Int)]
     private let indexToLocFormat: Int
     private let numberOfHMetrics: Int
+    /// Long vertical metrics in `vmtx`, from `vhea`. Zero when the font carries no
+    /// vertical metrics (`vmtx`/`vhea` absent), the usual case for text fonts.
+    private let numberOfVMetrics: Int
     private let cff: CFFFont?
     private let cff2: CFF2Font?
 
@@ -132,6 +135,14 @@ public struct Font: Equatable, Sendable {
         numberOfGlyphs = glyphCount
         indexToLocFormat = locFormat
         numberOfHMetrics = max(1, hMetricCount)
+        // Vertical metrics are optional: only fonts meant for vertical layout (CJK)
+        // carry vhea/vmtx. numOfLongVerMetrics lives at vhea + 34, as the
+        // horizontal count lives at hhea + 34.
+        if let vhea = tableDirectory["vhea"], let vMetricCount = Self.u16(bytes, at: vhea.offset + 34) {
+            numberOfVMetrics = max(1, vMetricCount)
+        } else {
+            numberOfVMetrics = 0
+        }
         cff = parsedCFF
         cff2 = parsedCFF2
     }
@@ -242,6 +253,19 @@ public struct Font: Equatable, Sendable {
         guard let hmtx = tables["hmtx"], index >= 0 else { return 0 }
         let metricIndex = min(index, numberOfHMetrics - 1)
         guard let advance = Self.u16(data, at: hmtx.offset + metricIndex * 4) else { return 0 }
+        return Double(advance)
+    }
+
+    /// The advance height for a glyph, in font units: how far the pen descends for
+    /// the glyph in top-to-bottom vertical layout, from `vmtx`. Returns 0 when the
+    /// font has no vertical metrics, the caller's signal to synthesize one (a full
+    /// em is the usual fallback). Mirrors `advanceWidth(forGlyph:)`: each long
+    /// metric is a 4-byte `advanceHeight, topSideBearing` pair, advanceHeight
+    /// first, and glyphs past the long-metric count reuse the last advance.
+    public func advanceHeight(forGlyph index: Int) -> Double {
+        guard numberOfVMetrics > 0, let vmtx = tables["vmtx"], index >= 0 else { return 0 }
+        let metricIndex = min(index, numberOfVMetrics - 1)
+        guard let advance = Self.u16(data, at: vmtx.offset + metricIndex * 4) else { return 0 }
         return Double(advance)
     }
 
