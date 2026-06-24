@@ -51,6 +51,26 @@ struct AffineDecompositionTests {
         #expect(approx(translation.translationX, 12) && approx(translation.translationY, -8))
     }
 
+    @Test func recomposeOfDecomposeReproducesAGridOfMatrices() {
+        // A deterministic grid of linear parts with a fixed translation. Near-singular matrices are
+        // skipped (the QR factorisation is ill-conditioned there); every well-conditioned one must
+        // round-trip, proving the decomposition is the exact inverse well beyond the curated samples.
+        let values = [-1.3, -0.7, 0.0, 0.5, 1.1, 2.0]
+        var checked = 0
+        for a in values {
+            for b in values {
+                for c in values {
+                    for d in values where abs((a * d) - (b * c)) > 0.05 {
+                        let matrix = AT(a: a, b: b, c: c, d: d, tx: 3, ty: -5)
+                        #expect(same(matrix, AT.recomposed(matrix.decomposed())), "round-trip failed for \(matrix)")
+                        checked += 1
+                    }
+                }
+            }
+        }
+        #expect(checked > 1000)
+    }
+
     #if canImport(CoreGraphics)
         @Test func primitivesMatchCoreGraphics() {
             let angle = 0.7
