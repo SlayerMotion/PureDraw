@@ -99,3 +99,28 @@ struct ShrivelDeformerTests {
         #expect(distance(shrivel.transform(point), center) < distance(point, center))
     }
 }
+
+/// The validators check a deformer's parameters are finite; this checks the field's output is too. A NaN
+/// or infinite point cannot be rendered, so every deformer at strong settings must map a grid of finite
+/// points, including the center and points well beyond the radius, to finite points.
+struct DeformerFinitenessTests {
+    @Test func `every deformer maps finite points to finite points`() {
+        let center = Point(x: 0, y: 0)
+        let radius = 100.0
+        let fields: [(name: String, transform: (Point) -> Point)] = [
+            ("crumple", CrumpleDeformer(center: center, radius: radius, pinchStrength: 0.6, wrinkleStrength: 1.5).transform),
+            ("swirl", SwirlDeformer(center: center, radius: radius, angle: 5).transform),
+            ("pageCurl", PageCurlDeformer(center: center, radius: radius, curl: 0.8, tightness: 0.15).transform),
+            ("shrivel", ShrivelDeformer(center: center, radius: radius, shrink: 0.8, wrinkle: 2).transform),
+        ]
+        for x in stride(from: -150.0, through: 150, by: 10) {
+            for y in stride(from: -150.0, through: 150, by: 10) {
+                let point = Point(x: x, y: y)
+                for field in fields {
+                    let mapped = field.transform(point)
+                    #expect(mapped.x.isFinite && mapped.y.isFinite, "\(field.name) produced a non-finite point at \(point)")
+                }
+            }
+        }
+    }
+}
