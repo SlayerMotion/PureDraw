@@ -124,3 +124,19 @@ struct DeformerFinitenessTests {
         }
     }
 }
+
+/// A non-positive radius has no field: every deformer returns the point unchanged, so it never divides by
+/// zero or overflows to a non-finite displacement. The validators allow a finite-but-negative radius, so
+/// the transform itself has to guard, and all four now do.
+struct DeformerRadiusGuardTests {
+    @Test func `a non-positive radius is the identity for every deformer`() {
+        let center = Point(x: 10, y: 20)
+        let point = Point(x: 40, y: -5)
+        for radius in [0.0, -5.0] {
+            #expect(CrumpleDeformer(center: center, radius: radius, pinchStrength: 0.6, wrinkleStrength: 1.5).transform(point) == point)
+            #expect(SwirlDeformer(center: center, radius: radius, angle: 4).transform(point) == point)
+            #expect(PageCurlDeformer(center: center, radius: radius, curl: 0.6, tightness: 0.2).transform(point) == point)
+            #expect(ShrivelDeformer(center: center, radius: radius, shrink: 0.5, wrinkle: 1).transform(point) == point)
+        }
+    }
+}

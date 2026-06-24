@@ -35,6 +35,10 @@ public struct CrumpleDeformer: Sendable {
 
     /// Transforms a point by applying the pinch and wrinkling displacement.
     public func transform(_ point: Point) -> Point {
+        // A non-positive radius has no field, matching the swirl, page curl, and shrivel deformers. It
+        // also keeps the pinch falloff `exp(-dist / radius)` below from dividing by zero or, for a
+        // negative radius, overflowing to a non-finite displacement.
+        guard radius > 0 else { return point }
         // 1. Calculate distance and vector to pinch center
         let dxCenter = center.x - point.x
         let dyCenter = center.y - point.y
