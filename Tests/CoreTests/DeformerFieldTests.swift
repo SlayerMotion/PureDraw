@@ -100,6 +100,76 @@ struct ShrivelDeformerTests {
     }
 }
 
+struct PinchDeformerTests {
+    private let center = Point(x: 100, y: 100)
+
+    @Test func `the center is a fixed point`() {
+        let pinch = PinchDeformer(center: center, radius: 50, amount: 0.5)
+        #expect(pinch.transform(center) == center)
+    }
+
+    @Test func `points at or beyond the radius are untouched`() {
+        let pinch = PinchDeformer(center: center, radius: 50, amount: 0.5)
+        #expect(pinch.transform(Point(x: 160, y: 100)) == Point(x: 160, y: 100)) // distance 60 > 50
+        #expect(pinch.transform(Point(x: 150, y: 100)) == Point(x: 150, y: 100)) // distance 50 == radius
+    }
+
+    @Test func `a zero amount is the identity`() {
+        let pinch = PinchDeformer(center: center, radius: 50, amount: 0)
+        #expect(pinch.transform(Point(x: 120, y: 130)) == Point(x: 120, y: 130))
+    }
+
+    @Test func `a positive amount pulls the point inward`() {
+        let pinch = PinchDeformer(center: center, radius: 50, amount: 0.6)
+        let point = Point(x: 130, y: 100) // distance 30 < 50
+        #expect(distance(pinch.transform(point), center) < distance(point, center))
+    }
+
+    @Test func `a negative amount pushes the point outward`() {
+        let bloat = PinchDeformer(center: center, radius: 50, amount: -0.6)
+        let point = Point(x: 130, y: 100) // distance 30 < 50
+        #expect(distance(bloat.transform(point), center) > distance(point, center))
+    }
+
+    @Test func `the pinch keeps each point on its ray from the center`() {
+        let pinch = PinchDeformer(center: center, radius: 50, amount: 0.6)
+        let point = Point(x: 120, y: 130)
+        let moved = pinch.transform(point)
+        let before = atan2(point.y - center.y, point.x - center.x)
+        let after = atan2(moved.y - center.y, moved.x - center.x)
+        #expect(abs(before - after) < 1e-9)
+    }
+}
+
+struct RippleDeformerTests {
+    private let center = Point(x: 100, y: 100)
+
+    @Test func `the center is a fixed point`() {
+        let ripple = RippleDeformer(center: center, radius: 50, amplitude: 0.1, waves: 4)
+        #expect(ripple.transform(center) == center)
+    }
+
+    @Test func `points at or beyond the radius are untouched`() {
+        let ripple = RippleDeformer(center: center, radius: 50, amplitude: 0.1, waves: 4)
+        #expect(ripple.transform(Point(x: 160, y: 100)) == Point(x: 160, y: 100)) // distance 60 > 50
+        #expect(ripple.transform(Point(x: 150, y: 100)) == Point(x: 150, y: 100)) // distance 50 == radius
+    }
+
+    @Test func `a zero amplitude is the identity`() {
+        let ripple = RippleDeformer(center: center, radius: 50, amplitude: 0, waves: 4)
+        #expect(ripple.transform(Point(x: 120, y: 130)) == Point(x: 120, y: 130))
+    }
+
+    @Test func `the ripple keeps each point on its ray from the center`() {
+        let ripple = RippleDeformer(center: center, radius: 50, amplitude: 0.1, waves: 4)
+        let point = Point(x: 120, y: 130)
+        let moved = ripple.transform(point)
+        let before = atan2(point.y - center.y, point.x - center.x)
+        let after = atan2(moved.y - center.y, moved.x - center.x)
+        #expect(abs(before - after) < 1e-9)
+    }
+}
+
 /// The validators check a deformer's parameters are finite; this checks the field's output is too. A NaN
 /// or infinite point cannot be rendered, so every deformer at strong settings must map a grid of finite
 /// points, including the center and points well beyond the radius, to finite points.
@@ -112,6 +182,9 @@ struct DeformerFinitenessTests {
             ("swirl", SwirlDeformer(center: center, radius: radius, angle: 5).transform),
             ("pageCurl", PageCurlDeformer(center: center, radius: radius, curl: 0.8, tightness: 0.15).transform),
             ("shrivel", ShrivelDeformer(center: center, radius: radius, shrink: 0.8, wrinkle: 2).transform),
+            ("pinch", PinchDeformer(center: center, radius: radius, amount: 0.8).transform),
+            ("bloat", PinchDeformer(center: center, radius: radius, amount: -0.8).transform),
+            ("ripple", RippleDeformer(center: center, radius: radius, amplitude: 0.2, waves: 6).transform),
         ]
         for x in stride(from: -150.0, through: 150, by: 10) {
             for y in stride(from: -150.0, through: 150, by: 10) {
@@ -137,6 +210,8 @@ struct DeformerRadiusGuardTests {
             #expect(SwirlDeformer(center: center, radius: radius, angle: 4).transform(point) == point)
             #expect(PageCurlDeformer(center: center, radius: radius, curl: 0.6, tightness: 0.2).transform(point) == point)
             #expect(ShrivelDeformer(center: center, radius: radius, shrink: 0.5, wrinkle: 1).transform(point) == point)
+            #expect(PinchDeformer(center: center, radius: radius, amount: 0.6).transform(point) == point)
+            #expect(RippleDeformer(center: center, radius: radius, amplitude: 0.1, waves: 4).transform(point) == point)
         }
     }
 }
