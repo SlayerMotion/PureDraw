@@ -25,6 +25,11 @@ public struct MarkLigatureAttachment: Equatable, Sendable {
         marks.isEmpty || ligatures.isEmpty
     }
 
+    /// Whether `glyph` is a mark that attaches to a ligature component.
+    public func isMark(_ glyph: Int) -> Bool {
+        marks[glyph] != nil
+    }
+
     /// The offset, in font units, to place `mark`'s glyph relative to the origin of
     /// `ligature`'s glyph so their anchors coincide on `component`, or `nil` when
     /// the mark is unknown, the component is out of range, or that component offers
