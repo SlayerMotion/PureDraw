@@ -740,6 +740,313 @@ public struct Font: Equatable, Sendable {
         return result
     }
 
+    /// The indices of the GSUB lookups selected by the features whose tag is in
+    /// `tags`, in lookup-list order (ascending index), deduplicated. This is the
+    /// order OpenType applies lookups: by position in the LookupList, not by
+    /// feature, so two features sharing a lookup apply it once and a lookup's
+    /// effect is seen by every later lookup. `restrictTo` filters by a script's
+    /// active feature indices, as for the per-feature accessors. The shaping tier
+    /// walks these in order and applies each through ``gsubLookup(at:)``.
+    public func gsubLookupIndices(features tags: Set<String>, restrictTo activeFeatures: Set<Int>? = nil) -> [Int] {
+        guard let gsub = tables["GSUB"], let featureListOffset = Self.u16(data, at: gsub.offset + 6) else { return [] }
+        let featureList = gsub.offset + featureListOffset
+        guard let featureCount = Self.u16(data, at: featureList) else { return [] }
+        var indices: Set<Int> = []
+        for featureIndex in 0 ..< featureCount {
+            if let activeFeatures, !activeFeatures.contains(featureIndex) { continue }
+            let record = featureList + 2 + featureIndex * 6
+            guard let tag = Self.tag(data, at: record), tags.contains(tag),
+                  let featureOffset = Self.u16(data, at: record + 4)
+            else {
+                continue
+            }
+            let featureTable = featureList + featureOffset
+            guard let lookupIndexCount = Self.u16(data, at: featureTable + 2) else { continue }
+            for slot in 0 ..< lookupIndexCount {
+                if let index = Self.u16(data, at: featureTable + 4 + slot * 2) { indices.insert(index) }
+            }
+        }
+        return indices.sorted()
+    }
+
+    /// The parsed GSUB lookup at LookupList index `index`, or nil when the index is
+    /// out of range. Type-7 extension lookups are resolved to their effective type.
+    /// The lookup's subtables are merged into one typed value: single, multiple,
+    /// alternate, and ligature subtables accumulate; contextual subtables (types 5
+    /// and 6) concatenate their rules. A type this model does not represent yields
+    /// ``GSUBLookup/Kind/unsupported`` so the shaping tier can still walk lookup
+    /// order. The contextual rules name nested lookups by index, which the shaper
+    /// resolves through this same accessor, so contextual recursion is possible.
+    public func gsubLookup(at index: Int) -> GSUBLookup? {
+        var lookupType: Int?
+        var flag = 0
+        var single: [Int: Int] = [:]
+        var multiple: [Int: [Int]] = [:]
+        var alternate: [Int: [Int]] = [:]
+        var ligature: [LigatureSubstitution] = []
+        var context: [GSUBContextRule] = []
+        var reverse: [ReverseChainingSubstitution] = []
+        forEachGSUBLookupSubtable(at: index) { subtable, effectiveType, lookupFlag in
+            lookupType = effectiveType
+            flag = lookupFlag
+            let skipsMarks = lookupFlag & (0x0008 | 0x0010) != 0
+            switch effectiveType {
+            case 1: parseSingleSubst(subtable: subtable, into: &single)
+            case 2: parseSequenceSubst(subtable: subtable, into: &multiple)
+            case 3: parseSequenceSubst(subtable: subtable, into: &alternate)
+            case 4: parseLigatureSubst(subtable: subtable, into: &ligature)
+            case 5: parseContextRecords(subtable: subtable, chaining: false, into: &context)
+            case 6: parseContextRecords(subtable: subtable, chaining: true, into: &context)
+            case 8: parseReverseChainSubst(subtable: subtable, ignoreMarks: skipsMarks, into: &reverse)
+            default: break
+            }
+        }
+        guard let lookupType else { return nil }
+        let ignoreMarks = flag & (0x0008 | 0x0010) != 0
+        let kind: GSUBLookup.Kind = switch lookupType {
+        case 1: .single(single)
+        case 2: .multiple(multiple)
+        case 3: .alternate(alternate)
+        case 4: .ligature(ligature)
+        case 5, 6: .context(context)
+        case 8: .reverseChainSingle(reverse)
+        default: .unsupported
+        }
+        return GSUBLookup(kind: kind, ignoreMarks: ignoreMarks)
+    }
+
+    /// Decodes a GSUB contextual (type 5) or chained contextual (type 6) subtable
+    /// into ``GSUBContextRule`` values that name nested lookups by index. All three
+    /// OpenType formats are read: format 1 lists explicit glyph sequences, format 2
+    /// lists class sequences (expanded here to glyph sets through the subtable's
+    /// class definitions), and format 3 lists coverage sequences. `chaining`
+    /// selects whether backtrack and lookahead sequences are present.
+    private func parseContextRecords(subtable: Int, chaining: Bool, into result: inout [GSUBContextRule]) {
+        switch Self.u16(data, at: subtable) {
+        case 1: parseContextFormat1(subtable: subtable, chaining: chaining, into: &result)
+        case 2: parseContextFormat2(subtable: subtable, chaining: chaining, into: &result)
+        case 3: parseContextFormat3(subtable: subtable, chaining: chaining, into: &result)
+        default: break
+        }
+    }
+
+    /// Reads `count` SequenceLookupRecords (each a 2-byte sequence index and a
+    /// 2-byte nested lookup index) starting at `cursor`.
+    private func readSequenceLookupRecords(at cursor: Int, count: Int) -> [GSUBContextRule.Record] {
+        var records: [GSUBContextRule.Record] = []
+        records.reserveCapacity(count)
+        for slot in 0 ..< count {
+            guard let sequenceIndex = Self.u16(data, at: cursor + slot * 4),
+                  let lookupIndex = Self.u16(data, at: cursor + slot * 4 + 2)
+            else {
+                break
+            }
+            records.append(.init(sequenceIndex: sequenceIndex, lookupIndex: lookupIndex))
+        }
+        return records
+    }
+
+    /// Per-class glyph sets for a class definition, including class 0 as the
+    /// complement: every glyph the table does not assign a non-zero class. The
+    /// complement is needed because class-based contextual rules match class 0
+    /// (any glyph not otherwise classified) as a context position.
+    private func classGlyphSets(_ classDef: OpenTypeClassDef) -> [Int: Set<Int>] {
+        var sets: [Int: Set<Int>] = [:]
+        var assigned: Set<Int> = []
+        for (glyph, value) in classDef.assignments {
+            sets[value, default: []].insert(glyph)
+            assigned.insert(glyph)
+        }
+        var zero: Set<Int> = []
+        zero.reserveCapacity(max(0, numberOfGlyphs - assigned.count))
+        for glyph in 0 ..< numberOfGlyphs where !assigned.contains(glyph) {
+            zero.insert(glyph)
+        }
+        sets[0] = zero
+        return sets
+    }
+
+    /// Decodes a type-5 ContextSubstFormat3 or type-6 ChainContextSubstFormat3
+    /// subtable: coverage sequences for the input (and, when chaining, backtrack
+    /// and lookahead), then the SequenceLookupRecords.
+    private func parseContextFormat3(subtable: Int, chaining: Bool, into result: inout [GSUBContextRule]) {
+        var cursor = subtable + 2
+        let backtrack: [Set<Int>]
+        let input: [Set<Int>]
+        let lookahead: [Set<Int>]
+        if chaining {
+            guard let back = readCoverageSequence(at: &cursor, subtableBase: subtable),
+                  let inp = readCoverageSequence(at: &cursor, subtableBase: subtable),
+                  let ahead = readCoverageSequence(at: &cursor, subtableBase: subtable)
+            else {
+                return
+            }
+            backtrack = back
+            input = inp
+            lookahead = ahead
+        } else {
+            guard let inp = readCoverageSequence(at: &cursor, subtableBase: subtable) else { return }
+            backtrack = []
+            input = inp
+            lookahead = []
+        }
+        guard let recordCount = Self.u16(data, at: cursor) else { return }
+        cursor += 2
+        let records = readSequenceLookupRecords(at: cursor, count: recordCount)
+        guard !records.isEmpty, !input.isEmpty else { return }
+        result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, records: records))
+    }
+
+    /// Decodes a type-5 ContextSubstFormat1 or type-6 ChainContextSubstFormat1
+    /// subtable: a coverage selects a rule set per first-input glyph; each rule
+    /// lists explicit glyph ids for the rest of the input (and, when chaining, the
+    /// backtrack and lookahead), then its nested lookup records.
+    private func parseContextFormat1(subtable: Int, chaining: Bool, into result: inout [GSUBContextRule]) {
+        guard let coverageOffset = Self.u16(data, at: subtable + 2),
+              let ruleSetCount = Self.u16(data, at: subtable + 4),
+              let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+        else {
+            return
+        }
+        for ruleSetIndex in 0 ..< ruleSetCount {
+            guard let firstGlyph = coverage.glyph(atIndex: ruleSetIndex),
+                  let ruleSetOffset = Self.u16(data, at: subtable + 6 + ruleSetIndex * 2), ruleSetOffset != 0
+            else {
+                continue
+            }
+            let ruleSet = subtable + ruleSetOffset
+            guard let ruleCount = Self.u16(data, at: ruleSet) else { continue }
+            for ruleIndex in 0 ..< ruleCount {
+                guard let ruleOffset = Self.u16(data, at: ruleSet + 2 + ruleIndex * 2), ruleOffset != 0 else { continue }
+                var cursor = ruleSet + ruleOffset
+                var backtrack: [Set<Int>] = []
+                if chaining {
+                    guard let glyphs = readGlyphSequence(at: &cursor) else { continue }
+                    backtrack = glyphs.map { [$0] }
+                }
+                guard let inputCount = Self.u16(data, at: cursor) else { continue }
+                cursor += 2
+                var input: [Set<Int>] = [[firstGlyph]]
+                var valid = true
+                for _ in 0 ..< max(0, inputCount - 1) {
+                    guard let glyph = Self.u16(data, at: cursor) else { valid = false
+                        break
+                    }
+                    input.append([glyph])
+                    cursor += 2
+                }
+                guard valid else { continue }
+                var lookahead: [Set<Int>] = []
+                if chaining {
+                    guard let glyphs = readGlyphSequence(at: &cursor) else { continue }
+                    lookahead = glyphs.map { [$0] }
+                }
+                guard let recordCount = Self.u16(data, at: cursor) else { continue }
+                cursor += 2
+                let records = readSequenceLookupRecords(at: cursor, count: recordCount)
+                guard !records.isEmpty else { continue }
+                result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, records: records))
+            }
+        }
+    }
+
+    /// Decodes a type-5 ContextSubstFormat2 or type-6 ChainContextSubstFormat2
+    /// subtable: class definitions classify the glyphs, a rule set is selected per
+    /// first-input class, and each rule lists class values for the rest of the
+    /// input (and, when chaining, the backtrack and lookahead). Each class value is
+    /// expanded to its glyph set so the rule matches like the other formats.
+    private func parseContextFormat2(subtable: Int, chaining: Bool, into result: inout [GSUBContextRule]) {
+        guard let coverageOffset = Self.u16(data, at: subtable + 2),
+              OpenTypeCoverage(data: data, offset: subtable + coverageOffset) != nil
+        else {
+            return
+        }
+        let backtrackSets: [Int: Set<Int>]
+        let inputSets: [Int: Set<Int>]
+        let lookaheadSets: [Int: Set<Int>]
+        var cursor = subtable + 4
+        if chaining {
+            guard let backOffset = Self.u16(data, at: cursor),
+                  let inputOffset = Self.u16(data, at: cursor + 2),
+                  let aheadOffset = Self.u16(data, at: cursor + 4),
+                  let backDef = OpenTypeClassDef(data: data, offset: subtable + backOffset),
+                  let inputDef = OpenTypeClassDef(data: data, offset: subtable + inputOffset),
+                  let aheadDef = OpenTypeClassDef(data: data, offset: subtable + aheadOffset)
+            else {
+                return
+            }
+            backtrackSets = classGlyphSets(backDef)
+            inputSets = classGlyphSets(inputDef)
+            lookaheadSets = classGlyphSets(aheadDef)
+            cursor += 6
+        } else {
+            guard let classDefOffset = Self.u16(data, at: cursor),
+                  let classDef = OpenTypeClassDef(data: data, offset: subtable + classDefOffset)
+            else {
+                return
+            }
+            let sets = classGlyphSets(classDef)
+            backtrackSets = sets
+            inputSets = sets
+            lookaheadSets = sets
+            cursor += 2
+        }
+        guard let ruleSetCount = Self.u16(data, at: cursor) else { return }
+        cursor += 2
+        let ruleSetBase = cursor
+        for ruleSetIndex in 0 ..< ruleSetCount {
+            guard let ruleSetOffset = Self.u16(data, at: ruleSetBase + ruleSetIndex * 2), ruleSetOffset != 0 else { continue }
+            let ruleSet = subtable + ruleSetOffset
+            guard let ruleCount = Self.u16(data, at: ruleSet) else { continue }
+            for ruleIndex in 0 ..< ruleCount {
+                guard let ruleOffset = Self.u16(data, at: ruleSet + 2 + ruleIndex * 2), ruleOffset != 0 else { continue }
+                var rule = ruleSet + ruleOffset
+                var backtrack: [Set<Int>] = []
+                if chaining {
+                    guard let classes = readGlyphSequence(at: &rule) else { continue }
+                    backtrack = classes.map { backtrackSets[$0] ?? [] }
+                }
+                guard let inputCount = Self.u16(data, at: rule) else { continue }
+                rule += 2
+                var input: [Set<Int>] = [inputSets[ruleSetIndex] ?? []]
+                var valid = true
+                for _ in 0 ..< max(0, inputCount - 1) {
+                    guard let value = Self.u16(data, at: rule) else { valid = false
+                        break
+                    }
+                    input.append(inputSets[value] ?? [])
+                    rule += 2
+                }
+                guard valid else { continue }
+                var lookahead: [Set<Int>] = []
+                if chaining {
+                    guard let classes = readGlyphSequence(at: &rule) else { continue }
+                    lookahead = classes.map { lookaheadSets[$0] ?? [] }
+                }
+                guard let recordCount = Self.u16(data, at: rule) else { continue }
+                rule += 2
+                let records = readSequenceLookupRecords(at: rule, count: recordCount)
+                guard !records.isEmpty else { continue }
+                result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, records: records))
+            }
+        }
+    }
+
+    /// Reads a count-prefixed list of u16 values (glyph ids or class values),
+    /// advancing `cursor` past it. The count is at `cursor`.
+    private func readGlyphSequence(at cursor: inout Int) -> [Int]? {
+        guard let count = Self.u16(data, at: cursor) else { return nil }
+        cursor += 2
+        var values: [Int] = []
+        values.reserveCapacity(count)
+        for _ in 0 ..< count {
+            guard let value = Self.u16(data, at: cursor) else { return nil }
+            values.append(value)
+            cursor += 2
+        }
+        return values
+    }
+
     /// The font's GSUB reverse chaining single substitutions (lookup type 8) under
     /// `feature`: a covered glyph becomes a fixed substitute when its backtrack and
     /// lookahead match. The shaping tier applies these to a run in reverse. Empty
