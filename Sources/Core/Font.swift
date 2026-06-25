@@ -1597,12 +1597,210 @@ public struct Font: Equatable, Sendable {
         var result: [ContextualPositioning] = []
         forEachGPOSSubtable(feature: feature, restrictTo: activeFeatures) { subtable, effectiveType in
             if effectiveType == 8 {
-                parseChainedContextPos(subtable: subtable, into: &result)
+                parseContextPositioning(subtable: subtable, chaining: true, into: &result)
             } else if effectiveType == 7 {
-                parseContextPos(subtable: subtable, into: &result)
+                parseContextPositioning(subtable: subtable, chaining: false, into: &result)
             }
         }
         return result
+    }
+
+    /// Decodes a GPOS contextual (type 7) or chained contextual (type 8) subtable
+    /// into ``ContextualPositioning`` values, across all three OpenType formats:
+    /// format 1 lists explicit glyph sequences, format 2 class sequences (expanded
+    /// here through the subtable's class definitions), and format 3 coverage
+    /// sequences. The positioning analogue of ``parseContextRecords``; each nested
+    /// positioning lookup's type-1 single adjustments are resolved into the rule's
+    /// actions. `chaining` selects whether backtrack and lookahead are present.
+    private func parseContextPositioning(subtable: Int, chaining: Bool, into result: inout [ContextualPositioning]) {
+        switch Self.u16(data, at: subtable) {
+        case 1: parseContextPosFormat1(subtable: subtable, chaining: chaining, into: &result)
+        case 2: parseContextPosFormat2(subtable: subtable, chaining: chaining, into: &result)
+        case 3: parseContextPosFormat3(subtable: subtable, chaining: chaining, into: &result)
+        default: break
+        }
+    }
+
+    /// Decodes a type-7/8 contextual positioning subtable in format 3 (coverage
+    /// sequences). A chained subtable lists its record count last, after the
+    /// lookahead; a plain context subtable lists it right after the input glyph
+    /// count, before the input coverages.
+    private func parseContextPosFormat3(subtable: Int, chaining: Bool, into result: inout [ContextualPositioning]) {
+        if chaining {
+            var cursor = subtable + 2
+            guard let backtrack = readCoverageSequence(at: &cursor, subtableBase: subtable),
+                  let input = readCoverageSequence(at: &cursor, subtableBase: subtable),
+                  let lookahead = readCoverageSequence(at: &cursor, subtableBase: subtable),
+                  let recordCount = Self.u16(data, at: cursor)
+            else {
+                return
+            }
+            cursor += 2
+            let actions = readPositioningActions(at: &cursor, recordCount: recordCount)
+            guard !actions.isEmpty else { return }
+            result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, actions: actions))
+        } else {
+            guard let glyphCount = Self.u16(data, at: subtable + 2),
+                  let recordCount = Self.u16(data, at: subtable + 4)
+            else {
+                return
+            }
+            var cursor = subtable + 6
+            var input: [Set<Int>] = []
+            for _ in 0 ..< glyphCount {
+                guard let coverageOffset = Self.u16(data, at: cursor),
+                      let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+                else {
+                    return
+                }
+                input.append(coverage.coveredGlyphs)
+                cursor += 2
+            }
+            let actions = readPositioningActions(at: &cursor, recordCount: recordCount)
+            guard !actions.isEmpty else { return }
+            result.append(.init(backtrack: [], input: input, lookahead: [], actions: actions))
+        }
+    }
+
+    /// Decodes a type-7/8 contextual positioning subtable in format 1 (a coverage
+    /// selects a rule set per first-input glyph; each rule lists explicit glyph ids
+    /// for the rest of the input, and the backtrack and lookahead when chaining).
+    private func parseContextPosFormat1(subtable: Int, chaining: Bool, into result: inout [ContextualPositioning]) {
+        guard let coverageOffset = Self.u16(data, at: subtable + 2),
+              let ruleSetCount = Self.u16(data, at: subtable + 4),
+              let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+        else {
+            return
+        }
+        for ruleSetIndex in 0 ..< ruleSetCount {
+            guard let firstGlyph = coverage.glyph(atIndex: ruleSetIndex),
+                  let ruleSetOffset = Self.u16(data, at: subtable + 6 + ruleSetIndex * 2), ruleSetOffset != 0
+            else {
+                continue
+            }
+            let ruleSet = subtable + ruleSetOffset
+            guard let ruleCount = Self.u16(data, at: ruleSet) else { continue }
+            for ruleIndex in 0 ..< ruleCount {
+                guard let ruleOffset = Self.u16(data, at: ruleSet + 2 + ruleIndex * 2), ruleOffset != 0 else { continue }
+                var cursor = ruleSet + ruleOffset
+                var backtrack: [Set<Int>] = []
+                if chaining {
+                    guard let glyphs = readGlyphSequence(at: &cursor) else { continue }
+                    backtrack = glyphs.map { [$0] }
+                }
+                guard let inputCount = Self.u16(data, at: cursor) else { continue }
+                cursor += 2
+                var recordCount = 0
+                if !chaining {
+                    guard let count = Self.u16(data, at: cursor) else { continue }
+                    recordCount = count
+                    cursor += 2
+                }
+                var input: [Set<Int>] = [[firstGlyph]]
+                var valid = true
+                for _ in 0 ..< max(0, inputCount - 1) {
+                    guard let glyph = Self.u16(data, at: cursor) else { valid = false
+                        break
+                    }
+                    input.append([glyph])
+                    cursor += 2
+                }
+                guard valid else { continue }
+                var lookahead: [Set<Int>] = []
+                if chaining {
+                    guard let glyphs = readGlyphSequence(at: &cursor) else { continue }
+                    lookahead = glyphs.map { [$0] }
+                    guard let count = Self.u16(data, at: cursor) else { continue }
+                    recordCount = count
+                    cursor += 2
+                }
+                let actions = readPositioningActions(at: &cursor, recordCount: recordCount)
+                guard !actions.isEmpty else { continue }
+                result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, actions: actions))
+            }
+        }
+    }
+
+    /// Decodes a type-7/8 contextual positioning subtable in format 2 (class
+    /// definitions classify the glyphs; a rule set is selected per first-input
+    /// class, and each rule lists class values for the rest of the input, and the
+    /// backtrack and lookahead when chaining). Each class is expanded to its glyph
+    /// set so the rule matches like the other formats.
+    private func parseContextPosFormat2(subtable: Int, chaining: Bool, into result: inout [ContextualPositioning]) {
+        guard let coverageOffset = Self.u16(data, at: subtable + 2),
+              OpenTypeCoverage(data: data, offset: subtable + coverageOffset) != nil
+        else {
+            return
+        }
+        let backtrackSets: [Int: Set<Int>]
+        let inputSets: [Int: Set<Int>]
+        let lookaheadSets: [Int: Set<Int>]
+        var cursor = subtable + 4
+        if chaining {
+            guard let backOffset = Self.u16(data, at: cursor),
+                  let inputOffset = Self.u16(data, at: cursor + 2),
+                  let aheadOffset = Self.u16(data, at: cursor + 4)
+            else {
+                return
+            }
+            backtrackSets = gsubClassGlyphSets(atOffset: backOffset, subtableBase: subtable)
+            inputSets = gsubClassGlyphSets(atOffset: inputOffset, subtableBase: subtable)
+            lookaheadSets = gsubClassGlyphSets(atOffset: aheadOffset, subtableBase: subtable)
+            cursor += 6
+        } else {
+            guard let classDefOffset = Self.u16(data, at: cursor) else { return }
+            let sets = gsubClassGlyphSets(atOffset: classDefOffset, subtableBase: subtable)
+            backtrackSets = sets
+            inputSets = sets
+            lookaheadSets = sets
+            cursor += 2
+        }
+        guard let ruleSetCount = Self.u16(data, at: cursor) else { return }
+        cursor += 2
+        let ruleSetBase = cursor
+        for ruleSetIndex in 0 ..< ruleSetCount {
+            guard let ruleSetOffset = Self.u16(data, at: ruleSetBase + ruleSetIndex * 2), ruleSetOffset != 0 else { continue }
+            let ruleSet = subtable + ruleSetOffset
+            guard let ruleCount = Self.u16(data, at: ruleSet) else { continue }
+            for ruleIndex in 0 ..< ruleCount {
+                guard let ruleOffset = Self.u16(data, at: ruleSet + 2 + ruleIndex * 2), ruleOffset != 0 else { continue }
+                var rule = ruleSet + ruleOffset
+                var backtrack: [Set<Int>] = []
+                if chaining {
+                    guard let classes = readGlyphSequence(at: &rule) else { continue }
+                    backtrack = classes.map { backtrackSets[$0] ?? [] }
+                }
+                guard let inputCount = Self.u16(data, at: rule) else { continue }
+                rule += 2
+                var recordCount = 0
+                if !chaining {
+                    guard let count = Self.u16(data, at: rule) else { continue }
+                    recordCount = count
+                    rule += 2
+                }
+                var input: [Set<Int>] = [inputSets[ruleSetIndex] ?? []]
+                var valid = true
+                for _ in 0 ..< max(0, inputCount - 1) {
+                    guard let value = Self.u16(data, at: rule) else { valid = false
+                        break
+                    }
+                    input.append(inputSets[value] ?? [])
+                    rule += 2
+                }
+                guard valid else { continue }
+                var lookahead: [Set<Int>] = []
+                if chaining {
+                    guard let classes = readGlyphSequence(at: &rule) else { continue }
+                    lookahead = classes.map { lookaheadSets[$0] ?? [] }
+                    guard let count = Self.u16(data, at: rule) else { continue }
+                    recordCount = count
+                    rule += 2
+                }
+                let actions = readPositioningActions(at: &rule, recordCount: recordCount)
+                guard !actions.isEmpty else { continue }
+                result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, actions: actions))
+            }
+        }
     }
 
     /// Walks the subtables of one GPOS lookup, addressed by its index in the lookup
@@ -1639,53 +1837,6 @@ public struct Font: Equatable, Sendable {
             }
             body(subtable, effectiveType)
         }
-    }
-
-    /// Decodes a GPOS ChainedSequenceContextFormat3 (type 8, format 3) subtable:
-    /// backtrack, input, and lookahead coverage sequences and the sequence-lookup
-    /// records that name nested positioning lookups. Each nested lookup is
-    /// resolved; its type-1 single adjustments become the rule's actions.
-    private func parseChainedContextPos(subtable: Int, into result: inout [ContextualPositioning]) {
-        guard Self.u16(data, at: subtable) == 3 else { return }
-        var cursor = subtable + 2
-        guard let backtrack = readCoverageSequence(at: &cursor, subtableBase: subtable),
-              let input = readCoverageSequence(at: &cursor, subtableBase: subtable),
-              let lookahead = readCoverageSequence(at: &cursor, subtableBase: subtable),
-              let recordCount = Self.u16(data, at: cursor)
-        else {
-            return
-        }
-        cursor += 2
-        let actions = readPositioningActions(at: &cursor, recordCount: recordCount)
-        guard !actions.isEmpty else { return }
-        result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, actions: actions))
-    }
-
-    /// Decodes a GPOS SequenceContextFormat3 (type 7, format 3) subtable: an input
-    /// coverage sequence and nested positioning records, with no backtrack or
-    /// lookahead. Represented as a ``ContextualPositioning`` with empty backtrack
-    /// and lookahead.
-    private func parseContextPos(subtable: Int, into result: inout [ContextualPositioning]) {
-        guard Self.u16(data, at: subtable) == 3,
-              let glyphCount = Self.u16(data, at: subtable + 2),
-              let recordCount = Self.u16(data, at: subtable + 4)
-        else {
-            return
-        }
-        var cursor = subtable + 6
-        var input: [Set<Int>] = []
-        for _ in 0 ..< glyphCount {
-            guard let coverageOffset = Self.u16(data, at: cursor),
-                  let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
-            else {
-                return
-            }
-            input.append(coverage.coveredGlyphs)
-            cursor += 2
-        }
-        let actions = readPositioningActions(at: &cursor, recordCount: recordCount)
-        guard !actions.isEmpty else { return }
-        result.append(.init(backtrack: [], input: input, lookahead: [], actions: actions))
     }
 
     /// Reads `recordCount` sequence-lookup records starting at `cursor` (each a
