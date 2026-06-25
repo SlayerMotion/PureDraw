@@ -84,7 +84,7 @@ struct MorxReader {
         return glyphs
     }
 
-    private func applySubtable(type: Int, body: Int, length: Int, glyphs: [MorxGlyph]) -> [MorxGlyph] {
+    private func applySubtable(type: Int, body: Int, length _: Int, glyphs: [MorxGlyph]) -> [MorxGlyph] {
         switch type {
         case 0: applyRearrangement(body: body, glyphs: glyphs)
         case 1: applyContextual(body: body, glyphs: glyphs)
@@ -519,14 +519,19 @@ struct MorxReader {
             }
             if currentInsert != 0xFFFF, currentCount > 0, index <= result.count {
                 let curIndex = index
-                let newGlyphs = insertionGlyphs(table: insertionTable, start: currentInsert, count: currentCount, near: curIndex < result.count ? result[curIndex].cluster : (result.last?.cluster ?? 0))
+                let newGlyphs = insertionGlyphs(
+                    table: insertionTable,
+                    start: currentInsert,
+                    count: currentCount,
+                    near: curIndex < result.count ? result[curIndex].cluster : (result.last?.cluster ?? 0)
+                )
                 let at = currentInsertBefore ? curIndex : curIndex + 1
                 result.insert(contentsOf: newGlyphs, at: min(at, result.count))
                 inserted += newGlyphs.count
             }
             if (flags & 0x8000) != 0 { markIndex = index }
             state = newState
-            if (flags & SM.dontAdvance) == 0 { index += 1 + (inserted) }
+            if (flags & SM.dontAdvance) == 0 { index += 1 + inserted }
         }
         return result
     }
