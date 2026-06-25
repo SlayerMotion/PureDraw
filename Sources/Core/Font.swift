@@ -1879,6 +1879,140 @@ public struct Font: Equatable, Sendable {
         return applyAvar(coords)
     }
 
+    /// The horizontal advance of `index` in font units at the variation instance
+    /// `variations` (axis tag to user value): the static `hmtx` advance plus the
+    /// `HVAR` delta for the instance. Equal to ``advanceWidth(forGlyph:)`` for a
+    /// static font or one without `HVAR`. The advance Core Text uses for a
+    /// variable-font instance, which can differ from `hmtx` even at the default
+    /// position when the font's `hmtx` is not its default-instance baseline.
+    public func advanceWidth(forGlyph index: Int, variations: [String: Double]) -> Double {
+        let base = advanceWidth(forGlyph: index)
+        guard let normalized = normalizedVariationCoordinates(variations) else { return base }
+        return base + hvarAdvanceDelta(glyph: index, normalized: normalized)
+    }
+
+    /// The `HVAR` advance-width delta for `glyph` at `normalized` axis coordinates,
+    /// in font units. The advance DeltaSetIndexMap maps the glyph to an item in the
+    /// ItemVariationStore, which interpolates the delta from its variation regions.
+    /// Zero when the font carries no `HVAR` table.
+    private func hvarAdvanceDelta(glyph: Int, normalized: [Double]) -> Double {
+        guard let hvar = tables["HVAR"], let ivsOffset = Self.u32(data, at: hvar.offset + 4) else { return 0 }
+        let advanceMapOffset = Self.u32(data, at: hvar.offset + 8) ?? 0
+        let index = deltaSetIndex(glyph: glyph, mapOffset: advanceMapOffset == 0 ? nil : hvar.offset + advanceMapOffset)
+        return itemVariationStoreDelta(at: hvar.offset + ivsOffset, outer: index.outer, inner: index.inner, normalized: normalized)
+    }
+
+    /// The (outer, inner) delta-set index for `glyph` from a DeltaSetIndexMap at
+    /// `mapOffset`, or the implicit identity `(0, glyph)` when there is no map.
+    private func deltaSetIndex(glyph: Int, mapOffset: Int?) -> (outer: Int, inner: Int) {
+        guard let mapOffset, let format = Self.u8(data, at: mapOffset), let entryFormat = Self.u8(data, at: mapOffset + 1) else {
+            return (0, glyph)
+        }
+        let entrySize = ((entryFormat & 0x30) >> 4) + 1
+        let innerBits = (entryFormat & 0x0F) + 1
+        let mapCount: Int
+        let dataStart: Int
+        if format == 0 {
+            mapCount = Self.u16(data, at: mapOffset + 2) ?? 0
+            dataStart = mapOffset + 4
+        } else {
+            mapCount = Self.u32(data, at: mapOffset + 2) ?? 0
+            dataStart = mapOffset + 6
+        }
+        let entryIndex = min(glyph, mapCount - 1)
+        guard entryIndex >= 0 else { return (0, glyph) }
+        var entry = 0
+        for byte in 0 ..< entrySize {
+            guard let value = Self.u8(data, at: dataStart + entryIndex * entrySize + byte) else { return (0, glyph) }
+            entry = (entry << 8) | value
+        }
+        return (entry >> innerBits, entry & ((1 << innerBits) - 1))
+    }
+
+    /// The interpolated delta for item `(outer, inner)` of the ItemVariationStore at
+    /// `ivsOffset`, at `normalized` axis coordinates, in font units: the sum over the
+    /// subtable's regions of the region scalar times that region's stored delta.
+    /// (OpenType, "Item Variation Store".)
+    private func itemVariationStoreDelta(at ivsOffset: Int, outer: Int, inner: Int, normalized: [Double]) -> Double {
+        guard Self.u16(data, at: ivsOffset) == 1,
+              let regionListOffset = Self.u32(data, at: ivsOffset + 2),
+              let dataCount = Self.u16(data, at: ivsOffset + 6), outer < dataCount,
+              let subtableOffset = Self.u32(data, at: ivsOffset + 8 + outer * 4)
+        else {
+            return 0
+        }
+        let regionList = ivsOffset + regionListOffset
+        guard let axisCount = Self.u16(data, at: regionList), let regionCount = Self.u16(data, at: regionList + 2) else { return 0 }
+        let subtable = ivsOffset + subtableOffset
+        guard let itemCount = Self.u16(data, at: subtable),
+              let wordDeltaCount = Self.u16(data, at: subtable + 2),
+              let regionIndexCount = Self.u16(data, at: subtable + 4), inner < itemCount
+        else {
+            return 0
+        }
+        let longWords = (wordDeltaCount & 0x8000) != 0
+        let wordCount = wordDeltaCount & 0x7FFF
+        var regionIndices: [Int] = []
+        for index in 0 ..< regionIndexCount {
+            regionIndices.append(Self.u16(data, at: subtable + 6 + index * 2) ?? 0)
+        }
+        let rowSize = wordCount * (longWords ? 4 : 2) + (regionIndexCount - wordCount) * (longWords ? 2 : 1)
+        var cursor = subtable + 6 + regionIndexCount * 2 + inner * rowSize
+        var delta = 0.0
+        for column in 0 ..< regionIndexCount {
+            let value: Int
+            if column < wordCount {
+                value = (longWords ? i32(at: cursor) : Self.i16(data, at: cursor)) ?? 0
+                cursor += longWords ? 4 : 2
+            } else {
+                value = (longWords ? Self.i16(data, at: cursor) : Self.i8(data, at: cursor)) ?? 0
+                cursor += longWords ? 2 : 1
+            }
+            let regionIndex = regionIndices[column]
+            guard regionIndex < regionCount else { continue }
+            delta += regionScalar(regionList: regionList, axisCount: axisCount, region: regionIndex, normalized: normalized) * Double(value)
+        }
+        return delta
+    }
+
+    /// A signed 32-bit big-endian integer at `offset`, derived from the unsigned read.
+    private func i32(at offset: Int) -> Int? {
+        guard let value = Self.u32(data, at: offset) else { return nil }
+        return value >= 0x8000_0000 ? value - 0x1_0000_0000 : value
+    }
+
+    /// The variation scalar of `region` at `normalized` coordinates: the product of
+    /// the per-axis interpolation factors. A region axis with peak 0 does not
+    /// participate. (OpenType, "Algorithm for interpolation of instance values".)
+    private func regionScalar(regionList: Int, axisCount: Int, region: Int, normalized: [Double]) -> Double {
+        let base = regionList + 4 + region * axisCount * 6
+        var scalar = 1.0
+        for axis in 0 ..< axisCount {
+            let record = base + axis * 6
+            guard let start = Self.f2dot14(data, at: record),
+                  let peak = Self.f2dot14(data, at: record + 2),
+                  let end = Self.f2dot14(data, at: record + 4)
+            else {
+                return 0
+            }
+            let coord = axis < normalized.count ? normalized[axis] : 0
+            let factor: Double = if peak == 0 {
+                1
+            } else if coord < start || coord > end {
+                0
+            } else if coord == peak {
+                1
+            } else if coord < peak {
+                peak > start ? (coord - start) / (peak - start) : 0
+            } else {
+                end > peak ? (end - coord) / (end - peak) : 0
+            }
+            scalar *= factor
+            if scalar == 0 { break }
+        }
+        return scalar
+    }
+
     /// Remaps normalized coordinates through the `avar` segment maps, leaving them unchanged when the
     /// table is absent or its axis count disagrees.
     private func applyAvar(_ coords: [Double]) -> [Double] {
