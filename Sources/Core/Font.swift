@@ -1820,9 +1820,18 @@ public struct Font: Equatable, Sendable {
     private func collectMarkAttachment(feature wanted: String, lookupType wantedType: Int) -> MarkAttachment {
         var marks: [Int: MarkAttachment.Mark] = [:]
         var bases: [Int: [Int: MarkAttachment.Point]] = [:]
+        // Mark classes are local to each subtable: class 0 in one mark lookup is a
+        // different class than class 0 in the next, and the BaseArray that pairs
+        // with it is the matching subtable's. Merging every subtable into one map
+        // keyed by the raw class would collide the classes, so a base covered by
+        // two lookups (common in Nastaliq, where most bases are) would take the
+        // wrong subtable's anchor. Give each subtable a disjoint class range by
+        // offsetting its classes past every class already seen; the mark and the
+        // base anchors of one subtable then keep their pairing across the merge.
+        var classOffset = 0
         forEachGPOSSubtable(feature: wanted) { subtable, effectiveType in
             if effectiveType == wantedType {
-                parseMarkAnchorSubtable(subtable: subtable, marks: &marks, bases: &bases)
+                classOffset += parseMarkAnchorSubtable(subtable: subtable, classOffset: classOffset, marks: &marks, bases: &bases)
             }
         }
         return MarkAttachment(marks: marks, bases: bases)
@@ -1930,11 +1939,21 @@ public struct Font: Equatable, Sendable {
     /// mark-to-mark the "base" array is the Mark2Array of preceding marks. Anchor
     /// coordinates are read from all anchor formats (1, 2, and 3); the device and
     /// contour-point refinements of formats 2 and 3 are not applied.
+    /// Decodes one GPOS MarkBasePosFormat1 (or the structurally identical
+    /// MarkMarkPosFormat1) subtable into the shared `marks` and `bases` maps, with
+    /// each class shifted by `classOffset` so this subtable's classes do not
+    /// collide with another's. A mark seen in a later subtable overwrites the
+    /// earlier (a mark belongs to one subtable in practice); a base's anchors are
+    /// merged, so a base covered by several subtables keeps each subtable's anchor
+    /// under that subtable's offset class. Returns this subtable's class count, the
+    /// amount to advance `classOffset` by for the next.
+    @discardableResult
     private func parseMarkAnchorSubtable(
         subtable: Int,
+        classOffset: Int,
         marks: inout [Int: MarkAttachment.Mark],
         bases: inout [Int: [Int: MarkAttachment.Point]]
-    ) {
+    ) -> Int {
         guard Self.u16(data, at: subtable) == 1,
               let markCoverageOffset = Self.u16(data, at: subtable + 2),
               let baseCoverageOffset = Self.u16(data, at: subtable + 4),
@@ -1944,7 +1963,7 @@ public struct Font: Equatable, Sendable {
               let markCoverage = OpenTypeCoverage(data: data, offset: subtable + markCoverageOffset),
               let baseCoverage = OpenTypeCoverage(data: data, offset: subtable + baseCoverageOffset)
         else {
-            return
+            return 0
         }
 
         let markArray = subtable + markArrayOffset
@@ -1958,7 +1977,7 @@ public struct Font: Equatable, Sendable {
                 else {
                     continue
                 }
-                marks[markGlyph] = MarkAttachment.Mark(markClass: markClass, anchor: anchor)
+                marks[markGlyph] = MarkAttachment.Mark(markClass: markClass + classOffset, anchor: anchor)
             }
         }
 
@@ -1966,7 +1985,6 @@ public struct Font: Equatable, Sendable {
         if let baseCount = Self.u16(data, at: baseArray) {
             for index in 0 ..< baseCount {
                 guard let baseGlyph = baseCoverage.glyph(atIndex: index) else { continue }
-                var classAnchors: [Int: MarkAttachment.Point] = [:]
                 for markClass in 0 ..< markClassCount {
                     let offsetPosition = baseArray + 2 + (index * markClassCount + markClass) * 2
                     guard let anchorOffset = Self.u16(data, at: offsetPosition), anchorOffset != 0,
@@ -1974,13 +1992,11 @@ public struct Font: Equatable, Sendable {
                     else {
                         continue
                     }
-                    classAnchors[markClass] = anchor
-                }
-                if !classAnchors.isEmpty {
-                    bases[baseGlyph] = classAnchors
+                    bases[baseGlyph, default: [:]][markClass + classOffset] = anchor
                 }
             }
         }
+        return markClassCount
     }
 
     /// Reads an Anchor table's coordinates. Formats 1, 2, and 3 all store the x
