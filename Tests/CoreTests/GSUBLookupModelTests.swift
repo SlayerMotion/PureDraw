@@ -34,6 +34,30 @@
             }
         }
 
+        @Test func classBasedChainRuleWithNullBacktrackClassDefParses() {
+            guard let data = FileManager.default.contents(atPath: Self.nastaliq),
+                  let font = try? Font(data: [UInt8](data))
+            else {
+                return
+            }
+            // Lookup 27 is a type-6 ChainContextSubstFormat2 whose backtrack class
+            // definition offset is the null offset 0 (no rule uses backtrack). A
+            // null class-definition offset means every glyph is class 0, not a class
+            // table at the subtable base; parsing it as a table dropped the whole
+            // lookup, which carries the Nastaliq tall-variant selection. It must now
+            // parse to contextual rules with nested records.
+            guard let lookup = font.gsubLookup(at: 27) else {
+                Issue.record("lookup 27 must parse")
+                return
+            }
+            guard case let .context(rules) = lookup.kind else {
+                Issue.record("lookup 27 must be a contextual lookup, got \(lookup.kind)")
+                return
+            }
+            #expect(!rules.isEmpty, "lookup 27's class-based chain rules must parse despite the null backtrack class def")
+            #expect(rules.contains { !$0.records.isEmpty }, "lookup 27's rules must carry nested lookup records")
+        }
+
         @Test func rligContextualRulesAreSurfacedFromFormats1And2() {
             guard let data = FileManager.default.contents(atPath: Self.nastaliq),
                   let font = try? Font(data: [UInt8](data))

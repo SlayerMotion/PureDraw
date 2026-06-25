@@ -866,6 +866,21 @@ public struct Font: Equatable, Sendable {
         return sets
     }
 
+    /// The per-class glyph sets for the class definition at `offset` (relative to
+    /// `subtableBase`), or all glyphs in class 0 when the offset is the null offset
+    /// 0. A class-based chaining subtable uses a null backtrack or lookahead class
+    /// definition when no rule has backtrack or lookahead, and a null offset is not
+    /// a class table to parse: every glyph is then class 0 (a class-0 context
+    /// position matches anything, a non-zero one matches nothing), which is exactly
+    /// the absent-classification meaning. Parsing at `subtableBase` instead would
+    /// misread the subtable header as a class table and drop the whole lookup.
+    private func gsubClassGlyphSets(atOffset offset: Int, subtableBase: Int) -> [Int: Set<Int>] {
+        guard offset != 0, let classDef = OpenTypeClassDef(data: data, offset: subtableBase + offset) else {
+            return [0: Set(0 ..< numberOfGlyphs)]
+        }
+        return classGlyphSets(classDef)
+    }
+
     /// Decodes a type-5 ContextSubstFormat3 or type-6 ChainContextSubstFormat3
     /// subtable: coverage sequences for the input (and, when chaining, backtrack
     /// and lookahead), then the SequenceLookupRecords.
@@ -968,24 +983,17 @@ public struct Font: Equatable, Sendable {
         if chaining {
             guard let backOffset = Self.u16(data, at: cursor),
                   let inputOffset = Self.u16(data, at: cursor + 2),
-                  let aheadOffset = Self.u16(data, at: cursor + 4),
-                  let backDef = OpenTypeClassDef(data: data, offset: subtable + backOffset),
-                  let inputDef = OpenTypeClassDef(data: data, offset: subtable + inputOffset),
-                  let aheadDef = OpenTypeClassDef(data: data, offset: subtable + aheadOffset)
+                  let aheadOffset = Self.u16(data, at: cursor + 4)
             else {
                 return
             }
-            backtrackSets = classGlyphSets(backDef)
-            inputSets = classGlyphSets(inputDef)
-            lookaheadSets = classGlyphSets(aheadDef)
+            backtrackSets = gsubClassGlyphSets(atOffset: backOffset, subtableBase: subtable)
+            inputSets = gsubClassGlyphSets(atOffset: inputOffset, subtableBase: subtable)
+            lookaheadSets = gsubClassGlyphSets(atOffset: aheadOffset, subtableBase: subtable)
             cursor += 6
         } else {
-            guard let classDefOffset = Self.u16(data, at: cursor),
-                  let classDef = OpenTypeClassDef(data: data, offset: subtable + classDefOffset)
-            else {
-                return
-            }
-            let sets = classGlyphSets(classDef)
+            guard let classDefOffset = Self.u16(data, at: cursor) else { return }
+            let sets = gsubClassGlyphSets(atOffset: classDefOffset, subtableBase: subtable)
             backtrackSets = sets
             inputSets = sets
             lookaheadSets = sets
