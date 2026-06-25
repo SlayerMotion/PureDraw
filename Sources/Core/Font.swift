@@ -494,6 +494,21 @@ public struct Font: Equatable, Sendable {
         return result
     }
 
+    /// Whether the font carries an AAT `morx` glyph metamorphosis table, which Core
+    /// Text shapes through in preference to OpenType GSUB when present.
+    public var hasMorx: Bool {
+        tables["morx"] != nil
+    }
+
+    /// Applies the font's AAT `morx` chain to `glyphs`, returning the transformed
+    /// glyph run with each glyph tagged by the input index it derives from. Returns
+    /// the input unchanged when the font carries no `morx` table. PureDraw owns the
+    /// byte-level state machines; the shaping tier consumes the structured result.
+    public func applyMorx(_ glyphs: [MorxGlyph]) -> [MorxGlyph] {
+        guard let morx = tables["morx"] else { return glyphs }
+        return MorxReader(data: data, base: morx.offset, glyphCount: numberOfGlyphs).apply(glyphs)
+    }
+
     /// The font's ligature substitutions (GSUB lookup type 4) under a single
     /// feature tag, for example the Khmer below-base forms feature `blwf`, whose
     /// coeng + consonant ligature forms the subscript consonant, or the pre-base
