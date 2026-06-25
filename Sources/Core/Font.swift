@@ -314,14 +314,27 @@ public struct Font: Equatable, Sendable {
     /// order) table, so a caller shaping a right-to-left run, which kerns before the
     /// bidi reorder, passes `false` to skip it rather than kern the wrong, logical,
     /// adjacencies; GPOS kerning is logical-order and stays.
-    public func kerningMap(restrictTo activeFeatures: Set<Int>? = nil, includeLegacyKern: Bool = true) -> KerningMap {
+    public func kerningMap(restrictTo activeFeatures: Set<Int>? = nil, includeLegacyKern: Bool = true, variations: [String: Double] = [:]) -> KerningMap {
         var pairs: [UInt64: Int] = [:]
         var classSubtables: [KerningClassSubtable] = []
-        parseGPOSKern(into: &pairs, classSubtables: &classSubtables, restrictTo: activeFeatures)
+        let normalized = variations.isEmpty ? nil : normalizedVariationCoordinates(variations)
+        parseGPOSKern(into: &pairs, classSubtables: &classSubtables, restrictTo: activeFeatures, normalized: normalized)
         if pairs.isEmpty, classSubtables.isEmpty, includeLegacyKern {
             parseLegacyKern(into: &pairs)
         }
         return KerningMap(adjustments: pairs, classSubtables: classSubtables)
+    }
+
+    /// The x-advance kern value of a ValueRecord at `recordStart`, plus the
+    /// instance's delta when the record carries an XAdvance VariationIndex (the
+    /// `valueFormat` XAdvDevice bit, 0x40, into the GDEF ItemVariationStore). The
+    /// device offset is relative to `subtableBase`. Returns `base` unchanged for a
+    /// static font, the default instance, or an ordinary hinting Device table.
+    private func variedXAdvance(_ base: Int, valueFormat: Int, recordStart: Int, subtableBase: Int, normalized: [Double]?) -> Int {
+        guard let normalized, valueFormat & 0x0040 != 0, let store = gdefItemVariationStoreOffset else { return base }
+        let deviceFieldOffset = (valueFormat & 0x003F).nonzeroBitCount * 2
+        guard let deviceOffset = Self.u16(data, at: recordStart + deviceFieldOffset), deviceOffset != 0 else { return base }
+        return base + variationIndexDelta(at: subtableBase + deviceOffset, store: store, normalized: normalized)
     }
 
     /// Reads GPOS `kern`-feature pair positioning (PairPos format 1) into `pairs`.
@@ -330,7 +343,12 @@ public struct Font: Equatable, Sendable {
     /// the FeatureList directly, without per-script or per-language selection,
     /// which matches the common single-`kern`-feature font. Extension lookups
     /// (type 9) wrapping pair positioning are resolved.
-    private func parseGPOSKern(into pairs: inout [UInt64: Int], classSubtables: inout [KerningClassSubtable], restrictTo activeFeatures: Set<Int>? = nil) {
+    private func parseGPOSKern(
+        into pairs: inout [UInt64: Int],
+        classSubtables: inout [KerningClassSubtable],
+        restrictTo activeFeatures: Set<Int>? = nil,
+        normalized: [Double]? = nil
+    ) {
         guard let gpos = tables["GPOS"] else { return }
         let base = gpos.offset
         guard let featureListOffset = Self.u16(data, at: base + 6),
@@ -387,9 +405,9 @@ public struct Font: Equatable, Sendable {
                 if effectiveType == 2 {
                     guard let posFormat = Self.u16(data, at: subtable) else { continue }
                     if posFormat == 1 {
-                        parsePairPosFormat1(subtable: subtable, into: &pairs)
+                        parsePairPosFormat1(subtable: subtable, normalized: normalized, into: &pairs)
                     } else if posFormat == 2 {
-                        parsePairPosFormat2(subtable: subtable, into: &classSubtables)
+                        parsePairPosFormat2(subtable: subtable, normalized: normalized, into: &classSubtables)
                     }
                 }
             }
@@ -398,7 +416,7 @@ public struct Font: Equatable, Sendable {
 
     /// Decodes a GPOS PairPos format 2 (class-based pair) subtable into a
     /// ``KerningClassSubtable``, reusing the Coverage and ClassDef parsers.
-    private func parsePairPosFormat2(subtable: Int, into classSubtables: inout [KerningClassSubtable]) {
+    private func parsePairPosFormat2(subtable: Int, normalized: [Double]?, into classSubtables: inout [KerningClassSubtable]) {
         guard let coverageOffset = Self.u16(data, at: subtable + 2),
               let valueFormat1 = Self.u16(data, at: subtable + 4),
               let valueFormat2 = Self.u16(data, at: subtable + 6),
@@ -424,7 +442,7 @@ public struct Font: Equatable, Sendable {
                 let cell = firstClass * class2Count + secondClass
                 let record = matrixBase + cell * recordSize
                 if let xAdvance = Self.i16(data, at: record + xAdvanceOffset) {
-                    xAdvances[cell] = xAdvance
+                    xAdvances[cell] = variedXAdvance(xAdvance, valueFormat: valueFormat1, recordStart: record, subtableBase: subtable, normalized: normalized)
                 }
             }
         }
@@ -441,7 +459,7 @@ public struct Font: Equatable, Sendable {
 
     /// Decodes a GPOS PairPos format 1 (explicit pair) subtable into `pairs`,
     /// extracting the first value record's x advance as the kerning amount.
-    private func parsePairPosFormat1(subtable: Int, into pairs: inout [UInt64: Int]) {
+    private func parsePairPosFormat1(subtable: Int, normalized: [Double]?, into pairs: inout [UInt64: Int]) {
         guard Self.u16(data, at: subtable) == 1,
               let coverageOffset = Self.u16(data, at: subtable + 2),
               let valueFormat1 = Self.u16(data, at: subtable + 4),
@@ -471,8 +489,9 @@ public struct Font: Equatable, Sendable {
                 else {
                     break
                 }
-                if xAdvance != 0 {
-                    pairs[KerningMap.key(firstGlyph: firstGlyph, secondGlyph: secondGlyph)] = xAdvance
+                let varied = variedXAdvance(xAdvance, valueFormat: valueFormat1, recordStart: record + 2, subtableBase: subtable, normalized: normalized)
+                if varied != 0 {
+                    pairs[KerningMap.key(firstGlyph: firstGlyph, secondGlyph: secondGlyph)] = varied
                 }
             }
         }
