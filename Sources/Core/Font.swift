@@ -494,6 +494,23 @@ public struct Font: Equatable, Sendable {
         return result
     }
 
+    /// The font's ligature substitutions (GSUB lookup type 4) under a single
+    /// feature tag, for example the Khmer below-base forms feature `blwf`, whose
+    /// coeng + consonant ligature forms the subscript consonant, or the pre-base
+    /// `pref`. Mirrors ``singleSubstitutions(feature:)`` for ligatures: the broad
+    /// ``ligatures(restrictTo:)`` gathers only `liga`/`rlig`/`ccmp`, so a
+    /// script-form feature that carries its conjuncts as ligatures needs this
+    /// per-tag accessor. Extension lookups (type 7) are resolved.
+    public func ligatures(feature tag: String, restrictTo activeFeatures: Set<Int>? = nil) -> [LigatureSubstitution] {
+        var result: [LigatureSubstitution] = []
+        forEachGSUBSubtable(matching: { $0 == tag }, restrictTo: activeFeatures) { subtable, effectiveType, _ in
+            if effectiveType == 4 {
+                parseLigatureSubst(subtable: subtable, into: &result)
+            }
+        }
+        return result
+    }
+
     private func parseGSUBLigatures(into result: inout [LigatureSubstitution], restrictTo activeFeatures: Set<Int>?) {
         // `liga` is the standard Latin ligatures; `rlig` is required ligatures,
         // used for the Arabic lam-alef among others; `ccmp` composes glyphs, for
