@@ -299,6 +299,62 @@ public struct Font: Equatable, Sendable {
         return Double(advance)
     }
 
+    /// The horizontal tracking adjustment, in font units, that the AAT `trak` table
+    /// applies to every glyph advance at `pointSize` for the default (normal) track.
+    ///
+    /// The `trak` table stores a tracking value per (track, size). Core Text applies
+    /// the track whose value is `0.0` (normal tracking) and bakes the result into
+    /// `CTFontGetAdvancesForGlyphs`, so a sized advance that matches Core Text must add
+    /// it. The per-size values are interpolated linearly in point size, holding the end
+    /// values for sizes outside the table's range. The amount is a function of size,
+    /// not of the glyph, and is the same constant added to each glyph in a run.
+    /// Returns 0 when the font has no `trak` table, no horizontal track data, or no
+    /// `0.0` track. (Apple TrueType Reference Manual, `trak`.)
+    public func horizontalTracking(forPointSize pointSize: Double) -> Double {
+        guard let trak = tables["trak"],
+              let horizOffset = Self.u16(data, at: trak.offset + 6), horizOffset != 0
+        else { return 0 }
+        let trackData = trak.offset + horizOffset
+        guard let trackCount = Self.u16(data, at: trackData),
+              let sizeCount = Self.u16(data, at: trackData + 2),
+              let sizeTableOffset = Self.u32(data, at: trackData + 4),
+              sizeCount > 0
+        else { return 0 }
+        // Core Text applies the normal track, the one whose track value is 0.0.
+        var valuesBase: Int?
+        for index in 0 ..< trackCount {
+            let record = trackData + 8 + index * 8
+            guard let track = Self.fixed16(data, at: record),
+                  let perSizeOffset = Self.u16(data, at: record + 6)
+            else { return 0 }
+            if track == 0 {
+                valuesBase = trak.offset + perSizeOffset
+                break
+            }
+        }
+        guard let valuesBase else { return 0 }
+        // The point sizes (Fixed) and the normal track's per-size values (font units).
+        let sizeBase = trak.offset + sizeTableOffset
+        var sizes: [Double] = []
+        var values: [Double] = []
+        for index in 0 ..< sizeCount {
+            guard let size = Self.fixed16(data, at: sizeBase + index * 4),
+                  let value = Self.i16(data, at: valuesBase + index * 2)
+            else { return 0 }
+            sizes.append(size)
+            values.append(Double(value))
+        }
+        if pointSize <= sizes[0] { return values[0] }
+        if pointSize >= sizes[sizeCount - 1] { return values[sizeCount - 1] }
+        for index in 1 ..< sizeCount where pointSize <= sizes[index] {
+            let lo = sizes[index - 1], hi = sizes[index]
+            guard hi > lo else { return values[index - 1] }
+            let fraction = (pointSize - lo) / (hi - lo)
+            return values[index - 1] + fraction * (values[index] - values[index - 1])
+        }
+        return values[sizeCount - 1]
+    }
+
     // MARK: - Kerning
 
     /// The font's pairwise kerning, for the shaping tier to apply.
