@@ -1869,8 +1869,8 @@ public struct Font: Equatable, Sendable {
     /// feature, for the shaping tier to seat combining marks over their bases
     /// (Arabic vowel marks, for example). Extension lookups (type 9) are
     /// resolved. Empty when the font carries no mark positioning.
-    public func markAttachment() -> MarkAttachment {
-        collectMarkAttachment(feature: "mark", lookupType: 4)
+    public func markAttachment(variations: [String: Double] = [:]) -> MarkAttachment {
+        collectMarkAttachment(feature: "mark", lookupType: 4, normalized: variations.isEmpty ? nil : normalizedVariationCoordinates(variations))
     }
 
     /// The font's GPOS mark-to-mark attachment (the `mkmk` feature, lookup type
@@ -1880,20 +1880,21 @@ public struct Font: Equatable, Sendable {
     /// attaching mark as its `marks` and the preceding mark it rides on as its
     /// `bases`, so ``MarkAttachment/offset(base:mark:)`` reads the same way as
     /// for mark-to-base. Empty when the font carries no mark-to-mark attachment.
-    public func markMarkAttachment() -> MarkAttachment {
-        collectMarkAttachment(feature: "mkmk", lookupType: 6)
+    public func markMarkAttachment(variations: [String: Double] = [:]) -> MarkAttachment {
+        collectMarkAttachment(feature: "mkmk", lookupType: 6, normalized: variations.isEmpty ? nil : normalizedVariationCoordinates(variations))
     }
 
     /// The font's GPOS mark-to-ligature attachment (the `mark` feature, lookup type
     /// 5): per-component anchors that seat a combining mark over the right part of a
     /// ligature. Extension lookups (type 9) are resolved. Empty when the font
     /// carries no mark-to-ligature attachment.
-    public func markLigatureAttachment() -> MarkLigatureAttachment {
+    public func markLigatureAttachment(variations: [String: Double] = [:]) -> MarkLigatureAttachment {
         var marks: [Int: MarkAttachment.Mark] = [:]
         var ligatures: [Int: [[Int: MarkAttachment.Point]]] = [:]
+        let normalized = variations.isEmpty ? nil : normalizedVariationCoordinates(variations)
         forEachGPOSSubtable(feature: "mark") { subtable, effectiveType in
             if effectiveType == 5 {
-                parseMarkLigatureSubtable(subtable: subtable, marks: &marks, ligatures: &ligatures)
+                parseMarkLigatureSubtable(subtable: subtable, normalized: normalized, marks: &marks, ligatures: &ligatures)
             }
         }
         return MarkLigatureAttachment(marks: marks, ligatures: ligatures)
@@ -1906,6 +1907,7 @@ public struct Font: Equatable, Sendable {
     /// class). Anchor offsets in a LigatureAttach are relative to that table.
     private func parseMarkLigatureSubtable(
         subtable: Int,
+        normalized: [Double]?,
         marks: inout [Int: MarkAttachment.Mark],
         ligatures: inout [Int: [[Int: MarkAttachment.Point]]]
     ) {
@@ -1928,7 +1930,7 @@ public struct Font: Equatable, Sendable {
                 guard let markGlyph = markCoverage.glyph(atIndex: index),
                       let markClass = Self.u16(data, at: record),
                       let anchorOffset = Self.u16(data, at: record + 2),
-                      let anchor = anchor(at: markArray + anchorOffset)
+                      let anchor = anchor(at: markArray + anchorOffset, normalized: normalized)
                 else {
                     continue
                 }
@@ -1952,7 +1954,7 @@ public struct Font: Equatable, Sendable {
                 for markClass in 0 ..< markClassCount {
                     let offsetPosition = attach + 2 + (component * markClassCount + markClass) * 2
                     guard let anchorOffset = Self.u16(data, at: offsetPosition), anchorOffset != 0,
-                          let anchor = anchor(at: attach + anchorOffset)
+                          let anchor = anchor(at: attach + anchorOffset, normalized: normalized)
                     else {
                         continue
                     }
@@ -1969,12 +1971,13 @@ public struct Font: Equatable, Sendable {
     /// connected script links one glyph's exit to the next glyph's entry. Empty
     /// when the font carries no cursive attachment. PureDraw parses the GPOS
     /// table; this forwards the typed result for the shaper to connect glyphs.
-    public func cursiveAttachment(restrictTo activeFeatures: Set<Int>? = nil) -> CursiveAttachment {
+    public func cursiveAttachment(restrictTo activeFeatures: Set<Int>? = nil, variations: [String: Double] = [:]) -> CursiveAttachment {
         var entries: [Int: CursiveAttachment.Point] = [:]
         var exits: [Int: CursiveAttachment.Point] = [:]
+        let normalized = variations.isEmpty ? nil : normalizedVariationCoordinates(variations)
         forEachGPOSSubtable(feature: "curs", restrictTo: activeFeatures) { subtable, effectiveType in
             if effectiveType == 3 {
-                parseCursivePos(subtable: subtable, entries: &entries, exits: &exits)
+                parseCursivePos(subtable: subtable, normalized: normalized, entries: &entries, exits: &exits)
             }
         }
         return CursiveAttachment(entries: entries, exits: exits)
@@ -1984,7 +1987,7 @@ public struct Font: Equatable, Sendable {
     /// ``MarkAttachment``. `lookupType` is 4 for mark-to-base (the `mark`
     /// feature) and 6 for mark-to-mark (the `mkmk` feature); the two share the
     /// same subtable layout, so one parser serves both.
-    private func collectMarkAttachment(feature wanted: String, lookupType wantedType: Int) -> MarkAttachment {
+    private func collectMarkAttachment(feature wanted: String, lookupType wantedType: Int, normalized: [Double]?) -> MarkAttachment {
         var marks: [Int: MarkAttachment.Mark] = [:]
         var bases: [Int: [Int: MarkAttachment.Point]] = [:]
         // Mark classes are local to each subtable: class 0 in one mark lookup is a
@@ -1998,7 +2001,7 @@ public struct Font: Equatable, Sendable {
         var classOffset = 0
         forEachGPOSSubtable(feature: wanted) { subtable, effectiveType in
             if effectiveType == wantedType {
-                classOffset += parseMarkAnchorSubtable(subtable: subtable, classOffset: classOffset, marks: &marks, bases: &bases)
+                classOffset += parseMarkAnchorSubtable(subtable: subtable, classOffset: classOffset, normalized: normalized, marks: &marks, bases: &bases)
             }
         }
         return MarkAttachment(marks: marks, bases: bases)
@@ -2075,6 +2078,7 @@ public struct Font: Equatable, Sendable {
     /// that side absent.
     private func parseCursivePos(
         subtable: Int,
+        normalized: [Double]?,
         entries: inout [Int: CursiveAttachment.Point],
         exits: inout [Int: CursiveAttachment.Point]
     ) {
@@ -2089,12 +2093,12 @@ public struct Font: Equatable, Sendable {
             guard let glyph = coverage.glyph(atIndex: index) else { continue }
             let record = subtable + 6 + index * 4
             if let entryOffset = Self.u16(data, at: record), entryOffset != 0,
-               let point = anchorCoordinates(at: subtable + entryOffset)
+               let point = anchorCoordinates(at: subtable + entryOffset, normalized: normalized)
             {
                 entries[glyph] = CursiveAttachment.Point(x: point.x, y: point.y)
             }
             if let exitOffset = Self.u16(data, at: record + 2), exitOffset != 0,
-               let point = anchorCoordinates(at: subtable + exitOffset)
+               let point = anchorCoordinates(at: subtable + exitOffset, normalized: normalized)
             {
                 exits[glyph] = CursiveAttachment.Point(x: point.x, y: point.y)
             }
@@ -2118,6 +2122,7 @@ public struct Font: Equatable, Sendable {
     private func parseMarkAnchorSubtable(
         subtable: Int,
         classOffset: Int,
+        normalized: [Double]?,
         marks: inout [Int: MarkAttachment.Mark],
         bases: inout [Int: [Int: MarkAttachment.Point]]
     ) -> Int {
@@ -2140,7 +2145,7 @@ public struct Font: Equatable, Sendable {
                 guard let markGlyph = markCoverage.glyph(atIndex: index),
                       let markClass = Self.u16(data, at: record),
                       let anchorOffset = Self.u16(data, at: record + 2),
-                      let anchor = anchor(at: markArray + anchorOffset)
+                      let anchor = anchor(at: markArray + anchorOffset, normalized: normalized)
                 else {
                     continue
                 }
@@ -2155,7 +2160,7 @@ public struct Font: Equatable, Sendable {
                 for markClass in 0 ..< markClassCount {
                     let offsetPosition = baseArray + 2 + (index * markClassCount + markClass) * 2
                     guard let anchorOffset = Self.u16(data, at: offsetPosition), anchorOffset != 0,
-                          let anchor = anchor(at: baseArray + anchorOffset)
+                          let anchor = anchor(at: baseArray + anchorOffset, normalized: normalized)
                     else {
                         continue
                     }
@@ -2166,23 +2171,60 @@ public struct Font: Equatable, Sendable {
         return markClassCount
     }
 
-    /// Reads an Anchor table's coordinates. Formats 1, 2, and 3 all store the x
-    /// and y coordinates at the same offsets; the point-index and device-table
-    /// refinements are ignored.
-    private func anchorCoordinates(at offset: Int) -> (x: Int, y: Int)? {
-        guard Self.u16(data, at: offset) != nil,
+    /// Reads an Anchor table's coordinates. Formats 1, 2, and 3 store the x and y
+    /// at the same offsets; the format-1/2 point-index refinement is ignored. For
+    /// format 3 at a variation instance (`normalized` non-nil), the x and y device
+    /// tables that are VariationIndex tables contribute the instance's delta from
+    /// the GDEF ItemVariationStore, so a mark anchor shifts with the axis the way
+    /// Core Text places it. The hinting Device tables (delta formats 1-3) are
+    /// ignored, as before.
+    private func anchorCoordinates(at offset: Int, normalized: [Double]?) -> (x: Int, y: Int)? {
+        guard let format = Self.u16(data, at: offset),
               let x = Self.i16(data, at: offset + 2),
               let y = Self.i16(data, at: offset + 4)
         else {
             return nil
         }
-        return (x, y)
+        guard format == 3, let normalized, let store = gdefItemVariationStoreOffset else {
+            return (x, y)
+        }
+        let dx = Self.u16(data, at: offset + 6).flatMap { $0 == 0 ? nil : variationIndexDelta(at: offset + $0, store: store, normalized: normalized) } ?? 0
+        let dy = Self.u16(data, at: offset + 8).flatMap { $0 == 0 ? nil : variationIndexDelta(at: offset + $0, store: store, normalized: normalized) } ?? 0
+        return (x + dx, y + dy)
     }
 
-    /// An Anchor table's coordinates as a ``MarkAttachment/Point``.
-    private func anchor(at offset: Int) -> MarkAttachment.Point? {
-        guard let point = anchorCoordinates(at: offset) else { return nil }
+    /// An Anchor table's coordinates as a ``MarkAttachment/Point``, at the variation
+    /// instance `normalized` (nil for a static font or the default instance).
+    private func anchor(at offset: Int, normalized: [Double]?) -> MarkAttachment.Point? {
+        guard let point = anchorCoordinates(at: offset, normalized: normalized) else { return nil }
         return MarkAttachment.Point(x: point.x, y: point.y)
+    }
+
+    /// The byte offset of the GDEF ItemVariationStore (GDEF table version 1.3 and
+    /// later), or nil when the font's GDEF carries none. GPOS anchors and value
+    /// records reference it by VariationIndex to vary with the axes.
+    private var gdefItemVariationStoreOffset: Int? {
+        guard let gdef = tables["GDEF"],
+              let minor = Self.u16(data, at: gdef.offset + 2), minor >= 3,
+              let storeOffset = Self.u32(data, at: gdef.offset + 14), storeOffset != 0
+        else {
+            return nil
+        }
+        return gdef.offset + storeOffset
+    }
+
+    /// The font-unit delta a VariationIndex table at `offset` contributes at the
+    /// instance `normalized`: it names an ItemVariationStore item by (outer, inner)
+    /// index, interpolated through `store`. Zero when the table is an ordinary
+    /// hinting Device table (delta format other than 0x8000).
+    private func variationIndexDelta(at offset: Int, store: Int, normalized: [Double]) -> Int {
+        guard Self.u16(data, at: offset + 4) == 0x8000,
+              let outer = Self.u16(data, at: offset),
+              let inner = Self.u16(data, at: offset + 2)
+        else {
+            return 0
+        }
+        return Int(itemVariationStoreDelta(at: store, outer: outer, inner: inner, normalized: normalized).rounded())
     }
 
     // MARK: - Outlines
