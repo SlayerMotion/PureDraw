@@ -65,12 +65,95 @@ struct KerxReader {
             // (0x40000000) subtables do not contribute to horizontal advance.
             let vertical = (coverage & 0x8000_0000) != 0
             let crossStream = (coverage & 0x4000_0000) != 0
-            if !vertical, !crossStream, format == 2 {
-                accumulateFormat2(subtableStart: subtableStart, glyphs: glyphs, into: &adjustments)
+            if !vertical, !crossStream {
+                switch format {
+                case 0: accumulateFormat0(subtableStart: subtableStart, glyphs: glyphs, into: &adjustments)
+                case 1: accumulateFormat1(subtableStart: subtableStart, glyphs: glyphs, into: &adjustments)
+                case 2: accumulateFormat2(subtableStart: subtableStart, glyphs: glyphs, into: &adjustments)
+                default: break
+                }
             }
             subtableStart += length
         }
         return adjustments
+    }
+
+    /// Format 0: an ordered list of (left glyph, right glyph) pairs, each with a
+    /// kerning value, sorted so the pair for two adjacent glyphs is found by binary
+    /// search. The classic `kern` format 0, widened to 32-bit counts.
+    private func accumulateFormat0(subtableStart: Int, glyphs: [Int], into adjustments: inout [Int]) {
+        let body = subtableStart + 12
+        guard let nPairs = u32(body) else { return }
+        let pairs = body + 16
+        for index in 1 ..< glyphs.count {
+            let key = glyphs[index - 1] << 16 | glyphs[index]
+            var low = 0
+            var high = nPairs
+            while low < high {
+                let mid = (low + high) / 2
+                let pair = pairs + mid * 6
+                guard let left = u16(pair), let right = u16(pair + 2) else { break }
+                let probe = left << 16 | right
+                if probe == key {
+                    if let value = i16(pair + 4) { adjustments[index] += value }
+                    break
+                }
+                if key < probe { high = mid } else { low = mid + 1 }
+            }
+        }
+    }
+
+    /// Format 1: state-machine kerning. As the machine walks, a `push` entry stacks
+    /// the current glyph; an entry carrying a value offset pops the stacked glyphs and
+    /// applies successive kerning values to them, the value list terminated by a value
+    /// with its low bit set. (Apple TrueType Reference Manual, "Format 1".)
+    private func accumulateFormat1(subtableStart: Int, glyphs: [Int], into adjustments: inout [Int]) {
+        let body = subtableStart + 12
+        guard let nClasses = u32(body),
+              let classOffset = u32(body + 4),
+              let stateOffset = u32(body + 8),
+              let entryOffset = u32(body + 12)
+        else {
+            return
+        }
+        let classTable = body + classOffset
+        let stateArray = body + stateOffset
+        let entryTable = body + entryOffset
+
+        var state = 0
+        var index = 0
+        var stack: [Int] = []
+        var safety = 0
+        let limit = (glyphs.count + 1) * 4 + 64
+        while index <= glyphs.count, safety < limit {
+            safety += 1
+            let classValue = index < glyphs.count ? classOf(glyphs[index], classTable: classTable, nClasses: nClasses) : SM.endOfText
+            guard let entryIdx = u16(stateArray + (state * nClasses + classValue) * 2),
+                  let newState = u16(entryTable + entryIdx * 4),
+                  let flags = u16(entryTable + entryIdx * 4 + 2)
+            else {
+                break
+            }
+            if (flags & 0x8000) != 0, index < glyphs.count {
+                stack.append(index)
+            }
+            let valueOffset = flags & 0x3FFF
+            if valueOffset != 0 {
+                var valuePtr = subtableStart + valueOffset
+                while !stack.isEmpty, let raw = i16(valuePtr) {
+                    valuePtr += 2
+                    let glyphIndex = stack.removeLast()
+                    // The low bit is the list terminator, not part of the value.
+                    let value = raw & ~1
+                    if value != 0, glyphIndex >= 1, glyphIndex < adjustments.count {
+                        adjustments[glyphIndex] += value
+                    }
+                    if raw & 1 != 0 { break }
+                }
+            }
+            state = newState
+            if (flags & SM.dontAdvance) == 0 { index += 1 }
+        }
     }
 
     /// Format 2: class-based pair kerning. The left glyph selects a row, the right
