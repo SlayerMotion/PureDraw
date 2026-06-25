@@ -883,33 +883,45 @@ public struct Font: Equatable, Sendable {
 
     /// Decodes a type-5 ContextSubstFormat3 or type-6 ChainContextSubstFormat3
     /// subtable: coverage sequences for the input (and, when chaining, backtrack
-    /// and lookahead), then the SequenceLookupRecords.
+    /// and lookahead), then the SequenceLookupRecords. The two layouts differ in
+    /// where the record count sits: a chaining subtable puts it last, after the
+    /// lookahead; a plain context subtable (type 5) puts seqLookupCount right after
+    /// the input glyph count, before the input coverages.
     private func parseContextFormat3(subtable: Int, chaining: Bool, into result: inout [GSUBContextRule]) {
-        var cursor = subtable + 2
-        let backtrack: [Set<Int>]
-        let input: [Set<Int>]
-        let lookahead: [Set<Int>]
         if chaining {
-            guard let back = readCoverageSequence(at: &cursor, subtableBase: subtable),
-                  let inp = readCoverageSequence(at: &cursor, subtableBase: subtable),
-                  let ahead = readCoverageSequence(at: &cursor, subtableBase: subtable)
+            var cursor = subtable + 2
+            guard let backtrack = readCoverageSequence(at: &cursor, subtableBase: subtable),
+                  let input = readCoverageSequence(at: &cursor, subtableBase: subtable),
+                  let lookahead = readCoverageSequence(at: &cursor, subtableBase: subtable),
+                  let recordCount = Self.u16(data, at: cursor)
             else {
                 return
             }
-            backtrack = back
-            input = inp
-            lookahead = ahead
+            cursor += 2
+            let records = readSequenceLookupRecords(at: cursor, count: recordCount)
+            guard !records.isEmpty, !input.isEmpty else { return }
+            result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, records: records))
         } else {
-            guard let inp = readCoverageSequence(at: &cursor, subtableBase: subtable) else { return }
-            backtrack = []
-            input = inp
-            lookahead = []
+            guard let glyphCount = Self.u16(data, at: subtable + 2),
+                  let recordCount = Self.u16(data, at: subtable + 4)
+            else {
+                return
+            }
+            var cursor = subtable + 6
+            var input: [Set<Int>] = []
+            for _ in 0 ..< glyphCount {
+                guard let coverageOffset = Self.u16(data, at: cursor),
+                      let coverage = OpenTypeCoverage(data: data, offset: subtable + coverageOffset)
+                else {
+                    return
+                }
+                input.append(coverage.coveredGlyphs)
+                cursor += 2
+            }
+            let records = readSequenceLookupRecords(at: cursor, count: recordCount)
+            guard !records.isEmpty, !input.isEmpty else { return }
+            result.append(.init(backtrack: [], input: input, lookahead: [], records: records))
         }
-        guard let recordCount = Self.u16(data, at: cursor) else { return }
-        cursor += 2
-        let records = readSequenceLookupRecords(at: cursor, count: recordCount)
-        guard !records.isEmpty, !input.isEmpty else { return }
-        result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, records: records))
     }
 
     /// Decodes a type-5 ContextSubstFormat1 or type-6 ChainContextSubstFormat1
@@ -941,6 +953,14 @@ public struct Font: Equatable, Sendable {
                 }
                 guard let inputCount = Self.u16(data, at: cursor) else { continue }
                 cursor += 2
+                // A type-5 SequenceRule lists seqLookupCount right after glyphCount,
+                // before the input; a type-6 ChainSequenceRule lists it last.
+                var recordCount = 0
+                if !chaining {
+                    guard let count = Self.u16(data, at: cursor) else { continue }
+                    recordCount = count
+                    cursor += 2
+                }
                 var input: [Set<Int>] = [[firstGlyph]]
                 var valid = true
                 for _ in 0 ..< max(0, inputCount - 1) {
@@ -951,16 +971,19 @@ public struct Font: Equatable, Sendable {
                     cursor += 2
                 }
                 guard valid else { continue }
-                var lookahead: [Set<Int>] = []
                 if chaining {
                     guard let glyphs = readGlyphSequence(at: &cursor) else { continue }
-                    lookahead = glyphs.map { [$0] }
+                    let lookahead = glyphs.map { Set([$0]) }
+                    guard let count = Self.u16(data, at: cursor) else { continue }
+                    cursor += 2
+                    let records = readSequenceLookupRecords(at: cursor, count: count)
+                    guard !records.isEmpty else { continue }
+                    result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, records: records))
+                    continue
                 }
-                guard let recordCount = Self.u16(data, at: cursor) else { continue }
-                cursor += 2
                 let records = readSequenceLookupRecords(at: cursor, count: recordCount)
                 guard !records.isEmpty else { continue }
-                result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, records: records))
+                result.append(.init(backtrack: backtrack, input: input, lookahead: [], records: records))
             }
         }
     }
@@ -1016,6 +1039,14 @@ public struct Font: Equatable, Sendable {
                 }
                 guard let inputCount = Self.u16(data, at: rule) else { continue }
                 rule += 2
+                // A type-5 ClassSequenceRule lists seqLookupCount right after the
+                // input glyph count, before the input; a type-6 rule lists it last.
+                var recordCount = 0
+                if !chaining {
+                    guard let count = Self.u16(data, at: rule) else { continue }
+                    recordCount = count
+                    rule += 2
+                }
                 var input: [Set<Int>] = [inputSets[ruleSetIndex] ?? []]
                 var valid = true
                 for _ in 0 ..< max(0, inputCount - 1) {
@@ -1026,16 +1057,19 @@ public struct Font: Equatable, Sendable {
                     rule += 2
                 }
                 guard valid else { continue }
-                var lookahead: [Set<Int>] = []
                 if chaining {
                     guard let classes = readGlyphSequence(at: &rule) else { continue }
-                    lookahead = classes.map { lookaheadSets[$0] ?? [] }
+                    let lookahead = classes.map { lookaheadSets[$0] ?? [] }
+                    guard let count = Self.u16(data, at: rule) else { continue }
+                    rule += 2
+                    let records = readSequenceLookupRecords(at: rule, count: count)
+                    guard !records.isEmpty else { continue }
+                    result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, records: records))
+                    continue
                 }
-                guard let recordCount = Self.u16(data, at: rule) else { continue }
-                rule += 2
                 let records = readSequenceLookupRecords(at: rule, count: recordCount)
                 guard !records.isEmpty else { continue }
-                result.append(.init(backtrack: backtrack, input: input, lookahead: lookahead, records: records))
+                result.append(.init(backtrack: backtrack, input: input, lookahead: [], records: records))
             }
         }
     }

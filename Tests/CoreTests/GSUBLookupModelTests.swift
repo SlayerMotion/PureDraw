@@ -58,6 +58,29 @@
             #expect(rules.contains { !$0.records.isEmpty }, "lookup 27's rules must carry nested lookup records")
         }
 
+        @Test func type5ContextRuleReadsRecordCountBeforeInput() {
+            guard let data = FileManager.default.contents(atPath: Self.nastaliq),
+                  let font = try? Font(data: [UInt8](data))
+            else {
+                return
+            }
+            // Lookup 158 is a type-5 ContextSubstFormat2. A plain context rule lists
+            // its seqLookupCount right after the input glyph count, before the input
+            // sequence; a chaining rule lists it last. Reading it in the chaining
+            // position scrambled the record count and input, so the rule never
+            // matched. It must parse to a rule whose nested record invokes lookup 159
+            // (the Nastaliq spacer insertion), the substitution Core Text applies.
+            guard let lookup = font.gsubLookup(at: 158), case let .context(rules) = lookup.kind else {
+                Issue.record("lookup 158 must parse to a contextual lookup")
+                return
+            }
+            #expect(!rules.isEmpty, "lookup 158 must parse to contextual rules")
+            #expect(
+                rules.contains { $0.records.contains { $0.lookupIndex == 159 } },
+                "a lookup 158 rule must invoke lookup 159 (the spacer); records were \(rules.flatMap { $0.records.map(\.lookupIndex) })"
+            )
+        }
+
         @Test func rligContextualRulesAreSurfacedFromFormats1And2() {
             guard let data = FileManager.default.contents(atPath: Self.nastaliq),
                   let font = try? Font(data: [UInt8](data))
