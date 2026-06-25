@@ -509,6 +509,26 @@ public struct Font: Equatable, Sendable {
         return MorxReader(data: data, base: morx.offset, glyphCount: numberOfGlyphs).apply(glyphs)
     }
 
+    /// The AAT `kerx` horizontal kerning adjustments for `glyphs`, one per glyph:
+    /// element `i` is the advance adjustment to apply before glyph `i` (the kerning
+    /// between glyph `i - 1` and glyph `i`), in font units, with element 0 zero. All
+    /// zeros when the font carries no `kerx` table. This is the AAT pair kerning
+    /// (format 2) that complements the glyph advances on a `morx`-shaped run.
+    public func kerxHorizontalAdjustments(_ glyphs: [Int]) -> [Int] {
+        guard let kerx = tables["kerx"] else { return [Int](repeating: 0, count: glyphs.count) }
+        return KerxReader(data: data, base: kerx.offset, ankrBase: tables["ankr"]?.offset, glyphCount: numberOfGlyphs).horizontalAdjustments(glyphs)
+    }
+
+    /// The AAT `kerx` format-4 anchor attachments for `glyphs`: each says a glyph
+    /// attaches to an earlier glyph by aligning anchor points resolved from the
+    /// `ankr` table. Empty when the font carries no `kerx` or `ankr` table. This is
+    /// the AAT mark-to-base positioning that seats, for example, a Myanmar subscript
+    /// under its base. The shaping tier applies them with its pen positions.
+    public func kerxAnchorAttachments(_ glyphs: [Int]) -> [KerxAnchorAttachment] {
+        guard let kerx = tables["kerx"] else { return [] }
+        return KerxReader(data: data, base: kerx.offset, ankrBase: tables["ankr"]?.offset, glyphCount: numberOfGlyphs).anchorAttachments(glyphs)
+    }
+
     /// The font's ligature substitutions (GSUB lookup type 4) under a single
     /// feature tag, for example the Khmer below-base forms feature `blwf`, whose
     /// coeng + consonant ligature forms the subscript consonant, or the pre-base
