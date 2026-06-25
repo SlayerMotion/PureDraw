@@ -17,6 +17,17 @@ public struct Font: Equatable, Sendable {
     public let ascent: Double
     /// Typographic descent in font units (typically negative).
     public let descent: Double
+    /// OS/2 typographic ascender in font units. This is the line-spacing ascent
+    /// Core Text (and so SwiftUI) uses to compute line height, distinct from the
+    /// `hhea` ascent above. Falls back to the `hhea` ascender when the font carries
+    /// no `OS/2` table.
+    public let typoAscender: Double
+    /// OS/2 typographic descender in font units (typically negative). Falls back to
+    /// the `hhea` descender when the font carries no `OS/2` table.
+    public let typoDescender: Double
+    /// OS/2 typographic line gap in font units: the leading added between lines.
+    /// Falls back to the `hhea` line gap when the font carries no `OS/2` table.
+    public let typoLineGap: Double
     /// The number of glyphs in the font, the valid range for a glyph index.
     public let numberOfGlyphs: Int
 
@@ -132,6 +143,24 @@ public struct Font: Equatable, Sendable {
         self.unitsPerEm = unitsPerEm
         ascent = Double(ascender)
         descent = Double(descender)
+        // Line height comes from the OS/2 typographic metrics, not hhea: Core Text
+        // (and SwiftUI's Text) size lines from sTypoAscender/sTypoDescender/
+        // sTypoLineGap, at fixed offsets 68/70/72 of the OS/2 table (present in
+        // every OS/2 version, v0 onward). The hhea line gap lives at hhea + 8.
+        // OS/2 is an optional table: fall back to hhea metrics when it is absent.
+        let hheaLineGap = Self.i16(bytes, at: hhea.offset + 8) ?? 0
+        if let os2 = tableDirectory["OS/2"],
+           let typoAsc = Self.i16(bytes, at: os2.offset + 68),
+           let typoDesc = Self.i16(bytes, at: os2.offset + 70),
+           let typoGap = Self.i16(bytes, at: os2.offset + 72) {
+            typoAscender = Double(typoAsc)
+            typoDescender = Double(typoDesc)
+            typoLineGap = Double(typoGap)
+        } else {
+            typoAscender = Double(ascender)
+            typoDescender = Double(descender)
+            typoLineGap = Double(hheaLineGap)
+        }
         numberOfGlyphs = glyphCount
         indexToLocFormat = locFormat
         numberOfHMetrics = max(1, hMetricCount)

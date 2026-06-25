@@ -59,7 +59,7 @@ struct FontTests {
 /// (.notdef empty, 'A' mapped to a 500x500 square), cmap format 4,
 /// short loca, 1000 units per em.
 enum MiniFont {
-    static func build() -> [UInt8] {
+    static func build(extraTables: [(tag: String, data: [UInt8])] = []) -> [UInt8] {
         var head: [UInt8] = []
         head += be32(0x0001_0000) // version
         head += be32(0) // fontRevision
@@ -117,7 +117,7 @@ enum MiniFont {
         let tables: [(tag: String, data: [UInt8])] = [
             ("cmap", cmap), ("glyf", glyf), ("head", head), ("hhea", hhea),
             ("hmtx", hmtx), ("loca", loca), ("maxp", maxp),
-        ]
+        ] + extraTables
 
         var font: [UInt8] = []
         font += be32(0x0001_0000)
