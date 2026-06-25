@@ -48,10 +48,16 @@ public struct GSUBLookup: Equatable, Sendable {
     /// one kind of mark while matching across another. Independent of
     /// ``ignoreMarks``, which skips every mark.
     public let markAttachmentType: Int
+    /// The lookup's mark filtering-set index (the UseMarkFilteringSet flag), or nil.
+    /// When set, the lookup skips every mark not in that GDEF mark glyph set, so a
+    /// rule can match across one kind of mark while keeping another (a Hebrew
+    /// vowel point skipped, the shin dot kept). Independent of ``ignoreMarks``.
+    public let markFilteringSet: Int?
 
-    public init(kind: Kind, ignoreMarks: Bool, markAttachmentType: Int = 0) {
+    public init(kind: Kind, ignoreMarks: Bool, markAttachmentType: Int = 0, markFilteringSet: Int? = nil) {
         self.kind = kind
         self.ignoreMarks = ignoreMarks
         self.markAttachmentType = markAttachmentType
+        self.markFilteringSet = markFilteringSet
     }
 }

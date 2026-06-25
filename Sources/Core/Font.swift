@@ -821,8 +821,12 @@ public struct Font: Equatable, Sendable {
             }
         }
         guard let lookupType else { return nil }
-        let ignoreMarks = flag & (0x0008 | 0x0010) != 0
+        // IgnoreMarks (0x0008) skips every mark; UseMarkFilteringSet (0x0010) skips
+        // only marks outside a named GDEF mark glyph set. They are distinct: the
+        // filtering set is read separately, not folded into ignore-all-marks.
+        let ignoreMarks = flag & 0x0008 != 0
         let markAttachmentType = (flag & 0xFF00) >> 8
+        let markFilteringSet = flag & 0x0010 != 0 ? gsubLookupMarkFilteringSet(at: index) : nil
         let kind: GSUBLookup.Kind = switch lookupType {
         case 1: .single(single)
         case 2: .multiple(multiple)
@@ -832,7 +836,7 @@ public struct Font: Equatable, Sendable {
         case 8: .reverseChainSingle(reverse)
         default: .unsupported
         }
-        return GSUBLookup(kind: kind, ignoreMarks: ignoreMarks, markAttachmentType: markAttachmentType)
+        return GSUBLookup(kind: kind, ignoreMarks: ignoreMarks, markAttachmentType: markAttachmentType, markFilteringSet: markFilteringSet)
     }
 
     /// Decodes a GSUB contextual (type 5) or chained contextual (type 6) subtable
@@ -1285,6 +1289,50 @@ public struct Font: Equatable, Sendable {
             return 0
         }
         return classDef.classValue(forGlyph: glyph)
+    }
+
+    /// Whether `glyph` is in the GDEF mark glyph set numbered `set` (the
+    /// MarkGlyphSetsDef table, GDEF version 1.2 and later). A lookup whose flag
+    /// carries UseMarkFilteringSet skips every mark not in its named set, so a rule
+    /// can match across one kind of mark (a Hebrew vowel point) while keeping
+    /// another (the shin dot). False when the font has no mark glyph sets.
+    public func markFilterSetContains(set setIndex: Int, glyph: Int) -> Bool {
+        guard let gdef = tables["GDEF"],
+              let minor = Self.u16(data, at: gdef.offset + 2), minor >= 2,
+              let setsOffset = Self.u16(data, at: gdef.offset + 12), setsOffset != 0
+        else {
+            return false
+        }
+        let base = gdef.offset + setsOffset
+        guard Self.u16(data, at: base) == 1,
+              let count = Self.u16(data, at: base + 2), setIndex >= 0, setIndex < count,
+              let coverageOffset = Self.u32(data, at: base + 4 + setIndex * 4),
+              let coverage = OpenTypeCoverage(data: data, offset: base + coverageOffset)
+        else {
+            return false
+        }
+        return coverage.coveredGlyphs.contains(glyph)
+    }
+
+    /// The mark filtering-set index of the GSUB lookup at `index`, or nil when its
+    /// flag does not carry UseMarkFilteringSet. The index follows the subtable
+    /// offsets in the Lookup table and names a set in ``markFilterSetContains(set:glyph:)``.
+    private func gsubLookupMarkFilteringSet(at index: Int) -> Int? {
+        guard let gsub = tables["GSUB"], let lookupListOffset = Self.u16(data, at: gsub.offset + 8) else { return nil }
+        let lookupList = gsub.offset + lookupListOffset
+        guard let lookupCount = Self.u16(data, at: lookupList), index >= 0, index < lookupCount,
+              let lookupOffset = Self.u16(data, at: lookupList + 2 + index * 2)
+        else {
+            return nil
+        }
+        let lookup = lookupList + lookupOffset
+        guard let flag = Self.u16(data, at: lookup + 2), flag & 0x0010 != 0,
+              let subtableCount = Self.u16(data, at: lookup + 4),
+              let filterSet = Self.u16(data, at: lookup + 6 + subtableCount * 2)
+        else {
+            return nil
+        }
+        return filterSet
     }
 
     /// Walks every GSUB subtable of the lookups whose feature tag satisfies
