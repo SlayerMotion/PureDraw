@@ -1988,12 +1988,15 @@ public struct Font: Equatable, Sendable {
         return actions
     }
 
-    /// The font's mark-to-base attachment (GPOS lookup type 4) under the `mark`
-    /// feature, for the shaping tier to seat combining marks over their bases
-    /// (Arabic vowel marks, for example). Extension lookups (type 9) are
-    /// resolved. Empty when the font carries no mark positioning.
+    /// The font's mark-to-base attachment (GPOS lookup type 4), for the shaping tier
+    /// to seat combining marks over their bases (Arabic vowel marks, for example).
+    /// Gathers the general `mark` feature together with the Indic above-base (`abvm`)
+    /// and below-base (`blwm`) mark features, which seat a Devanagari reph or an
+    /// i/u-matra over its consonant; those features exist only in Indic fonts, so they
+    /// are a no-op elsewhere. Extension lookups (type 9) are resolved. Empty when the
+    /// font carries no mark positioning.
     public func markAttachment(variations: [String: Double] = [:]) -> MarkAttachment {
-        collectMarkAttachment(feature: "mark", lookupType: 4, normalized: variations.isEmpty ? nil : normalizedVariationCoordinates(variations))
+        collectMarkAttachment(features: ["mark", "abvm", "blwm"], lookupType: 4, normalized: variations.isEmpty ? nil : normalizedVariationCoordinates(variations))
     }
 
     /// The font's GPOS mark-to-mark attachment (the `mkmk` feature, lookup type
@@ -2004,7 +2007,7 @@ public struct Font: Equatable, Sendable {
     /// `bases`, so ``MarkAttachment/offset(base:mark:)`` reads the same way as
     /// for mark-to-base. Empty when the font carries no mark-to-mark attachment.
     public func markMarkAttachment(variations: [String: Double] = [:]) -> MarkAttachment {
-        collectMarkAttachment(feature: "mkmk", lookupType: 6, normalized: variations.isEmpty ? nil : normalizedVariationCoordinates(variations))
+        collectMarkAttachment(features: ["mkmk"], lookupType: 6, normalized: variations.isEmpty ? nil : normalizedVariationCoordinates(variations))
     }
 
     /// The font's GPOS mark-to-ligature attachment (the `mark` feature, lookup type
@@ -2110,7 +2113,7 @@ public struct Font: Equatable, Sendable {
     /// ``MarkAttachment``. `lookupType` is 4 for mark-to-base (the `mark`
     /// feature) and 6 for mark-to-mark (the `mkmk` feature); the two share the
     /// same subtable layout, so one parser serves both.
-    private func collectMarkAttachment(feature wanted: String, lookupType wantedType: Int, normalized: [Double]?) -> MarkAttachment {
+    private func collectMarkAttachment(features wanted: [String], lookupType wantedType: Int, normalized: [Double]?) -> MarkAttachment {
         var marks: [Int: MarkAttachment.Mark] = [:]
         var bases: [Int: [Int: MarkAttachment.Point]] = [:]
         // Mark classes are local to each subtable: class 0 in one mark lookup is a
@@ -2120,11 +2123,15 @@ public struct Font: Equatable, Sendable {
         // two lookups (common in Nastaliq, where most bases are) would take the
         // wrong subtable's anchor. Give each subtable a disjoint class range by
         // offsetting its classes past every class already seen; the mark and the
-        // base anchors of one subtable then keep their pairing across the merge.
+        // base anchors of one subtable then keep their pairing across the merge. The
+        // offset carries across the features too, so the above-base (`abvm`) and
+        // below-base (`blwm`) Indic mark lookups merge with `mark` without colliding.
         var classOffset = 0
-        forEachGPOSSubtable(feature: wanted) { subtable, effectiveType in
-            if effectiveType == wantedType {
-                classOffset += parseMarkAnchorSubtable(subtable: subtable, classOffset: classOffset, normalized: normalized, marks: &marks, bases: &bases)
+        for feature in wanted {
+            forEachGPOSSubtable(feature: feature) { subtable, effectiveType in
+                if effectiveType == wantedType {
+                    classOffset += parseMarkAnchorSubtable(subtable: subtable, classOffset: classOffset, normalized: normalized, marks: &marks, bases: &bases)
+                }
             }
         }
         return MarkAttachment(marks: marks, bases: bases)
