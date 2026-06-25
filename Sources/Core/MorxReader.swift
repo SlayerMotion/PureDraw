@@ -81,7 +81,11 @@ struct MorxReader {
             }
             chainStart += chainLength
         }
-        return glyphs
+        // Remove glyphs a subtable marked deleted. AAT's deleted-glyph marker is
+        // 0xFFFF; a subtable substitutes a glyph to it to drop the glyph (a variation
+        // selector absorbed into its base, for one), leaving it in the stream as the
+        // "deleted" class so later subtables skip it, and the engine removes it here.
+        return glyphs.filter { $0.glyphID != 0xFFFF }
     }
 
     private func applySubtable(type: Int, body: Int, length _: Int, glyphs: [MorxGlyph]) -> [MorxGlyph] {

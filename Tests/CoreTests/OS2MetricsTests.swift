@@ -1,6 +1,6 @@
 import Foundation
-import Testing
 @testable import PureDraw
+import Testing
 
 /// OS/2 typographic metrics drive line height in Core Text and SwiftUI, distinct
 /// from the `hhea` em-box. These tests pin the parse two ways: a deterministic
@@ -8,7 +8,6 @@ import Testing
 /// a macOS-gated check reads Arial's real published values as a ground-truth oracle.
 @Suite("OS/2 typographic metrics")
 struct OS2MetricsTests {
-
     /// Builds a minimal valid OS/2 table (version 0, 78+ bytes) carrying the three
     /// typographic metrics at their fixed offsets 68/70/72.
     private func os2Table(typoAscender: Int, typoDescender: Int, typoLineGap: Int) -> [UInt8] {
@@ -46,22 +45,22 @@ struct OS2MetricsTests {
     }
 
     #if os(macOS)
-    @Test func arialOS2MatchesPublishedValues() throws {
-        // Real-artifact oracle: Arial's OS/2 (unitsPerEm 2048) publishes
-        // sTypoAscender 1491, sTypoDescender -431, sTypoLineGap 307. These differ
-        // from its hhea metrics (1854 / -434), so reading them proves the OS/2 path
-        // end to end on a shipping font.
-        let path = "/System/Library/Fonts/Supplemental/Arial.ttf"
-        guard let data = try? Array(Data(contentsOf: URL(fileURLWithPath: path))) else {
-            return // Arial not present on this host; the synthetic tests still cover the parse.
+        @Test func arialOS2MatchesPublishedValues() throws {
+            // Real-artifact oracle: Arial's OS/2 (unitsPerEm 2048) publishes
+            // sTypoAscender 1491, sTypoDescender -431, sTypoLineGap 307. These differ
+            // from its hhea metrics (1854 / -434), so reading them proves the OS/2 path
+            // end to end on a shipping font.
+            let path = "/System/Library/Fonts/Supplemental/Arial.ttf"
+            guard let data = try? Array(Data(contentsOf: URL(fileURLWithPath: path))) else {
+                return // Arial not present on this host; the synthetic tests still cover the parse.
+            }
+            let font = try Font(data: data)
+            #expect(font.unitsPerEm == 2048)
+            #expect(font.typoAscender == 1491)
+            #expect(font.typoDescender == -431)
+            #expect(font.typoLineGap == 307)
+            #expect(font.ascent == 1854) // hhea, distinct from typo
+            #expect(font.descent == -434)
         }
-        let font = try Font(data: data)
-        #expect(font.unitsPerEm == 2048)
-        #expect(font.typoAscender == 1491)
-        #expect(font.typoDescender == -431)
-        #expect(font.typoLineGap == 307)
-        #expect(font.ascent == 1854)   // hhea, distinct from typo
-        #expect(font.descent == -434)
-    }
     #endif
 }

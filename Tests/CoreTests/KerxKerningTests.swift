@@ -11,7 +11,7 @@
     /// shaping tier reproduces Core Text's spacing.
     @Suite("AAT kerx pair kerning (format 0)")
     struct KerxKerningTests {
-        @Test func kannadaFormat0PairKerning() throws {
+        @Test func kannadaFormat0PairKerning() {
             let path = "/System/Library/Fonts/Supplemental/Kannada MN.ttc"
             guard let data = FileManager.default.contents(atPath: path),
                   let font = try? Font(data: [UInt8](data))

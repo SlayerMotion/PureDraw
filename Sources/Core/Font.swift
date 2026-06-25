@@ -152,7 +152,8 @@ public struct Font: Equatable, Sendable {
         if let os2 = tableDirectory["OS/2"],
            let typoAsc = Self.i16(bytes, at: os2.offset + 68),
            let typoDesc = Self.i16(bytes, at: os2.offset + 70),
-           let typoGap = Self.i16(bytes, at: os2.offset + 72) {
+           let typoGap = Self.i16(bytes, at: os2.offset + 72)
+        {
             typoAscender = Double(typoAsc)
             typoDescender = Double(typoDesc)
             typoLineGap = Double(typoGap)
@@ -308,11 +309,16 @@ public struct Font: Equatable, Sendable {
     /// (explicit pairs) is decoded here; PairPos format 2 (class-based pairs),
     /// the GSUB substitution lookups, and GDEF are the next slices of
     /// SlayerMotion/PureDraw#140.
-    public func kerningMap(restrictTo activeFeatures: Set<Int>? = nil) -> KerningMap {
+    /// `includeLegacyKern` controls the fallback to the legacy `kern` table when the
+    /// font carries no GPOS kerning. The legacy `kern` is a glyph-stream (display
+    /// order) table, so a caller shaping a right-to-left run, which kerns before the
+    /// bidi reorder, passes `false` to skip it rather than kern the wrong, logical,
+    /// adjacencies; GPOS kerning is logical-order and stays.
+    public func kerningMap(restrictTo activeFeatures: Set<Int>? = nil, includeLegacyKern: Bool = true) -> KerningMap {
         var pairs: [UInt64: Int] = [:]
         var classSubtables: [KerningClassSubtable] = []
         parseGPOSKern(into: &pairs, classSubtables: &classSubtables, restrictTo: activeFeatures)
-        if pairs.isEmpty, classSubtables.isEmpty {
+        if pairs.isEmpty, classSubtables.isEmpty, includeLegacyKern {
             parseLegacyKern(into: &pairs)
         }
         return KerningMap(adjustments: pairs, classSubtables: classSubtables)
@@ -472,38 +478,71 @@ public struct Font: Equatable, Sendable {
         }
     }
 
-    /// Reads the legacy `kern` table (Microsoft format 0) into `pairs`.
+    /// Reads the legacy `kern` table into `pairs`, in both layouts a font may use:
+    /// the Microsoft version 0 (u16 version and count, subtable format in the
+    /// coverage high byte) and the Apple AAT version 1.0 (u32 version and count,
+    /// format in the coverage low byte, the layout Helvetica and other classic Apple
+    /// fonts carry). Only horizontal, non-cross-stream format-0 pair subtables
+    /// contribute to horizontal kerning.
     private func parseLegacyKern(into pairs: inout [UInt64: Int]) {
-        guard let kern = tables["kern"],
-              Self.u16(data, at: kern.offset) == 0,
-              let subtableCount = Self.u16(data, at: kern.offset + 2)
-        else {
-            return
-        }
-        var subtableOffset = kern.offset + 4
-        for _ in 0 ..< subtableCount {
-            guard let length = Self.u16(data, at: subtableOffset + 2),
-                  let coverage = Self.u16(data, at: subtableOffset + 4),
-                  length > 0
-            else {
-                return
-            }
-            let format = (coverage >> 8) & 0xFF
-            let isHorizontal = (coverage & 0x0001) != 0
-            if format == 0, isHorizontal, let pairCount = Self.u16(data, at: subtableOffset + 6) {
-                let pairsStart = subtableOffset + 14 // header(6) + nPairs/searchRange/entrySelector/rangeShift(8)
-                for pairIndex in 0 ..< pairCount {
-                    let record = pairsStart + pairIndex * 6
-                    guard let left = Self.u16(data, at: record),
-                          let right = Self.u16(data, at: record + 2),
-                          let value = Self.i16(data, at: record + 4)
-                    else {
-                        break
-                    }
-                    pairs[KerningMap.key(firstGlyph: left, secondGlyph: right)] = value
+        guard let kern = tables["kern"] else { return }
+        if Self.u16(data, at: kern.offset) == 0 {
+            guard let subtableCount = Self.u16(data, at: kern.offset + 2) else { return }
+            var subtableOffset = kern.offset + 4
+            for _ in 0 ..< subtableCount {
+                guard let length = Self.u16(data, at: subtableOffset + 2),
+                      let coverage = Self.u16(data, at: subtableOffset + 4),
+                      length > 0
+                else {
+                    return
                 }
+                let format = (coverage >> 8) & 0xFF
+                let isHorizontal = (coverage & 0x0001) != 0
+                if format == 0, isHorizontal {
+                    // Subtable header is version, length, coverage (6 bytes); the
+                    // format-0 nPairs field follows.
+                    readKernFormat0(pairsHeader: subtableOffset + 6, into: &pairs)
+                }
+                subtableOffset += length
             }
-            subtableOffset += length
+        } else if Self.u32(data, at: kern.offset) == 0x0001_0000 {
+            guard let subtableCount = Self.u32(data, at: kern.offset + 4) else { return }
+            var subtableOffset = kern.offset + 8
+            for _ in 0 ..< subtableCount {
+                guard let length = Self.u32(data, at: subtableOffset),
+                      let coverage = Self.u16(data, at: subtableOffset + 4),
+                      length > 0
+                else {
+                    return
+                }
+                let format = coverage & 0xFF
+                let vertical = (coverage & 0x8000) != 0
+                let crossStream = (coverage & 0x4000) != 0
+                if format == 0, !vertical, !crossStream {
+                    // Subtable header is length, coverage, tupleIndex (8 bytes); the
+                    // format-0 nPairs field follows.
+                    readKernFormat0(pairsHeader: subtableOffset + 8, into: &pairs)
+                }
+                subtableOffset += length
+            }
+        }
+    }
+
+    /// Reads a format-0 `kern` subtable's pair list, whose `pairsHeader` is the u16
+    /// `nPairs` field; the pair records follow the 8-byte search header. Each record
+    /// is (left glyph, right glyph, i16 value), inserted into `pairs`.
+    private func readKernFormat0(pairsHeader: Int, into pairs: inout [UInt64: Int]) {
+        guard let pairCount = Self.u16(data, at: pairsHeader) else { return }
+        let pairsStart = pairsHeader + 8
+        for pairIndex in 0 ..< pairCount {
+            let record = pairsStart + pairIndex * 6
+            guard let left = Self.u16(data, at: record),
+                  let right = Self.u16(data, at: record + 2),
+                  let value = Self.i16(data, at: record + 4)
+            else {
+                break
+            }
+            pairs[KerningMap.key(firstGlyph: left, secondGlyph: right)] = value
         }
     }
 
