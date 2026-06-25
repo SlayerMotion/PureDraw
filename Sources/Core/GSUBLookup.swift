@@ -42,9 +42,16 @@ public struct GSUBLookup: Equatable, Sendable {
     /// lookup flag); GDEF classifies marks. Mirrors the flag the contextual and
     /// reverse-chaining values already carry.
     public let ignoreMarks: Bool
+    /// The lookup's mark attachment type (the high byte of the lookup flag), or 0
+    /// when none. When non-zero, the lookup skips every mark whose GDEF mark
+    /// attachment class differs from this type, so a contextual rule can step over
+    /// one kind of mark while matching across another. Independent of
+    /// ``ignoreMarks``, which skips every mark.
+    public let markAttachmentType: Int
 
-    public init(kind: Kind, ignoreMarks: Bool) {
+    public init(kind: Kind, ignoreMarks: Bool, markAttachmentType: Int = 0) {
         self.kind = kind
         self.ignoreMarks = ignoreMarks
+        self.markAttachmentType = markAttachmentType
     }
 }

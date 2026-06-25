@@ -803,6 +803,7 @@ public struct Font: Equatable, Sendable {
         }
         guard let lookupType else { return nil }
         let ignoreMarks = flag & (0x0008 | 0x0010) != 0
+        let markAttachmentType = (flag & 0xFF00) >> 8
         let kind: GSUBLookup.Kind = switch lookupType {
         case 1: .single(single)
         case 2: .multiple(multiple)
@@ -812,7 +813,7 @@ public struct Font: Equatable, Sendable {
         case 8: .reverseChainSingle(reverse)
         default: .unsupported
         }
-        return GSUBLookup(kind: kind, ignoreMarks: ignoreMarks)
+        return GSUBLookup(kind: kind, ignoreMarks: ignoreMarks, markAttachmentType: markAttachmentType)
     }
 
     /// Decodes a GSUB contextual (type 5) or chained contextual (type 6) subtable
@@ -1250,6 +1251,21 @@ public struct Font: Equatable, Sendable {
             return false
         }
         return classDef.classValue(forGlyph: glyph) == 3
+    }
+
+    /// The GDEF mark attachment class of `glyph` (the MarkAttachClassDef table), or
+    /// 0 when the glyph has no class or the font has no such table. A lookup whose
+    /// flag carries a mark attachment type skips every mark whose class differs from
+    /// that type, so a contextual rule can match across one kind of mark (a Nastaliq
+    /// dot) while stepping over another (a spacer). (OpenType GDEF: MarkAttachClassDef.)
+    public func markAttachmentClass(_ glyph: Int) -> Int {
+        guard let gdef = tables["GDEF"],
+              let classDefOffset = Self.u16(data, at: gdef.offset + 10), classDefOffset != 0,
+              let classDef = OpenTypeClassDef(data: data, offset: gdef.offset + classDefOffset)
+        else {
+            return 0
+        }
+        return classDef.classValue(forGlyph: glyph)
     }
 
     /// Walks every GSUB subtable of the lookups whose feature tag satisfies

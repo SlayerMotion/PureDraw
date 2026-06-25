@@ -31,5 +31,21 @@
             #expect(offset.x == 73, "dot x offset \(offset.x)")
             #expect(offset.y == -166, "the below dot must sit below the baseline, got y \(offset.y)")
         }
+
+        @Test func markAttachmentTypeAndClassAreParsed() throws {
+            guard let data = FileManager.default.contents(atPath: Self.nastaliq),
+                  let font = try? Font(data: [UInt8](data))
+            else {
+                return
+            }
+            // Lookup 167 carries mark attachment type 2 (the high byte of its lookup
+            // flag), so it steps over marks whose GDEF mark attachment class is not 2.
+            // Noto Nastaliq's below dots are class 2 and its spacer is class 7, so the
+            // lookup matches across the dots while skipping the spacer.
+            let lookup = try #require(font.gsubLookup(at: 167))
+            #expect(lookup.markAttachmentType == 2, "lookup 167 mark attachment type \(lookup.markAttachmentType)")
+            #expect(font.markAttachmentClass(16) == 2, "the below dot is mark attachment class 2")
+            #expect(font.markAttachmentClass(972) == 7, "the spacer is mark attachment class 7")
+        }
     }
 #endif
