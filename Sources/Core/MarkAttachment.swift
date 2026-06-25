@@ -24,12 +24,19 @@ public struct MarkAttachment: Equatable, Sendable {
         }
     }
 
-    /// Each mark glyph to its class and anchor.
-    public let marks: [Int: Mark]
+    /// Each mark glyph to its class-and-anchor records. A glyph carries more than one
+    /// when it is a mark in several mark-to-base subtables, each pairing it with a
+    /// different base set under a different class: a Devanagari reph is class 0 against
+    /// the wide base it sits inside in one subtable and a different class against other
+    /// bases in another. Flattening to one record would drop every pairing but the last
+    /// and orphan the mark from the base whose anchor it should use. The records are in
+    /// subtable (lookup) order, so the first that a base offers an anchor for wins, the
+    /// order Core Text resolves them in.
+    public let marks: [Int: [Mark]]
     /// Each base glyph to the anchor it offers for each mark class.
     public let bases: [Int: [Int: Point]]
 
-    public init(marks: [Int: Mark], bases: [Int: [Int: Point]]) {
+    public init(marks: [Int: [Mark]], bases: [Int: [Int: Point]]) {
         self.marks = marks
         self.bases = bases
     }
@@ -46,10 +53,16 @@ public struct MarkAttachment: Equatable, Sendable {
 
     /// The offset, in font units, to place `mark`'s glyph relative to the origin
     /// of `base`'s glyph so their anchors coincide, or `nil` if the pair does not
-    /// attach (the mark is unknown, the base offers no anchor for the mark's
-    /// class).
+    /// attach (the mark is unknown, or no class the mark carries is one the base
+    /// offers an anchor for). When the mark has records in several subtables, the
+    /// first, in lookup order, whose class the base anchors wins.
     public func offset(base: Int, mark: Int) -> Point? {
-        guard let mark = marks[mark], let basePoint = bases[base]?[mark.markClass] else { return nil }
-        return Point(x: basePoint.x - mark.anchor.x, y: basePoint.y - mark.anchor.y)
+        guard let records = marks[mark], let baseAnchors = bases[base] else { return nil }
+        for record in records {
+            if let basePoint = baseAnchors[record.markClass] {
+                return Point(x: basePoint.x - record.anchor.x, y: basePoint.y - record.anchor.y)
+            }
+        }
+        return nil
     }
 }

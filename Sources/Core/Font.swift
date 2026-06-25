@@ -2114,7 +2114,7 @@ public struct Font: Equatable, Sendable {
     /// feature) and 6 for mark-to-mark (the `mkmk` feature); the two share the
     /// same subtable layout, so one parser serves both.
     private func collectMarkAttachment(features wanted: [String], lookupType wantedType: Int, normalized: [Double]?) -> MarkAttachment {
-        var marks: [Int: MarkAttachment.Mark] = [:]
+        var marks: [Int: [MarkAttachment.Mark]] = [:]
         var bases: [Int: [Int: MarkAttachment.Point]] = [:]
         // Mark classes are local to each subtable: class 0 in one mark lookup is a
         // different class than class 0 in the next, and the BaseArray that pairs
@@ -2253,7 +2253,7 @@ public struct Font: Equatable, Sendable {
         subtable: Int,
         classOffset: Int,
         normalized: [Double]?,
-        marks: inout [Int: MarkAttachment.Mark],
+        marks: inout [Int: [MarkAttachment.Mark]],
         bases: inout [Int: [Int: MarkAttachment.Point]]
     ) -> Int {
         guard Self.u16(data, at: subtable) == 1,
@@ -2279,7 +2279,7 @@ public struct Font: Equatable, Sendable {
                 else {
                     continue
                 }
-                marks[markGlyph] = MarkAttachment.Mark(markClass: markClass + classOffset, anchor: anchor)
+                marks[markGlyph, default: []].append(MarkAttachment.Mark(markClass: markClass + classOffset, anchor: anchor))
             }
         }
 
