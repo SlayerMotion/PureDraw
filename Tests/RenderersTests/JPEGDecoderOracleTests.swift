@@ -92,6 +92,82 @@
             return data
         }
 
+        /// A smooth diagonal color sweep: each channel ramps in a different direction, so chroma
+        /// (Cb/Cr) varies strongly but continuously. At 4:2:0 this exercises chroma upsampling hard
+        /// while staying free of the sharp discontinuities that would confound the comparison with
+        /// the inverse-DCT divergence.
+        private func chromaSweepRGBA(width: Int, height: Int) -> [UInt8] {
+            var data = [UInt8](repeating: 0, count: width * height * 4)
+            for y in 0 ..< height {
+                for x in 0 ..< width {
+                    let i = (y * width + x) * 4
+                    data[i] = UInt8(255 * x / max(width - 1, 1))
+                    data[i + 1] = UInt8(255 * (height - 1 - y) / max(height - 1, 1))
+                    data[i + 2] = UInt8(255 * y / max(height - 1, 1))
+                    data[i + 3] = 255
+                }
+            }
+            return data
+        }
+
+        /// Strongly-varying chroma at 4:2:0 must match CoreGraphics closely, which requires centered
+        /// "fancy" chroma upsampling (nearest-neighbour upsampling would diverge by tens of levels).
+        @Test func upsamplesSubsampledChromaLikeCoreGraphics() throws {
+            let (w, h) = (64, 48)
+            let source = chromaSweepRGBA(width: w, height: h)
+            let cgImage = try #require(makeCGImage(rgba: source, width: w, height: h))
+            // Quality 0.9 keeps ImageIO on 4:2:0 subsampling for this size.
+            let jpeg = try #require(encodeJPEG(cgImage, quality: 0.9))
+            let mine = try ImageDecoder.decode(jpeg)
+            let reference = try #require(decodeWithCoreGraphics(jpeg, width: w, height: h))
+            var maxDiff = 0
+            for pixel in 0 ..< w * h {
+                let dst = pixel * 4
+                for channel in 0 ..< 3 {
+                    maxDiff = max(maxDiff, abs(Int(mine.data[dst + channel]) - Int(reference[dst + channel])))
+                }
+            }
+            #expect(maxDiff <= 12, "subsampled-chroma max diff vs CoreGraphics was \(maxDiff)")
+        }
+
+        /// A 4:4:0 (h1v2, vertical-only chroma subsampling) JPEG, a layout ImageIO never emits but
+        /// must decode. Generated offline with `cjpeg -sample 1x2` over a smooth color sweep. Matching
+        /// CoreGraphics requires centered *vertical* chroma upsampling; nearest-neighbour would band.
+        @Test func decodes440ChromaLikeCoreGraphics() throws {
+            let base64 = """
+            /9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMU
+            FRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU
+            FBQUFBQUFBT/wAARCAAwAEADARIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUF
+            BAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVW
+            V1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi
+            4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAEC
+            AxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVm
+            Z2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq
+            8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDrLTWOnzVxFpq/T5q/nKfC390/hrDZd5HqNpq/T5q4i01fp81cM+Fv7p9Xhsu8j1G01jp8
+            1cRaav0+auCfC390+rwuXeR6jaax0+auItNX6fNXBPhb+6fWYbL/ACPULTV+nzVxFpq/T5q4Z8Lf3T6rDZf5HqNprHT5q4i01fp8
+            1cE+Fv7p9Xhsu8j1G01jp81cRaav0+auGfC390+rw2XeR6jaav0+auItNX6fNXBPhb+6fV4bLvI+FLTV+nzVxFpq/T5q/wBJ58Lf
+            3T+IMNl3keoWmr9PmriLTV+nzVwT4W/un1WGy7yPUbTV+nzVxFpq/T5q4Z8Lf3T6vC5d5HqNpq/T5q4i01fp81cE+Fv7p9Zhsu8j
+            1G01fp81cRaav0+auGfC390+rw2XeR6jaav0+auItNX6fNXBPhb+6fV4bLvI9QtNX6fNXEWmr9Pmrgnwt/dPq8Nl3keo2mr9Pmri
+            LTV+nzVwz4W/un1eGy7yPhS01fp81cRaav05r/SafC390/iDDZd5HqFpq/T5q4m01fpzXDPhb+6fVYbLvI9QtNX6fNXE2mr9Oa4J
+            8Lf3T6zC5d5HqFpq/T5q4m01fpzXBPhb+6fV4bL/ACPULTV+nzVxFpq/TmuGfC390+rw2X+R6jaav0+auItNX6c1wT4W/un1eGy7
+            yPUbTV+nzVxFpq/TmuGfC390+rw2XeR6haav0+auJtNX6c1wT4W/un1eGy7yP//Z
+            """
+            let data = try #require(Data(base64Encoded: base64, options: .ignoreUnknownCharacters))
+            let jpeg = [UInt8](data)
+            let (w, h) = (64, 48)
+            let mine = try ImageDecoder.decode(jpeg)
+            #expect(mine.width == w && mine.height == h)
+            let reference = try #require(decodeWithCoreGraphics(jpeg, width: w, height: h))
+            var maxDiff = 0
+            for pixel in 0 ..< w * h {
+                let dst = pixel * 4
+                for channel in 0 ..< 3 {
+                    maxDiff = max(maxDiff, abs(Int(mine.data[dst + channel]) - Int(reference[dst + channel])))
+                }
+            }
+            #expect(maxDiff <= 12, "4:4:0 max diff vs CoreGraphics was \(maxDiff)")
+        }
+
         /// True if the byte stream carries an SOF2 (progressive) frame header.
         private func isProgressive(_ jpeg: [UInt8]) -> Bool {
             var i = 0

@@ -862,43 +862,168 @@ enum JPEGDecoder {
             return rgba
         }
 
-        // Three components. APP14 transform 0 means the samples are already R,G,B; otherwise
-        // (or absent, the JFIF default) they are YCbCr. YCCK/CMYK (transform 2 / 4 components)
-        // is rejected earlier. The chroma row offset depends only on y, so it is hoisted out of
-        // the inner loop, which then nearest-samples each plane with a single division per pixel.
-        let p0 = planes[0], p1 = planes[1], p2 = planes[2]
+        /// Three components. Present each at full resolution as a (samples, row stride) view: a
+        /// full-resolution component (always luma, and the chroma of 4:4:4 / RGB) is read in place at
+        /// its padded stride with no copy; a subsampled chroma component is materialized once via
+        /// centered "fancy" upsampling (matching CoreGraphics/libjpeg). APP14 transform 0 marks the
+        /// samples as already R,G,B; otherwise (the JFIF default) they are YCbCr.
+        func view(_ plane: Plane) -> (samples: [UInt8], stride: Int) {
+            if plane.h == hMax, plane.v == vMax { return (plane.samples, plane.width) }
+            return (upsampledComponent(plane, width: width, height: height, hMax: hMax, vMax: vMax), width)
+        }
+        let (s0, stride0) = view(planes[0])
+        let (s1, stride1) = view(planes[1])
+        let (s2, stride2) = view(planes[2])
         let isRGB = adobeTransform == 0
-        // The horizontal sample index repeats identically across every row, so build each plane's
-        // column-mapping table once instead of dividing per pixel.
-        let cols0 = (0 ..< width).map { $0 * p0.h / hMax }
-        let cols1 = (0 ..< width).map { $0 * p1.h / hMax }
-        let cols2 = (0 ..< width).map { $0 * p2.h / hMax }
         for y in 0 ..< height {
-            let r0 = (y * p0.v / vMax) * p0.width
-            let r1 = (y * p1.v / vMax) * p1.width
-            let r2 = (y * p2.v / vMax) * p2.width
+            let r0 = y * stride0, r1 = y * stride1, r2 = y * stride2
             var dst = y * width * 4
             for x in 0 ..< width {
-                let c0 = p0.samples[r0 + cols0[x]]
-                let c1 = p1.samples[r1 + cols1[x]]
-                let c2 = p2.samples[r2 + cols2[x]]
+                let c0 = s0[r0 + x]
+                let c1 = s1[r1 + x]
+                let c2 = s2[r2 + x]
                 if isRGB {
                     rgba[dst] = c0
                     rgba[dst + 1] = c1
                     rgba[dst + 2] = c2
                 } else {
                     let yy = Double(c0)
-                    let cb = Double(c1) - 128.0
-                    let cr = Double(c2) - 128.0
-                    rgba[dst] = clampByte(yy + 1.402 * cr)
-                    rgba[dst + 1] = clampByte(yy - 0.344136 * cb - 0.714136 * cr)
-                    rgba[dst + 2] = clampByte(yy + 1.772 * cb)
+                    let cbValue = Double(c1) - 128.0
+                    let crValue = Double(c2) - 128.0
+                    rgba[dst] = clampByte(yy + 1.402 * crValue)
+                    rgba[dst + 1] = clampByte(yy - 0.344136 * cbValue - 0.714136 * crValue)
+                    rgba[dst + 2] = clampByte(yy + 1.772 * cbValue)
                 }
                 rgba[dst + 3] = 255
                 dst += 4
             }
         }
         return rgba
+    }
+
+    // MARK: - Chroma upsampling
+
+    /// Upsamples one component's sample plane to full resolution. Matches libjpeg's centered "fancy"
+    /// triangle upsampling for the 2x cases (h2v1 4:2:2, h2v2 4:2:0, h1v2 4:4:0), which is what
+    /// CoreGraphics produces; other (rarer) ratios fall back to sample replication, as libjpeg does.
+    private static func upsampledComponent(_ plane: Plane, width: Int, height: Int, hMax: Int, vMax: Int) -> [UInt8] {
+        let dw = (width * plane.h + hMax - 1) / hMax // the component's own (downsampled) width
+        let dh = (height * plane.v + vMax - 1) / vMax
+        if plane.h == hMax, plane.v == vMax {
+            // Full-resolution component: copy the valid region.
+            var out = [UInt8](repeating: 0, count: width * height)
+            for y in 0 ..< height {
+                let src = y * plane.width, dst = y * width
+                for x in 0 ..< width {
+                    out[dst + x] = plane.samples[src + x]
+                }
+            }
+            return out
+        }
+        if 2 * plane.h == hMax, plane.v == vMax { return fancyUpsampleH2V1(plane, dw: dw, dh: dh, width: width, height: height) }
+        if 2 * plane.h == hMax, 2 * plane.v == vMax { return fancyUpsampleH2V2(plane, dw: dw, dh: dh, width: width, height: height) }
+        if plane.h == hMax, 2 * plane.v == vMax { return fancyUpsampleH1V2(plane, dh: dh, width: width, height: height) }
+        // Replication fallback for the remaining (rare) non-2x ratios, e.g. 4:1:1.
+        var out = [UInt8](repeating: 0, count: width * height)
+        for y in 0 ..< height {
+            let srow = (y * plane.v / vMax) * plane.width, dst = y * width
+            for x in 0 ..< width {
+                out[dst + x] = plane.samples[srow + x * plane.h / hMax]
+            }
+        }
+        return out
+    }
+
+    /// Horizontal 2x centered upsampling of `dw` samples at `src`: `out[2i]` leans on the left
+    /// neighbour, `out[2i+1]` on the right (3:1), with edge samples carried through (T.81-conformant
+    /// "fancy" upsampling as in libjpeg `h2v1_fancy_upsample`).
+    private static func horizontalFancy(_ samples: [UInt8], src: Int, dw: Int, into row: inout [Int]) {
+        if dw == 1 {
+            row[0] = Int(samples[src])
+            row[1] = Int(samples[src])
+            return
+        }
+        let first = Int(samples[src])
+        row[0] = first
+        row[1] = (first * 3 + Int(samples[src + 1]) + 2) >> 2
+        for i in 1 ..< dw - 1 {
+            let center = Int(samples[src + i]) * 3
+            row[2 * i] = (center + Int(samples[src + i - 1]) + 1) >> 2
+            row[2 * i + 1] = (center + Int(samples[src + i + 1]) + 2) >> 2
+        }
+        let last = dw - 1
+        let lastValue = Int(samples[src + last])
+        row[2 * last] = (lastValue * 3 + Int(samples[src + last - 1]) + 1) >> 2
+        row[2 * last + 1] = lastValue
+    }
+
+    private static func fancyUpsampleH2V1(_ plane: Plane, dw: Int, dh: Int, width: Int, height: Int) -> [UInt8] {
+        var out = [UInt8](repeating: 0, count: width * height)
+        var row = [Int](repeating: 0, count: 2 * dw)
+        for y in 0 ..< height {
+            horizontalFancy(plane.samples, src: min(y, dh - 1) * plane.width, dw: dw, into: &row)
+            let dst = y * width
+            for x in 0 ..< width {
+                out[dst + x] = UInt8(row[x])
+            }
+        }
+        return out
+    }
+
+    /// Vertical-only 2x centered upsampling (libjpeg `h1v2_fancy_upsample`, 4:4:0): each output row
+    /// blends its source row (weight 3) with the nearer neighbour row (weight 1); horizontal is full
+    /// resolution. The bias is `1 + (y & 1)`: the top output row leans toward the row above, the
+    /// bottom toward the row below.
+    private static func fancyUpsampleH1V2(_ plane: Plane, dh: Int, width: Int, height: Int) -> [UInt8] {
+        var out = [UInt8](repeating: 0, count: width * height)
+        for y in 0 ..< height {
+            let main = min(y >> 1, dh - 1)
+            let adjacent = (y & 1 == 0) ? max(main - 1, 0) : min(main + 1, dh - 1)
+            let mainBase = main * plane.width, adjBase = adjacent * plane.width
+            let bias = 1 + (y & 1)
+            let dst = y * width
+            for x in 0 ..< width {
+                out[dst + x] = UInt8((Int(plane.samples[mainBase + x]) * 3 + Int(plane.samples[adjBase + x]) + bias) >> 2)
+            }
+        }
+        return out
+    }
+
+    /// Vertical + horizontal 2x centered upsampling (libjpeg `h2v2_fancy_upsample`): each output row
+    /// blends its source row (weight 3) with the nearer neighbour row (weight 1), then the same 3:1
+    /// blend horizontally, for the classic 9/3/3/1 kernel over the 2x2 chroma cell.
+    private static func fancyUpsampleH2V2(_ plane: Plane, dw: Int, dh: Int, width: Int, height: Int) -> [UInt8] {
+        var out = [UInt8](repeating: 0, count: width * height)
+        var colsum = [Int](repeating: 0, count: dw)
+        var row = [Int](repeating: 0, count: 2 * dw)
+        for y in 0 ..< height {
+            let main = min(y >> 1, dh - 1)
+            let adjacent = (y & 1 == 0) ? max(main - 1, 0) : min(main + 1, dh - 1)
+            let mainBase = main * plane.width, adjBase = adjacent * plane.width
+            for i in 0 ..< dw {
+                colsum[i] = Int(plane.samples[mainBase + i]) * 3 + Int(plane.samples[adjBase + i])
+            }
+            if dw == 1 {
+                row[0] = (colsum[0] * 4 + 8) >> 4
+                row[1] = (colsum[0] * 4 + 7) >> 4
+            } else {
+                row[0] = (colsum[0] * 4 + 8) >> 4
+                row[1] = (colsum[0] * 3 + colsum[1] + 7) >> 4
+                for i in 1 ..< dw - 1 {
+                    let center = colsum[i] * 3
+                    row[2 * i] = (center + colsum[i - 1] + 8) >> 4
+                    row[2 * i + 1] = (center + colsum[i + 1] + 7) >> 4
+                }
+                let last = dw - 1
+                row[2 * last] = (colsum[last] * 3 + colsum[last - 1] + 8) >> 4
+                row[2 * last + 1] = (colsum[last] * 4 + 7) >> 4
+            }
+            let dst = y * width
+            for x in 0 ..< width {
+                out[dst + x] = UInt8(row[x])
+            }
+        }
+        return out
     }
 
     // MARK: - Bit reader
