@@ -60,6 +60,48 @@
             return [UInt8](out as Data)
         }
 
+        /// Encodes a progressive (multi-scan, SOF2) JPEG via ImageIO's JFIF progressive flag.
+        private func encodeProgressiveJPEG(_ image: CGImage, quality: CGFloat) -> [UInt8]? {
+            let out = NSMutableData()
+            guard let dest = CGImageDestinationCreateWithData(out, "public.jpeg" as CFString, 1, nil) else { return nil }
+            let properties: [CFString: Any] = [
+                kCGImageDestinationLossyCompressionQuality: quality,
+                kCGImagePropertyJFIFDictionary: [kCGImagePropertyJFIFIsProgressive: true],
+            ]
+            CGImageDestinationAddImage(dest, image, properties as CFDictionary)
+            guard CGImageDestinationFinalize(dest) else { return nil }
+            return [UInt8](out as Data)
+        }
+
+        /// A high-frequency *luminance* pattern (the three channels move together, so chroma stays
+        /// near zero). This spreads luma energy across many AC coefficients, exercising the AC-first
+        /// and AC-refinement scans, without stressing 4:2:0 chroma upsampling (a separate
+        /// approximation that would otherwise dominate the comparison on high-frequency chroma).
+        private func highFrequencyLumaRGBA(width: Int, height: Int) -> [UInt8] {
+            var data = [UInt8](repeating: 0, count: width * height * 4)
+            for y in 0 ..< height {
+                for x in 0 ..< width {
+                    let i = (y * width + x) * 4
+                    let value = UInt8((x * 17 + y * 29) % 256)
+                    data[i] = value
+                    data[i + 1] = value
+                    data[i + 2] = value
+                    data[i + 3] = 255
+                }
+            }
+            return data
+        }
+
+        /// True if the byte stream carries an SOF2 (progressive) frame header.
+        private func isProgressive(_ jpeg: [UInt8]) -> Bool {
+            var i = 0
+            while i + 1 < jpeg.count {
+                if jpeg[i] == 0xFF, jpeg[i + 1] == 0xC2 { return true }
+                i += 1
+            }
+            return false
+        }
+
         /// Decodes JPEG bytes through CoreGraphics into a straight RGBA buffer (the reference).
         private func decodeWithCoreGraphics(_ jpeg: [UInt8], width: Int, height: Int) -> [UInt8]? {
             guard let source = CGImageSourceCreateWithData(Data(jpeg) as CFData, nil),
@@ -80,6 +122,37 @@
             }) else { return nil }
             ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             return buffer
+        }
+
+        /// Representative qualities that still produce the full multi-scan progressive structure
+        /// (DC first/refine, AC first/refine). Very low qualities are excluded: they only surface
+        /// the float-vs-integer inverse-DCT divergence from CoreGraphics on heavy quantization, which
+        /// the baseline decoder shares and which is unrelated to progressive decoding.
+        @Test(arguments: [0.75, 0.95])
+        func decodesProgressiveJPEG(quality: Double) throws {
+            let (w, h) = (48, 32)
+            // Both a smooth gradient and a high-frequency luma pattern, so the scan set spans DC,
+            // AC-first, and AC-refinement scans across several spectral bands.
+            for source in [gradientRGBA(width: w, height: h), highFrequencyLumaRGBA(width: w, height: h)] {
+                let cgImage = try #require(makeCGImage(rgba: source, width: w, height: h))
+                let jpeg = try #require(encodeProgressiveJPEG(cgImage, quality: CGFloat(quality)))
+                #expect(isProgressive(jpeg), "ImageIO did not emit a progressive frame")
+
+                let mine = try ImageDecoder.decode(jpeg)
+                #expect(mine.width == w && mine.height == h)
+                let reference = try #require(decodeWithCoreGraphics(jpeg, width: w, height: h))
+
+                // Both decoders see identical coefficients, so agreement is bounded by inverse-DCT
+                // rounding regardless of content; this validates every progressive scan type.
+                var maxDiff = 0
+                for pixel in 0 ..< w * h {
+                    let dst = pixel * 4
+                    for channel in 0 ..< 3 {
+                        maxDiff = max(maxDiff, abs(Int(mine.data[dst + channel]) - Int(reference[dst + channel])))
+                    }
+                }
+                #expect(maxDiff <= 10, "progressive q\(quality): max diff vs CoreGraphics was \(maxDiff)")
+            }
         }
 
         @Test(arguments: [1.0, 0.85])
@@ -111,29 +184,55 @@
             #expect(mean < 2.0, "mean channel diff vs CoreGraphics was \(mean)")
         }
 
+        /// Builds a 1-component (DeviceGray) CGImage from a horizontal gray ramp.
+        private func makeGrayCGImage(width: Int, height: Int) -> CGImage? {
+            var rgba = [UInt8](repeating: 0, count: width * height * 4)
+            for y in 0 ..< height {
+                for x in 0 ..< width {
+                    let v = UInt8(255 * x / max(width - 1, 1))
+                    let i = (y * width + x) * 4
+                    rgba[i] = v
+                    rgba[i + 1] = v
+                    rgba[i + 2] = v
+                    rgba[i + 3] = 255
+                }
+            }
+            guard let rgb = makeCGImage(rgba: rgba, width: width, height: height),
+                  let ctx = CGContext(
+                      data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width,
+                      space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue
+                  )
+            else { return nil }
+            ctx.draw(rgb, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return ctx.makeImage()
+        }
+
+        /// A single-component progressive JPEG exercises the non-interleaved DC scan path (a DC scan
+        /// with one component is NOT interleaved over the MCU grid). Decode must match CoreGraphics.
+        @Test func decodesGrayscaleProgressiveJPEG() throws {
+            let (w, h) = (32, 24)
+            let grayImage = try #require(makeGrayCGImage(width: w, height: h))
+            let jpeg = try #require(encodeProgressiveJPEG(grayImage, quality: 0.85))
+            #expect(isProgressive(jpeg), "ImageIO did not emit a progressive frame")
+
+            let mine = try ImageDecoder.decode(jpeg)
+            #expect(mine.width == w && mine.height == h)
+            let reference = try #require(decodeWithCoreGraphics(jpeg, width: w, height: h))
+            var maxDiff = 0
+            for pixel in 0 ..< w * h {
+                let dst = pixel * 4
+                #expect(mine.data[dst] == mine.data[dst + 1] && mine.data[dst + 1] == mine.data[dst + 2])
+                for channel in 0 ..< 3 {
+                    maxDiff = max(maxDiff, abs(Int(mine.data[dst + channel]) - Int(reference[dst + channel])))
+                }
+            }
+            #expect(maxDiff <= 10, "grayscale progressive max diff vs CoreGraphics was \(maxDiff)")
+        }
+
         @Test func decodesGrayscaleJPEGFromImageIO() throws {
             // A single-component (grayscale) JPEG produced by ImageIO must decode to opaque gray.
             let (w, h) = (24, 16)
-            var gray = [UInt8](repeating: 0, count: w * h * 4)
-            for y in 0 ..< h {
-                for x in 0 ..< w {
-                    let v = UInt8(255 * x / (w - 1))
-                    let i = (y * w + x) * 4
-                    gray[i] = v
-                    gray[i + 1] = v
-                    gray[i + 2] = v
-                    gray[i + 3] = 255
-                }
-            }
-            let cgImage = try #require(makeCGImage(rgba: gray, width: w, height: h))
-            // Re-encode through a gray color space so ImageIO emits a 1-component JPEG.
-            let grayCS = CGColorSpaceCreateDeviceGray()
-            guard let grayCtx = CGContext(
-                data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w,
-                space: grayCS, bitmapInfo: CGImageAlphaInfo.none.rawValue
-            ) else { return }
-            grayCtx.draw(cgImage, in: CGRect(x: 0, y: 0, width: w, height: h))
-            let grayImage = try #require(grayCtx.makeImage())
+            let grayImage = try #require(makeGrayCGImage(width: w, height: h))
             let jpeg = try #require(encodeJPEG(grayImage, quality: 0.95))
 
             let mine = try ImageDecoder.decode(jpeg)

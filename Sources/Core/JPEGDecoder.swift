@@ -7,12 +7,11 @@
 /// the JPEG counterpart to `PNGDecoder`. It is invoked from `ImageDecoder.decode` when the
 /// leading bytes are the JPEG `SOI` marker (`FF D8`).
 ///
-/// Supported: 8-bit baseline (`SOF0`) and extended-sequential (`SOF1`) DCT with Huffman
-/// coding, 1-component grayscale and 3-component YCbCr/RGB, arbitrary chroma subsampling
-/// (4:4:4, 4:2:2, 4:2:0, 4:1:1), restart intervals, and the Adobe (`APP14`) color transform
-/// flag. Progressive (`SOF2`), arithmetic-coded, 12-bit, and 4-component (CMYK/YCCK) streams
-/// are reported as `unsupportedFormat` rather than guessed, so a caller knows decoding did
-/// not happen.
+/// Supported: 8-bit baseline (`SOF0`), extended-sequential (`SOF1`), and progressive (`SOF2`)
+/// DCT with Huffman coding, 1-component grayscale and 3-component YCbCr/RGB, arbitrary chroma
+/// subsampling (4:4:4, 4:2:2, 4:2:0, 4:1:1), restart intervals, and the Adobe (`APP14`) color
+/// transform flag. Arithmetic-coded, 12-bit, and 4-component (CMYK/YCCK) streams are reported as
+/// `unsupportedFormat` rather than guessed, so a caller knows decoding did not happen.
 enum JPEGDecoder {
     /// Upper bound on `width * height` (64 megapixels). A few header bytes can declare dimensions
     /// up to 65535x65535, so this caps the plane and RGBA allocations a crafted file can request.
@@ -108,6 +107,11 @@ enum JPEGDecoder {
         var restartInterval = 0
         var adobeTransform: Int? = nil
         var entropyStart = -1
+        var progressive = false
+        // Progressive coefficients accumulate across scans: one block-major, zig-zag-ordered
+        // buffer per component, sized to the padded MCU grid. Empty until the first progressive
+        // scan allocates it.
+        var coefficients: [[Int]] = []
 
         var pos = 2 // past SOI (FF D8)
         markers: while pos + 1 < data.count {
@@ -138,7 +142,8 @@ enum JPEGDecoder {
             let segmentEnd = pos + length
 
             switch marker {
-            case 0xC0, 0xC1: // SOF0 baseline / SOF1 extended sequential
+            case 0xC0, 0xC1, 0xC2: // SOF0 baseline / SOF1 extended sequential / SOF2 progressive
+                progressive = marker == 0xC2
                 guard length >= 8 else { throw malformed("truncated SOF") }
                 let precision = Int(data[pos + 2])
                 guard precision == 8 else { throw unsupported("\(precision)-bit JPEG") }
@@ -161,8 +166,6 @@ enum JPEGDecoder {
                     }
                     return component
                 }
-            case 0xC2: // SOF2
-                throw unsupported("progressive JPEG")
             case 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF: // arithmetic / differential / lossless
                 throw unsupported("JPEG frame type 0x\(hex(marker))")
             case 0xC4: // DHT
@@ -216,6 +219,7 @@ enum JPEGDecoder {
                 guard length >= 3 else { throw malformed("truncated SOS header") } // scanCount byte must exist
                 let scanCount = Int(data[pos + 2])
                 guard length >= 6 + scanCount * 2 else { throw malformed("truncated SOS header") }
+                var scanComponents: [Int] = []
                 for i in 0 ..< scanCount {
                     let base = pos + 3 + i * 2
                     let selector = Int(data[base])
@@ -225,9 +229,47 @@ enum JPEGDecoder {
                     }
                     components[index].dcTable = tables >> 4
                     components[index].acTable = tables & 0x0F
+                    scanComponents.append(index)
                 }
-                entropyStart = segmentEnd
-                break markers
+                if !progressive {
+                    entropyStart = segmentEnd
+                    break markers
+                }
+                // Progressive: this is one of several scans. Decode it into the coefficient store,
+                // then resume the marker loop at the scan's end (the next non-restart marker).
+                let spectral = pos + 3 + scanCount * 2
+                let ss = Int(data[spectral])
+                let se = Int(data[spectral + 1])
+                let ah = Int(data[spectral + 2]) >> 4
+                let al = Int(data[spectral + 2]) & 0x0F
+                guard ss <= se, se < 64, al < 16 else { throw malformed("invalid spectral selection") }
+                guard ss != 0 || se == 0 else { throw malformed("DC band must have Se == 0") }
+                if coefficients.isEmpty {
+                    // Validate dimensions and component count BEFORE allocating the (potentially
+                    // large) coefficient store; the post-loop guards run too late for this path.
+                    guard width > 0, height > 0, width * height <= maxPixels else {
+                        throw unsupported("image dimensions too large (\(width)x\(height))")
+                    }
+                    guard components.count == 1 || components.count == 3 else {
+                        throw unsupported("\(components.count)-component JPEG")
+                    }
+                    coefficients = allocateCoefficientStore(components: components, width: width, height: height)
+                }
+                try decodeProgressiveScan(
+                    data,
+                    from: segmentEnd,
+                    scanComponents: scanComponents,
+                    components: components,
+                    width: width,
+                    height: height,
+                    dcTables: dcTables,
+                    acTables: acTables,
+                    ss: ss, se: se, ah: ah, al: al,
+                    restartInterval: restartInterval,
+                    coefficients: &coefficients
+                )
+                pos = findNextMarker(data, from: segmentEnd)
+                continue
             default: // APPn, COM, and any other length-bearing segment: skip.
                 break
             }
@@ -240,22 +282,35 @@ enum JPEGDecoder {
         guard width * height <= maxPixels else {
             throw unsupported("image dimensions too large (\(width)x\(height))")
         }
-        guard !components.isEmpty, entropyStart >= 0 else { throw malformed("no scan data") }
+        guard !components.isEmpty else { throw malformed("no frame header") }
         guard components.count == 1 || components.count == 3 else {
             throw unsupported("\(components.count)-component JPEG")
         }
 
-        let planes = try decodeScan(
-            data,
-            from: entropyStart,
-            width: width,
-            height: height,
-            components: components,
-            quant: quant,
-            dcTables: dcTables,
-            acTables: acTables,
-            restartInterval: restartInterval
-        )
+        let planes: [Plane]
+        if progressive {
+            guard !coefficients.isEmpty else { throw malformed("no scan data") }
+            planes = try finalizeCoefficients(
+                coefficients: coefficients,
+                components: components,
+                quant: quant,
+                width: width,
+                height: height
+            )
+        } else {
+            guard entropyStart >= 0 else { throw malformed("no scan data") }
+            planes = try decodeScan(
+                data,
+                from: entropyStart,
+                width: width,
+                height: height,
+                components: components,
+                quant: quant,
+                dcTables: dcTables,
+                acTables: acTables,
+                restartInterval: restartInterval
+            )
+        }
         let rgba = assembleRGBA(
             planes: planes,
             components: components,
@@ -478,6 +533,303 @@ enum JPEGDecoder {
                 plane.samples[dstRow + x] = clampByte(spatial[srcRow + x])
             }
         }
+    }
+
+    // MARK: - Progressive
+
+    /// The interleaved-MCU grid for a frame: the max sampling factors and the MCU counts.
+    private static func mcuGrid(_ components: [Component], width: Int, height: Int) -> (hMax: Int, vMax: Int, perLine: Int, perColumn: Int) {
+        let hMax = components.map(\.h).max() ?? 1
+        let vMax = components.map(\.v).max() ?? 1
+        return (hMax, vMax, (width + 8 * hMax - 1) / (8 * hMax), (height + 8 * vMax - 1) / (8 * vMax))
+    }
+
+    /// One zig-zag-ordered coefficient buffer per component, sized to the padded MCU block grid.
+    ///
+    /// Progressive decoding must buffer every coefficient across scans (unlike baseline, which
+    /// transforms each block immediately), so this is inherently large: ~`width * height` entries
+    /// per component, bounded by the `maxPixels` cap. `Int` is used rather than a 16-bit coefficient
+    /// type so the accumulate/refine arithmetic cannot overflow and trap on malformed input, keeping
+    /// the throw-don't-trap contract; the trade is a larger but still capped allocation.
+    private static func allocateCoefficientStore(components: [Component], width: Int, height: Int) -> [[Int]] {
+        let grid = mcuGrid(components, width: width, height: height)
+        return components.map { [Int](repeating: 0, count: grid.perLine * $0.h * grid.perColumn * $0.v * 64) }
+    }
+
+    /// The byte offset of the next real marker at or after `start`, skipping `FF 00` stuffing and
+    /// restart markers (both part of the entropy stream). Used to resume the marker loop after a
+    /// progressive scan.
+    private static func findNextMarker(_ data: [UInt8], from start: Int) -> Int {
+        var p = start
+        while p + 1 < data.count {
+            if data[p] == 0xFF {
+                let next = data[p + 1]
+                if next != 0x00, !(0xD0 ... 0xD7).contains(next) { return p }
+            }
+            p += 1
+        }
+        return data.count
+    }
+
+    /// Decodes one progressive scan into the coefficient store. A DC scan (`ss == 0`) is interleaved
+    /// across the scan's components; an AC scan addresses a single component's blocks in raster
+    /// order. `ah == 0` is a first scan (initial bits, point-transformed by `al`); `ah > 0` a
+    /// refinement that appends one more bit.
+    private static func decodeProgressiveScan(
+        _ data: [UInt8],
+        from start: Int,
+        scanComponents: [Int],
+        components: [Component],
+        width: Int,
+        height: Int,
+        dcTables: [Int: HuffTable],
+        acTables: [Int: HuffTable],
+        ss: Int, se: Int, ah: Int, al: Int,
+        restartInterval: Int,
+        coefficients: inout [[Int]]
+    ) throws {
+        guard !scanComponents.isEmpty else { throw malformed("scan declares no components") }
+        let grid = mcuGrid(components, width: width, height: height)
+        var reader = BitReader(data: data, position: start)
+        var eobrun = 0
+
+        // Interleaving is decided by the component count, not the band: a multi-component scan is
+        // interleaved (and per the spec must be a DC scan); a single-component scan is
+        // non-interleaved, whether it is the DC band or an AC band.
+        if scanComponents.count > 1 {
+            guard ss == 0 else { throw malformed("interleaved progressive scan must be a DC scan") }
+            var predictors = [Int](repeating: 0, count: components.count)
+            var decoded = 0
+            for mcuY in 0 ..< grid.perColumn {
+                for mcuX in 0 ..< grid.perLine {
+                    if restartInterval > 0, decoded > 0, decoded % restartInterval == 0 {
+                        reader.restart()
+                        for i in predictors.indices {
+                            predictors[i] = 0
+                        }
+                    }
+                    for ci in scanComponents {
+                        let component = components[ci]
+                        guard let dc = dcTables[component.dcTable] else { throw malformed("scan references a missing table") }
+                        let blocksWide = grid.perLine * component.h
+                        for by in 0 ..< component.v {
+                            for bx in 0 ..< component.h {
+                                let offset = ((mcuY * component.v + by) * blocksWide + (mcuX * component.h + bx)) * 64
+                                try decodeProgressiveDC(&reader, &coefficients[ci], offset: offset, ah: ah, al: al, dc: dc, predictor: &predictors[ci])
+                            }
+                        }
+                    }
+                    decoded += 1
+                }
+            }
+        } else {
+            // Single component, non-interleaved: iterate the component's own block grid.
+            let ci = scanComponents[0]
+            let component = components[ci]
+            let blocksWide = grid.perLine * component.h
+            let samplesWide = (width * component.h + grid.hMax - 1) / grid.hMax
+            let samplesHigh = (height * component.v + grid.vMax - 1) / grid.vMax
+            let blocksPerLine = (samplesWide + 7) / 8
+            let blocksPerColumn = (samplesHigh + 7) / 8
+            var predictor = 0
+            var decoded = 0
+
+            if ss == 0 {
+                guard let dc = dcTables[component.dcTable] else { throw malformed("scan references a missing table") }
+                for blockRow in 0 ..< blocksPerColumn {
+                    for blockCol in 0 ..< blocksPerLine {
+                        if restartInterval > 0, decoded > 0, decoded % restartInterval == 0 {
+                            reader.restart()
+                            predictor = 0
+                        }
+                        let offset = (blockRow * blocksWide + blockCol) * 64
+                        try decodeProgressiveDC(&reader, &coefficients[ci], offset: offset, ah: ah, al: al, dc: dc, predictor: &predictor)
+                        decoded += 1
+                    }
+                }
+            } else {
+                guard let ac = acTables[component.acTable] else { throw malformed("scan references a missing table") }
+                for blockRow in 0 ..< blocksPerColumn {
+                    for blockCol in 0 ..< blocksPerLine {
+                        if restartInterval > 0, decoded > 0, decoded % restartInterval == 0 {
+                            reader.restart()
+                            eobrun = 0
+                        }
+                        let offset = (blockRow * blocksWide + blockCol) * 64
+                        if ah == 0 {
+                            try decodeACFirst(&reader, &coefficients[ci], offset: offset, ss: ss, se: se, al: al, ac: ac, eobrun: &eobrun)
+                        } else {
+                            try decodeACRefine(&reader, &coefficients[ci], offset: offset, ss: ss, se: se, al: al, ac: ac, eobrun: &eobrun)
+                        }
+                        decoded += 1
+                    }
+                }
+            }
+        }
+    }
+
+    /// Decodes one block's progressive DC: an `ah == 0` first scan accumulates the predicted DC
+    /// (point-transformed by `al`); an `ah > 0` refinement appends one lower bit.
+    private static func decodeProgressiveDC(
+        _ reader: inout BitReader,
+        _ coef: inout [Int],
+        offset: Int,
+        ah: Int, al: Int,
+        dc: HuffTable,
+        predictor: inout Int
+    ) throws {
+        if ah == 0 {
+            let category = try decodeHuffman(&reader, dc)
+            guard category <= 16 else { throw malformed("invalid DC category \(category)") }
+            let diff = category == 0 ? 0 : extend(reader.receive(category), category)
+            predictor += diff
+            coef[offset] = predictor << al
+        } else if reader.bit() != 0 {
+            coef[offset] |= (1 << al)
+        }
+    }
+
+    /// First AC scan of a band (`ah == 0`): place new coefficients shifted by `al`, with
+    /// end-of-band run handling (ITU-T T.81 G.1.2.2).
+    private static func decodeACFirst(
+        _ reader: inout BitReader,
+        _ coef: inout [Int],
+        offset: Int,
+        ss: Int, se: Int, al: Int,
+        ac: HuffTable,
+        eobrun: inout Int
+    ) throws {
+        if eobrun > 0 { eobrun -= 1
+            return
+        }
+        var k = ss
+        while k <= se {
+            let rs = try decodeHuffman(&reader, ac)
+            let run = rs >> 4
+            let size = rs & 0x0F
+            if size == 0 {
+                if run != 15 {
+                    // EOB run: this block plus a counted-down number of following blocks are empty
+                    // in this band.
+                    eobrun = (1 << run) - 1
+                    if run != 0 { eobrun += reader.receive(run) }
+                    break
+                }
+                k += 16 // ZRL: sixteen zero coefficients
+            } else {
+                k += run
+                guard k <= se else { break }
+                coef[offset + k] = extend(reader.receive(size), size) << al
+                k += 1
+            }
+        }
+    }
+
+    /// Refinement AC scan of a band (`ah > 0`): append one bit to existing coefficients and place
+    /// newly nonzero ones, applying correction bits across the band (ITU-T T.81 G.1.2.3).
+    private static func decodeACRefine(
+        _ reader: inout BitReader,
+        _ coef: inout [Int],
+        offset: Int,
+        ss: Int, se: Int, al: Int,
+        ac: HuffTable,
+        eobrun: inout Int
+    ) throws {
+        let positive = 1 << al
+        let negative = -1 << al
+        var k = ss
+
+        if eobrun == 0 {
+            while k <= se {
+                let rs = try decodeHuffman(&reader, ac)
+                var run = rs >> 4
+                let size = rs & 0x0F
+                var newValue = 0
+                if size == 0 {
+                    if run != 15 {
+                        eobrun = 1 << run
+                        if run != 0 { eobrun += reader.receive(run) }
+                        break
+                    }
+                    // run == 15: skip sixteen zero-history coefficients (nonzero ones don't count).
+                } else {
+                    // In a refinement scan the only legal magnitude is 1; anything else is malformed.
+                    guard size == 1 else { throw malformed("AC refinement coefficient size must be 1") }
+                    newValue = reader.bit() != 0 ? positive : negative
+                }
+                // Advance over `run` zero-history coefficients, correcting nonzero ones en route.
+                // The correction bit must be read from the live reader for every nonzero coefficient.
+                while k <= se {
+                    let index = offset + k
+                    if coef[index] != 0 {
+                        if reader.bit() != 0, (coef[index] & positive) == 0 {
+                            coef[index] += coef[index] > 0 ? positive : negative
+                        }
+                    } else {
+                        if run == 0 { break }
+                        run -= 1
+                    }
+                    k += 1
+                }
+                if newValue != 0, k <= se {
+                    coef[offset + k] = newValue
+                }
+                k += 1
+            }
+        }
+
+        if eobrun > 0 {
+            while k <= se {
+                let index = offset + k
+                if coef[index] != 0, reader.bit() != 0, (coef[index] & positive) == 0 {
+                    coef[index] += coef[index] > 0 ? positive : negative
+                }
+                k += 1
+            }
+            eobrun -= 1
+        }
+    }
+
+    /// Dequantizes, de-zig-zags, and inverse-transforms the accumulated progressive coefficients
+    /// into component sample planes, reusing the baseline inverse-DCT and placement.
+    private static func finalizeCoefficients(
+        coefficients: [[Int]],
+        components: [Component],
+        quant: [Int: [Int]],
+        width: Int,
+        height: Int
+    ) throws -> [Plane] {
+        let grid = mcuGrid(components, width: width, height: height)
+        var planes = components.map { component in
+            Plane(
+                samples: [UInt8](repeating: 0, count: grid.perLine * component.h * 8 * grid.perColumn * component.v * 8),
+                width: grid.perLine * component.h * 8,
+                h: component.h,
+                v: component.v
+            )
+        }
+        var block = [Double](repeating: 0, count: 64)
+        var spatial = [Double](repeating: 0, count: 64)
+        var scratch = [Double](repeating: 0, count: 64)
+        for (ci, component) in components.enumerated() {
+            guard let quantTable = quant[component.quantTable] else { throw malformed("missing quantization table") }
+            let blocksWide = grid.perLine * component.h
+            let blocksHigh = grid.perColumn * component.v
+            for blockRow in 0 ..< blocksHigh {
+                for blockCol in 0 ..< blocksWide {
+                    let offset = (blockRow * blocksWide + blockCol) * 64
+                    for i in 0 ..< 64 {
+                        block[i] = 0
+                    }
+                    for k in 0 ..< 64 {
+                        block[zigZag[k]] = Double(coefficients[ci][offset + k] * quantTable[k])
+                    }
+                    inverseDCT(block, into: &spatial, scratch: &scratch)
+                    place(spatial, into: &planes[ci], originX: blockCol * 8, originY: blockRow * 8)
+                }
+            }
+        }
+        return planes
     }
 
     // MARK: - Color reconstruction
