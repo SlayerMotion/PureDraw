@@ -8,10 +8,9 @@ import Core
 /// Encodes an `Image` into PNG data without external dependencies.
 ///
 /// Output is always 8-bit RGBA (PNG color type 6) with filter type 0 on every
-/// scanline. The zlib stream uses stored (uncompressed) deflate blocks, which
-/// keeps the encoder small and standards-correct; pixels are decoded through
-/// `Image.pixelColor(x:y:)`, so any supported source layout round-trips to
-/// straight (non-premultiplied) RGBA.
+/// scanline. The zlib stream is DEFLATE-compressed via ``Deflate``; pixels are
+/// decoded through `Image.pixelColor(x:y:)`, so any supported source layout
+/// round-trips to straight (non-premultiplied) RGBA.
 public enum PNGEncoder {
     /// Encodes the image and writes the result to a data consumer.
     public static func encode(_ image: Image, to consumer: DataConsumer) {
@@ -22,7 +21,7 @@ public enum PNGEncoder {
     public static func encode(_ image: Image) -> [UInt8] {
         var png: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
         appendChunk(type: "IHDR", data: ihdr(width: image.width, height: image.height), to: &png)
-        appendChunk(type: "IDAT", data: zlibStored(rawScanlines(image)), to: &png)
+        appendChunk(type: "IDAT", data: zlib(rawScanlines(image)), to: &png)
         appendChunk(type: "IEND", data: [], to: &png)
         return png
     }
@@ -73,7 +72,7 @@ public enum PNGEncoder {
             fctl.append(0) // blend_op: source
             appendChunk(type: "fcTL", data: fctl, to: &png)
 
-            let frameData = zlibStored(rawScanlines(frame))
+            let frameData = zlib(rawScanlines(frame))
             if index == 0 {
                 // The default image doubles as the first frame.
                 appendChunk(type: "IDAT", data: frameData, to: &png)
@@ -137,22 +136,12 @@ public enum PNGEncoder {
         appendBigEndian(crc32(typeBytes + data), to: &png)
     }
 
-    /// Wraps raw bytes in a valid zlib stream of stored (uncompressed) deflate
-    /// blocks, usable both for PNG IDAT and as a PDF FlateDecode stream.
-    static func zlibStored(_ raw: [UInt8]) -> [UInt8] {
+    /// Wraps raw bytes in a valid zlib stream, DEFLATE-compressed via ``Deflate`` (falling back to
+    /// stored blocks when a region does not compress). Usable both for PNG IDAT and as a PDF
+    /// FlateDecode stream.
+    static func zlib(_ raw: [UInt8]) -> [UInt8] {
         var stream: [UInt8] = [0x78, 0x01] // deflate, 32K window, no preset dictionary
-        var offset = 0
-        repeat {
-            let blockLength = min(65535, raw.count - offset)
-            let isFinal = offset + blockLength == raw.count
-            stream.append(isFinal ? 1 : 0)
-            stream.append(UInt8(blockLength & 0xFF))
-            stream.append(UInt8((blockLength >> 8) & 0xFF))
-            stream.append(UInt8(~blockLength & 0xFF))
-            stream.append(UInt8((~blockLength >> 8) & 0xFF))
-            stream.append(contentsOf: raw[offset ..< offset + blockLength])
-            offset += blockLength
-        } while offset < raw.count
+        stream.append(contentsOf: Deflate.compressed(raw))
         appendBigEndian(adler32(raw), to: &stream)
         return stream
     }

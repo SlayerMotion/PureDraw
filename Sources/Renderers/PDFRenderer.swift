@@ -339,11 +339,11 @@ public struct PDFRenderer: Renderer {
 
                 // Valid zlib (FlateDecode) framing; Apple's NSData zlib emits
                 // raw DEFLATE that viewers reject.
-                let rgbCompressed = Data(PNGEncoder.zlibStored(Array(rgbData)))
+                let rgbCompressed = Data(PNGEncoder.zlib(Array(rgbData)))
 
                 var smaskObjId: Int? = nil
                 if hasAlpha {
-                    let alphaCompressed = Data(PNGEncoder.zlibStored(Array(alphaData)))
+                    let alphaCompressed = Data(PNGEncoder.zlib(Array(alphaData)))
                     var maskHeader = """
                     <<
                       /Type /XObject
@@ -625,7 +625,7 @@ public struct PDFRenderer: Renderer {
         // Apple's NSData zlib compression emits raw DEFLATE, which CoreGraphics
         // cannot decode as FlateDecode, so use PureDraw's zlib writer.
         let program = font.sfntData
-        let programStream = Data(PNGEncoder.zlibStored(program))
+        let programStream = Data(PNGEncoder.zlib(program))
         let fontFileHeader = "<<\n  /Length1 \(program.count)\n  /Filter /FlateDecode\n  /Length \(programStream.count)\n>>"
         let fontFileID = writer.append(header: fontFileHeader, stream: encrypt(programStream))
 
