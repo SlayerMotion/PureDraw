@@ -4,9 +4,11 @@
 //
 
 /// Decodes encoded image bytes into a raw-RGBA `Image`, the counterpart to `PNGEncoder`
-/// (PureDraw #103). Supports PNG (8-bit grayscale, RGB, RGBA, grayscale+alpha, and palette)
-/// and `data:` URIs wrapping a base64 PNG. JPEG and uncommon PNG variants (16-bit, interlaced)
-/// are reported as unsupported rather than guessed, so a caller knows decoding did not happen.
+/// (PureDraw #103). Supports PNG (8-bit grayscale, RGB, RGBA, grayscale+alpha, and palette),
+/// baseline/extended-sequential JPEG (see `JPEGDecoder`), and `data:` URIs wrapping either.
+/// Uncommon PNG variants (16-bit, interlaced) and non-baseline JPEG (progressive, arithmetic,
+/// 12-bit, CMYK) are reported as unsupported rather than guessed, so a caller knows decoding
+/// did not happen.
 public enum ImageDecoder {
     /// Why decoding failed: an unhandled format, or recognized bytes that are malformed.
     public enum Error: Swift.Error, Equatable {
@@ -24,7 +26,7 @@ public enum ImageDecoder {
             return try decodePNG(data)
         }
         if data.count >= 2, data[0] == 0xFF, data[1] == 0xD8 {
-            throw Error.unsupportedFormat("JPEG decoding is not implemented; decode it with a platform codec and supply raw pixels")
+            return try JPEGDecoder.decode(data)
         }
         throw Error.unsupportedFormat("unrecognized image signature")
     }
