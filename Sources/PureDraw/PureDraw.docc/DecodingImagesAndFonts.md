@@ -11,8 +11,9 @@ codec. Decoders are strict: unsupported or malformed input throws or returns
 ### Images
 
 `ImageDecoder` turns encoded bytes into a raw-RGBA `Image`. It handles PNG
-(8-bit grayscale, RGB, RGBA, grayscale+alpha, and palette) and `data:` URIs
-wrapping a base64 PNG.
+(grayscale, RGB, RGBA, grayscale+alpha, and palette at bit depths 1/2/4/8/16,
+including Adam7 interlacing), JPEG (baseline and progressive), GIF, and `data:`
+URIs wrapping any of them.
 
 ```swift
 import PureDraw

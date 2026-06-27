@@ -27,8 +27,8 @@ decoder must undo it. The five filters predict each byte from its neighbors:
 Reconstruction is sequential and stateful: each recovered byte feeds the prediction
 for the bytes below and to its right. The recovered samples are then assembled into
 straight-alpha RGBA according to the color type (grayscale, RGB, palette, with or
-without alpha) at 8 bits. JPEG, 16-bit, and interlaced PNG are reported as
-unsupported rather than guessed.
+without alpha) at any valid bit depth (1/2/4/8/16); Adam7-interlaced images are
+decoded a pass at a time and composited. JPEG and GIF have their own decoders.
 
 ## WOFF 1.0
 
