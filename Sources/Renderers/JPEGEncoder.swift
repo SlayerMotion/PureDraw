@@ -6,18 +6,26 @@
 import Core
 
 /// Encodes an `Image` into a baseline (sequential, Huffman) JPEG/JFIF, the counterpart to
-/// `JPEGDecoder`. Output is a standards-conformant baseline file: 3-component YCbCr at full
-/// resolution (4:4:4, no chroma subsampling), level-shifted forward DCT, quality-scaled standard
-/// quantization tables, and **optimal** Huffman tables derived from the image's own symbol
-/// statistics (the JPEG Annex K procedure) rather than the fixed example tables. Alpha is dropped
-/// (JPEG has no alpha channel).
+/// `JPEGDecoder`. Output is a standards-conformant baseline file: 3-component YCbCr with 4:2:0
+/// chroma subsampling by default (or full-resolution 4:4:4 on request), level-shifted forward DCT,
+/// quality-scaled standard quantization tables, and **optimal** Huffman tables derived from the
+/// image's own symbol statistics (the JPEG Annex K procedure) rather than the fixed example tables.
+/// Alpha is dropped (JPEG has no alpha channel).
 ///
 /// Optimal tables are used deliberately: they avoid hand-transcribing the 162-entry standard
 /// tables, compress better, and are exercised end to end by the round-trip and ImageIO tests.
 public enum JPEGEncoder {
+    /// Chroma subsampling mode. `ratio420` (the default of most JPEG encoders) halves chroma
+    /// resolution on both axes, roughly halving file size for a small chroma-fidelity cost; `none`
+    /// keeps full-resolution 4:4:4 chroma.
+    public enum ChromaSubsampling: Sendable {
+        case full // 4:4:4
+        case ratio420 // 4:2:0
+    }
+
     /// Encodes the image at `quality` (1...100) and writes the result to a data consumer.
-    public static func encode(_ image: Image, quality: Int = 90, to consumer: DataConsumer) {
-        consumer.write(encode(image, quality: quality))
+    public static func encode(_ image: Image, quality: Int = 90, subsampling: ChromaSubsampling = .ratio420, to consumer: DataConsumer) {
+        consumer.write(encode(image, quality: quality, subsampling: subsampling))
     }
 
     /// Encodes an RGBA `Image` as the bytes of a baseline JPEG file. `quality` is clamped to
@@ -26,7 +34,7 @@ public enum JPEGEncoder {
     /// Returns an empty array for dimensions JPEG cannot represent (zero, or larger than the 16-bit
     /// frame fields allow, i.e. > 65535 in either axis); callers should treat empty output as "not
     /// encoded".
-    public static func encode(_ image: Image, quality: Int = 90) -> [UInt8] {
+    public static func encode(_ image: Image, quality: Int = 90, subsampling: ChromaSubsampling = .ratio420) -> [UInt8] {
         let width = image.width
         let height = image.height
         // JPEG frame dimensions are 16-bit fields; reject anything that would not fit rather than
@@ -36,57 +44,96 @@ public enum JPEGEncoder {
         let lumaQuant = scaledQuantTable(base: baseLuminanceQuant, quality: quality)
         let chromaQuant = scaledQuantTable(base: baseChrominanceQuant, quality: quality)
 
-        // Forward transform every block of every component once, into zig-zag-ordered quantized
-        // coefficients. 4:4:4 means one 8x8 block per component per MCU.
-        let blocksWide = (width + 7) / 8
-        let blocksHigh = (height + 7) / 8
+        // Forward transform every component's blocks into zig-zag-ordered quantized coefficients.
+        // 4:4:4 stores one 8x8 block per component per MCU; 4:2:0 stores a 2x2 grid of luma blocks
+        // per 16x16 MCU against one half-resolution chroma block.
         let (yPlane, cbPlane, crPlane) = yCbCrPlanes(image, width: width, height: height)
 
-        var yBlocks: [[Int]] = []
-        var cbBlocks: [[Int]] = []
-        var crBlocks: [[Int]] = []
-        yBlocks.reserveCapacity(blocksWide * blocksHigh)
-        cbBlocks.reserveCapacity(blocksWide * blocksHigh)
-        crBlocks.reserveCapacity(blocksWide * blocksHigh)
+        let mcusWide: Int, mcusHigh: Int, yCols: Int, yRows: Int, chromaCols: Int, chromaRows: Int
+        let lumaSampling: UInt8
+        let chromaCb: [Double], chromaCr: [Double], chromaWidth: Int, chromaHeight: Int
+        switch subsampling {
+        case .full:
+            mcusWide = (width + 7) / 8
+            mcusHigh = (height + 7) / 8
+            yCols = mcusWide
+            yRows = mcusHigh
+            chromaCols = mcusWide
+            chromaRows = mcusHigh
+            lumaSampling = 0x11
+            chromaCb = cbPlane
+            chromaCr = crPlane
+            chromaWidth = width
+            chromaHeight = height
+        case .ratio420:
+            mcusWide = (width + 15) / 16
+            mcusHigh = (height + 15) / 16
+            yCols = mcusWide * 2
+            yRows = mcusHigh * 2
+            chromaCols = mcusWide
+            chromaRows = mcusHigh
+            lumaSampling = 0x22
+            let cb = downsampleChroma(cbPlane, width: width, height: height)
+            let cr = downsampleChroma(crPlane, width: width, height: height)
+            chromaCb = cb.plane
+            chromaCr = cr.plane
+            chromaWidth = cb.width
+            chromaHeight = cb.height
+        }
+
         // Scratch buffers reused across every block of the forward transform.
         var samples = [Double](repeating: 0, count: 64)
         var intermediate = [Double](repeating: 0, count: 64)
         var natural = [Int](repeating: 0, count: 64)
-        for by in 0 ..< blocksHigh {
-            for bx in 0 ..< blocksWide {
-                yBlocks.append(quantizedZigZag(
-                    yPlane,
-                    bx: bx,
-                    by: by,
-                    width: width,
-                    height: height,
-                    quant: lumaQuant,
-                    samples: &samples,
-                    intermediate: &intermediate,
-                    natural: &natural
-                ))
-                cbBlocks.append(quantizedZigZag(
-                    cbPlane,
-                    bx: bx,
-                    by: by,
-                    width: width,
-                    height: height,
-                    quant: chromaQuant,
-                    samples: &samples,
-                    intermediate: &intermediate,
-                    natural: &natural
-                ))
-                crBlocks.append(quantizedZigZag(
-                    crPlane,
-                    bx: bx,
-                    by: by,
-                    width: width,
-                    height: height,
-                    quant: chromaQuant,
-                    samples: &samples,
-                    intermediate: &intermediate,
-                    natural: &natural
-                ))
+        let yBlocks = gatherBlocks(
+            yPlane,
+            planeWidth: width,
+            planeHeight: height,
+            cols: yCols,
+            rows: yRows,
+            quant: lumaQuant,
+            samples: &samples,
+            intermediate: &intermediate,
+            natural: &natural
+        )
+        let cbBlocks = gatherBlocks(
+            chromaCb,
+            planeWidth: chromaWidth,
+            planeHeight: chromaHeight,
+            cols: chromaCols,
+            rows: chromaRows,
+            quant: chromaQuant,
+            samples: &samples,
+            intermediate: &intermediate,
+            natural: &natural
+        )
+        let crBlocks = gatherBlocks(
+            chromaCr,
+            planeWidth: chromaWidth,
+            planeHeight: chromaHeight,
+            cols: chromaCols,
+            rows: chromaRows,
+            quant: chromaQuant,
+            samples: &samples,
+            intermediate: &intermediate,
+            natural: &natural
+        )
+
+        // Reorder luma blocks from the raster grid into MCU scan order (for 4:2:0 the 2x2 luma
+        // blocks of each MCU become contiguous). DC coefficients are differentially predicted in
+        // scan order, so the frequency tally and the entropy encode MUST walk the blocks in the same
+        // order or they build mismatched DC tables and emit codes the decoder cannot read. (For
+        // 4:4:4, where each MCU is a single block, this is the identity reordering.)
+        let lumaPerAxis = yCols == mcusWide ? 1 : 2
+        var yScan: [[Int]] = []
+        yScan.reserveCapacity(yBlocks.count)
+        for my in 0 ..< mcusHigh {
+            for mx in 0 ..< mcusWide {
+                for dy in 0 ..< lumaPerAxis {
+                    for dx in 0 ..< lumaPerAxis {
+                        yScan.append(yBlocks[(my * lumaPerAxis + dy) * yCols + (mx * lumaPerAxis + dx)])
+                    }
+                }
             }
         }
 
@@ -96,7 +143,7 @@ public enum JPEGEncoder {
         var acLumaFreq = [Int](repeating: 0, count: 257)
         var dcChromaFreq = [Int](repeating: 0, count: 257)
         var acChromaFreq = [Int](repeating: 0, count: 257)
-        tally(yBlocks, dc: &dcLumaFreq, ac: &acLumaFreq)
+        tally(yScan, dc: &dcLumaFreq, ac: &acLumaFreq)
         tally(cbBlocks, dc: &dcChromaFreq, ac: &acChromaFreq)
         tally(crBlocks, dc: &dcChromaFreq, ac: &acChromaFreq)
 
@@ -111,21 +158,28 @@ public enum JPEGEncoder {
         appendAPP0(&out)
         appendDQT(&out, table: lumaQuant, id: 0)
         appendDQT(&out, table: chromaQuant, id: 1)
-        appendSOF0(&out, width: width, height: height)
+        appendSOF0(&out, width: width, height: height, lumaSampling: lumaSampling)
         appendDHT(&out, spec: dcLuma, tableClass: 0, id: 0)
         appendDHT(&out, spec: acLuma, tableClass: 1, id: 0)
         appendDHT(&out, spec: dcChroma, tableClass: 0, id: 1)
         appendDHT(&out, spec: acChroma, tableClass: 1, id: 1)
         appendSOSHeader(&out)
 
-        // Pass 2: emit the entropy-coded scan, MCU by MCU (Y, Cb, Cr), with per-component DC
-        // prediction.
+        // Pass 2: emit the entropy-coded scan in MCU order (the MCU's luma blocks, then Cb, Cr) with
+        // per-component DC prediction. `yScan` is already in scan order, matching the tally above.
         var writer = BitWriter()
         var predY = 0, predCb = 0, predCr = 0
-        for i in 0 ..< yBlocks.count {
-            encodeBlock(yBlocks[i], dc: dcLuma, ac: acLuma, predictor: &predY, into: &writer)
-            encodeBlock(cbBlocks[i], dc: dcChroma, ac: acChroma, predictor: &predCb, into: &writer)
-            encodeBlock(crBlocks[i], dc: dcChroma, ac: acChroma, predictor: &predCr, into: &writer)
+        let lumaPerMCU = lumaPerAxis * lumaPerAxis
+        var yIndex = 0
+        for my in 0 ..< mcusHigh {
+            for mx in 0 ..< mcusWide {
+                for _ in 0 ..< lumaPerMCU {
+                    encodeBlock(yScan[yIndex], dc: dcLuma, ac: acLuma, predictor: &predY, into: &writer)
+                    yIndex += 1
+                }
+                encodeBlock(cbBlocks[my * chromaCols + mx], dc: dcChroma, ac: acChroma, predictor: &predCb, into: &writer)
+                encodeBlock(crBlocks[my * chromaCols + mx], dc: dcChroma, ac: acChroma, predictor: &predCr, into: &writer)
+            }
         }
         out += writer.finish()
         out += [0xFF, 0xD9] // EOI
@@ -443,14 +497,59 @@ public enum JPEGEncoder {
         }
     }
 
-    private static func appendSOF0(_ out: inout [UInt8], width: Int, height: Int) {
+    private static func appendSOF0(_ out: inout [UInt8], width: Int, height: Int, lumaSampling: UInt8) {
         out += [0xFF, 0xC0, 0x00, 0x11, 0x08] // length 17, precision 8
         out += [UInt8(height >> 8), UInt8(height & 0xFF)]
         out += [UInt8(width >> 8), UInt8(width & 0xFF)]
         out.append(0x03) // three components
-        out += [0x01, 0x11, 0x00] // Y:  id 1, 1x1 sampling, quant table 0
+        out += [0x01, lumaSampling, 0x00] // Y:  id 1, luma sampling (0x11=4:4:4, 0x22=4:2:0), quant table 0
         out += [0x02, 0x11, 0x01] // Cb: id 2, 1x1 sampling, quant table 1
         out += [0x03, 0x11, 0x01] // Cr: id 3, 1x1 sampling, quant table 1
+    }
+
+    /// Forward-DCTs and quantizes a `cols` x `rows` grid of 8x8 blocks from a plane (edge-clamped at
+    /// the right/bottom so partial MCUs are padded, per the JPEG convention).
+    private static func gatherBlocks(
+        _ plane: [Double],
+        planeWidth: Int,
+        planeHeight: Int,
+        cols: Int,
+        rows: Int,
+        quant: [Int],
+        samples: inout [Double],
+        intermediate: inout [Double],
+        natural: inout [Int]
+    ) -> [[Int]] {
+        var blocks: [[Int]] = []
+        blocks.reserveCapacity(cols * rows)
+        for by in 0 ..< rows {
+            for bx in 0 ..< cols {
+                blocks.append(quantizedZigZag(
+                    plane, bx: bx, by: by, width: planeWidth, height: planeHeight,
+                    quant: quant, samples: &samples, intermediate: &intermediate, natural: &natural
+                ))
+            }
+        }
+        return blocks
+    }
+
+    /// Box-averages a full-resolution chroma plane to half resolution on each axis (the 4:2:0
+    /// downsample), clamping at the edges for odd dimensions.
+    private static func downsampleChroma(_ plane: [Double], width: Int, height: Int) -> (plane: [Double], width: Int, height: Int) {
+        let halfWidth = (width + 1) / 2
+        let halfHeight = (height + 1) / 2
+        var out = [Double](repeating: 0, count: halfWidth * halfHeight)
+        for y in 0 ..< halfHeight {
+            let y0 = 2 * y
+            let y1 = min(y0 + 1, height - 1)
+            for x in 0 ..< halfWidth {
+                let x0 = 2 * x
+                let x1 = min(x0 + 1, width - 1)
+                out[y * halfWidth + x] = (plane[y0 * width + x0] + plane[y0 * width + x1]
+                    + plane[y1 * width + x0] + plane[y1 * width + x1]) / 4
+            }
+        }
+        return (out, halfWidth, halfHeight)
     }
 
     private static func appendDHT(_ out: inout [UInt8], spec: HuffmanSpec, tableClass: Int, id: Int) {

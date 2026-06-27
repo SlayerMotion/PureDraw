@@ -79,10 +79,11 @@
         }
 
         /// Our own decoder and ImageIO should agree closely on our encoder's output (both see identical
-        /// coefficients; only IDCT rounding differs).
+        /// coefficients; only IDCT rounding differs). Uses 4:4:4 so the comparison isolates IDCT
+        /// rounding without the additional chroma-upsampling divergence a subsampled file would add.
         @Test func ownDecoderAgreesWithImageIO() throws {
             let (w, h) = (40, 24)
-            let jpeg = try JPEGEncoder.encode(gradient(width: w, height: h), quality: 90)
+            let jpeg = try JPEGEncoder.encode(gradient(width: w, height: h), quality: 90, subsampling: .full)
             let mine = try ImageDecoder.decode(jpeg)
             let theirs = try #require(decodeWithCoreGraphics(jpeg, width: w, height: h))
             var worst = 0
@@ -92,6 +93,44 @@
                 }
             }
             #expect(worst <= 4, "our decoder vs ImageIO on our output diverged by \(worst)")
+        }
+
+        /// On the default 4:2:0 path our decoder and ImageIO must still agree closely: both decode the
+        /// same coefficients, differing only by IDCT rounding and chroma upsampling. A chroma-siting
+        /// or downsample-position error (e.g. centered vs co-sited) would push them far apart on a
+        /// smooth gradient, which this catches; a tight tolerance is justified because smooth chroma
+        /// upsamples almost identically.
+        @Test func subsampledDecodeAgreesWithImageIO() throws {
+            let (w, h) = (64, 48)
+            let jpeg = try JPEGEncoder.encode(gradient(width: w, height: h), quality: 90, subsampling: .ratio420)
+            let mine = try ImageDecoder.decode(jpeg)
+            let theirs = try #require(decodeWithCoreGraphics(jpeg, width: w, height: h))
+            var total = 0, worst = 0
+            for p in 0 ..< w * h {
+                for c in 0 ..< 3 {
+                    let d = abs(Int(mine.data[p * 4 + c]) - Int(theirs[p * 4 + c]))
+                    total += d
+                    worst = max(worst, d)
+                }
+            }
+            let mean = Double(total) / Double(w * h * 3)
+            #expect(mean < 2.5, "4:2:0 our-decoder vs ImageIO mean \(mean)")
+            #expect(worst < 16, "4:2:0 our-decoder vs ImageIO worst \(worst)")
+        }
+
+        /// 4:2:0 subsampling (the default) must produce a smaller file than 4:4:4 for the same image,
+        /// stay a valid JPEG ImageIO accepts, and survive a round-trip through our own decoder.
+        @Test func subsampledOutputIsSmallerAndValid() throws {
+            let (w, h) = (80, 48)
+            let image = try gradient(width: w, height: h)
+            let full = JPEGEncoder.encode(image, quality: 90, subsampling: .full)
+            let subsampled = JPEGEncoder.encode(image, quality: 90, subsampling: .ratio420)
+            #expect(subsampled.count < full.count)
+
+            let source = try #require(CGImageSourceCreateWithData(Data(subsampled) as CFData, nil))
+            #expect((CGImageSourceGetType(source) as String?) == "public.jpeg")
+            let decoded = try ImageDecoder.decode(subsampled)
+            #expect(decoded.width == w && decoded.height == h)
         }
     }
 #endif

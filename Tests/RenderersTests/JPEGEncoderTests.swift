@@ -112,7 +112,8 @@ struct JPEGEncoderTests {
     @Test func roundTripsHighEntropyContent() throws {
         // Noisy, high-frequency content spreads energy across many AC coefficients, producing many
         // distinct run/size symbols and long Huffman codes, exercising the length-limiting and
-        // canonical-code paths the smooth gradients never reach. It must not trap.
+        // canonical-code paths the smooth gradients never reach. It must not trap. Uses 4:4:4 so the
+        // high-frequency CHROMA also reaches those paths instead of being averaged away by 4:2:0.
         let (w, h) = (64, 48)
         var data = [UInt8](repeating: 0, count: w * h * 4)
         for y in 0 ..< h {
@@ -125,7 +126,7 @@ struct JPEGEncoderTests {
             }
         }
         let original = try Image(width: w, height: h, alphaInfo: .last, data: data)
-        let decoded = try ImageDecoder.decode(JPEGEncoder.encode(original, quality: 90))
+        let decoded = try ImageDecoder.decode(JPEGEncoder.encode(original, quality: 90, subsampling: .full))
         #expect(decoded.width == w && decoded.height == h)
     }
 
@@ -144,5 +145,34 @@ struct JPEGEncoderTests {
         #expect(contains(0xC4)) // DHT
         #expect(contains(0xDA)) // SOS
         #expect(jpeg.count > 100)
+    }
+
+    /// 4:2:0 subsampling must round-trip through our own decoder at every size, including the
+    /// partial-MCU dimensions that exposed a DC-prediction-order bug: the frequency tally and the
+    /// entropy encode must walk luma blocks in the same MCU scan order, or the optimal DC table
+    /// desyncs and the stream becomes undecodable ("invalid Huffman code").
+    @Test(arguments: [(40, 24), (24, 24), (40, 8), (33, 25), (16, 16), (1, 1), (37, 21)])
+    func subsampledRoundTripsAcrossDimensions(size: (Int, Int)) throws {
+        let (w, h) = size
+        let jpeg = try JPEGEncoder.encode(gradient(width: w, height: h), quality: 90, subsampling: .ratio420)
+        let decoded = try ImageDecoder.decode(jpeg) // would throw if the DC-order bug regressed
+        #expect(decoded.width == w && decoded.height == h)
+    }
+
+    /// The SOF0 luma sampling factor records the chroma mode: 0x22 (2x2) for 4:2:0, 0x11 for 4:4:4.
+    @Test func sofRecordsLumaSamplingFactor() throws {
+        let image = try gradient(width: 16, height: 16)
+        func lumaSampling(_ jpeg: [UInt8]) -> UInt8? {
+            var i = 2 // after SOI
+            while i + 4 <= jpeg.count, jpeg[i] == 0xFF {
+                let marker = jpeg[i + 1]
+                let length = Int(jpeg[i + 2]) << 8 | Int(jpeg[i + 3])
+                if marker == 0xC0 { return jpeg[i + 11] } // first component's sampling-factor byte
+                i += 2 + length
+            }
+            return nil
+        }
+        #expect(lumaSampling(JPEGEncoder.encode(image, subsampling: .ratio420)) == 0x22)
+        #expect(lumaSampling(JPEGEncoder.encode(image, subsampling: .full)) == 0x11)
     }
 }
