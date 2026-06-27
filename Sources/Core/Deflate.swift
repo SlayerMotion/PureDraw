@@ -8,9 +8,9 @@
 /// (per-block optimal trees), fixed Huffman, or a stored block. Pure Swift, no Foundation; used for
 /// PNG `IDAT` and PDF `FlateDecode` streams. ``Inflate`` and the system zlib both decode its output.
 ///
-/// Greedy (non-lazy) matching is the one deliberate scope limit: lazy evaluation would tighten the
-/// ratio a little further. Everything else (dynamic trees, length-limited code lengths, per-block
-/// type selection) is the full algorithm.
+/// Matching is lazy: a match is deferred (a literal emitted) when the next position begins a longer
+/// one. Together with the dynamic per-block trees, length-limited code lengths, and per-block type
+/// selection, that is the full algorithm with no remaining shortcuts.
 public enum Deflate {
     /// Compresses `input` into a raw DEFLATE stream. Never larger than a stored encoding (the
     /// per-block selection always includes the stored alternative).
@@ -53,50 +53,70 @@ public enum Deflate {
             blockStart = end
         }
 
-        var i = 0
-        while i < count {
+        /// Token emitters: append the token and tally its Huffman symbol frequencies.
+        func appendLiteral(_ byte: UInt8) {
+            tokens.append(Token(literal: Int(byte), length: 0, distance: 0))
+            litFreq[Int(byte)] += 1
+        }
+        func appendMatch(length: Int, distance: Int) {
+            tokens.append(Token(literal: -1, length: length, distance: distance))
+            litFreq[257 + lengthCodeFor[length]] += 1
+            distFreq[distanceCodeFor(distance)] += 1
+        }
+
+        /// The longest match for the bytes at `position` against earlier window positions in the hash
+        /// chain (length 0 when none reaches `minMatch`). Does not insert `position`.
+        func longestMatch(at position: Int) -> (length: Int, distance: Int) {
+            guard position + minMatch - 1 < count else { return (0, 0) }
             var matchLength = 0
             var matchDistance = 0
-            if i + minMatch - 1 < count {
-                let maxLength = min(maxMatch, count - i)
-                var candidate = head[hash(i)]
-                var attempts = 0
-                while candidate >= 0, i - candidate <= windowSize, attempts < maxChain {
-                    if input[candidate + matchLength] == input[i + matchLength] {
-                        var length = 0
-                        while length < maxLength, input[candidate + length] == input[i + length] {
-                            length += 1
-                        }
-                        if length > matchLength {
-                            matchLength = length
-                            matchDistance = i - candidate
-                            if length >= maxLength { break }
-                        }
+            let maxLength = min(maxMatch, count - position)
+            var candidate = head[hash(position)]
+            var attempts = 0
+            while candidate >= 0, position - candidate <= windowSize, attempts < maxChain {
+                if input[candidate + matchLength] == input[position + matchLength] {
+                    var length = 0
+                    while length < maxLength, input[candidate + length] == input[position + length] {
+                        length += 1
                     }
-                    candidate = chain[candidate]
-                    attempts += 1
+                    if length > matchLength {
+                        matchLength = length
+                        matchDistance = position - candidate
+                        if length >= maxLength { break }
+                    }
                 }
+                candidate = chain[candidate]
+                attempts += 1
             }
+            return (matchLength, matchDistance)
+        }
 
-            if matchLength >= minMatch {
-                let lengthCode = lengthCodeFor[matchLength]
-                let distanceCode = distanceCodeFor(matchDistance)
-                tokens.append(Token(literal: -1, length: matchLength, distance: matchDistance))
-                litFreq[257 + lengthCode] += 1
-                distFreq[distanceCode] += 1
-                let end = i + matchLength
-                while i < end {
-                    insert(i)
+        // LZ77 with lazy matching: a match found at `i` is deferred (emitting a single literal) when
+        // the next position begins a strictly longer match, which tightens the overall ratio.
+        var i = 0
+        while i < count {
+            if tokens.count >= blockTokenLimit { flush(end: i, isFinal: false) }
+            let primary = longestMatch(at: i)
+            insert(i) // so the lazy look-ahead at i+1 can reference i
+
+            if primary.length >= minMatch {
+                if i + 1 < count, longestMatch(at: i + 1).length > primary.length {
+                    appendLiteral(input[i])
                     i += 1
+                    continue
                 }
+                appendMatch(length: primary.length, distance: primary.distance)
+                var covered = i + 1
+                let end = i + primary.length
+                while covered < end {
+                    insert(covered)
+                    covered += 1
+                }
+                i = end
             } else {
-                tokens.append(Token(literal: Int(input[i]), length: 0, distance: 0))
-                litFreq[Int(input[i])] += 1
-                insert(i)
+                appendLiteral(input[i])
                 i += 1
             }
-
-            if tokens.count >= blockTokenLimit, i < count { flush(end: i, isFinal: false) }
         }
         flush(end: count, isFinal: true)
         return writer.finish()
