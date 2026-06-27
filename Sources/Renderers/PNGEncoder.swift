@@ -7,10 +7,10 @@ import Core
 
 /// Encodes an `Image` into PNG data without external dependencies.
 ///
-/// Output is always 8-bit RGBA (PNG color type 6) with filter type 0 on every
-/// scanline. The zlib stream is DEFLATE-compressed via ``Deflate``; pixels are
-/// decoded through `Image.pixelColor(x:y:)`, so any supported source layout
-/// round-trips to straight (non-premultiplied) RGBA.
+/// Output is always 8-bit RGBA (PNG color type 6). Each scanline is filtered with
+/// the best of the five PNG filters, then the stream is DEFLATE-compressed via
+/// ``Deflate``; pixels are decoded through `Image.pixelColor(x:y:)`, so any
+/// supported source layout round-trips to straight (non-premultiplied) RGBA.
 public enum PNGEncoder {
     /// Encodes the image and writes the result to a data consumer.
     public static func encode(_ image: Image, to consumer: DataConsumer) {
@@ -96,25 +96,89 @@ public enum PNGEncoder {
         var ihdr: [UInt8] = []
         appendBigEndian(UInt32(width), to: &ihdr)
         appendBigEndian(UInt32(height), to: &ihdr)
-        ihdr.append(contentsOf: [8, 6, 0, 0, 0]) // 8-bit, RGBA, deflate, filter 0, no interlace
+        ihdr.append(contentsOf: [8, 6, 0, 0, 0]) // 8-bit, RGBA, deflate, filter method 0, no interlace
         return ihdr
     }
 
-    /// The filtered RGBA scanlines (filter type 0 per row) for an image.
+    /// The filtered RGBA scanlines for an image. Each row picks the PNG filter (None, Sub, Up,
+    /// Average, Paeth) that minimizes the sum of absolute signed residuals, the standard heuristic
+    /// (RFC 2083 §9.6): decorrelating each row from its neighbors makes the DEFLATE stream far
+    /// smaller. PureDraw's decoder reverses every filter type, so the output round-trips exactly.
     private static func rawScanlines(_ image: Image) -> [UInt8] {
+        let bytesPerPixel = 4
+        let rowBytes = image.width * bytesPerPixel
         var raw: [UInt8] = []
-        raw.reserveCapacity(image.height * (1 + image.width * 4))
+        raw.reserveCapacity(image.height * (1 + rowBytes))
+        var previous = [UInt8](repeating: 0, count: rowBytes) // reconstructed row above; zeros above row 0
+        var current = [UInt8](repeating: 0, count: rowBytes)
         for y in 0 ..< image.height {
-            raw.append(0) // filter type: none
             for x in 0 ..< image.width {
                 let color = image.pixelColor(x: x, y: y)
-                raw.append(channelByte(color.red))
-                raw.append(channelByte(color.green))
-                raw.append(channelByte(color.blue))
-                raw.append(channelByte(color.alpha))
+                let offset = x * bytesPerPixel
+                current[offset] = channelByte(color.red)
+                current[offset + 1] = channelByte(color.green)
+                current[offset + 2] = channelByte(color.blue)
+                current[offset + 3] = channelByte(color.alpha)
             }
+            let (filterType, filtered) = bestFilter(current, above: previous, bytesPerPixel: bytesPerPixel)
+            raw.append(filterType)
+            raw.append(contentsOf: filtered)
+            swap(&previous, &current) // the original (unfiltered) row becomes the row above
         }
         return raw
+    }
+
+    /// Picks the filter type whose residuals minimize the sum-of-absolute-signed-values heuristic.
+    private static func bestFilter(_ row: [UInt8], above: [UInt8], bytesPerPixel: Int) -> (type: UInt8, bytes: [UInt8]) {
+        var bestType: UInt8 = 0
+        var bestBytes = filterScanline(0, row, above, bytesPerPixel)
+        var bestScore = filterScore(bestBytes)
+        for type in 1 ... 4 {
+            let candidate = filterScanline(type, row, above, bytesPerPixel)
+            let score = filterScore(candidate)
+            if score < bestScore {
+                bestScore = score
+                bestType = UInt8(type)
+                bestBytes = candidate
+            }
+        }
+        return (bestType, bestBytes)
+    }
+
+    /// Each byte's magnitude as a signed value, so residuals near 0 or 255 (i.e. -1) score low.
+    private static func filterScore(_ bytes: [UInt8]) -> Int {
+        var total = 0
+        for byte in bytes {
+            total += Int(Int8(bitPattern: byte).magnitude)
+        }
+        return total
+    }
+
+    /// Applies one PNG scanline filter (RFC 2083 §6) using original (reconstructed-equivalent) bytes,
+    /// exactly the operation the decoder inverts.
+    private static func filterScanline(_ type: Int, _ row: [UInt8], _ above: [UInt8], _ bpp: Int) -> [UInt8] {
+        var out = [UInt8](repeating: 0, count: row.count)
+        for i in 0 ..< row.count {
+            let a = i >= bpp ? Int(row[i - bpp]) : 0 // left
+            let b = Int(above[i]) // up
+            let c = i >= bpp ? Int(above[i - bpp]) : 0 // upper-left
+            let predictor: Int = switch type {
+            case 1: a
+            case 2: b
+            case 3: (a + b) / 2
+            case 4: paethPredictor(a, b, c)
+            default: 0 // None
+            }
+            out[i] = UInt8((Int(row[i]) - predictor) & 0xFF)
+        }
+        return out
+    }
+
+    private static func paethPredictor(_ a: Int, _ b: Int, _ c: Int) -> Int {
+        let p = a + b - c
+        let pa = abs(p - a), pb = abs(p - b), pc = abs(p - c)
+        if pa <= pb, pa <= pc { return a }
+        return pb <= pc ? b : c
     }
 
     private static func channelByte(_ value: Double) -> UInt8 {
