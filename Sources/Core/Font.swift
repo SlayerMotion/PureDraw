@@ -370,11 +370,15 @@ public struct Font: Equatable, Sendable {
     /// order) table, so a caller shaping a right-to-left run, which kerns before the
     /// bidi reorder, passes `false` to skip it rather than kern the wrong, logical,
     /// adjacencies; GPOS kerning is logical-order and stays.
-    public func kerningMap(restrictTo activeFeatures: Set<Int>? = nil, includeLegacyKern: Bool = true, variations: [String: Double] = [:]) -> KerningMap {
+    /// The font's pair kerning for the given pair-positioning `features` (the GPOS
+    /// `kern` feature by default; pass `dist` as well for the Indic distance feature,
+    /// whose pairs tighten a subjoined consonant's advance under a two-part vowel
+    /// sign). Lookups from every named feature accumulate into one map.
+    public func kerningMap(features: Set<String> = ["kern"], restrictTo activeFeatures: Set<Int>? = nil, includeLegacyKern: Bool = true, variations: [String: Double] = [:]) -> KerningMap {
         var pairs: [UInt64: Int] = [:]
         var classSubtables: [KerningClassSubtable] = []
         let normalized = variations.isEmpty ? nil : normalizedVariationCoordinates(variations)
-        parseGPOSKern(into: &pairs, classSubtables: &classSubtables, restrictTo: activeFeatures, normalized: normalized)
+        parseGPOSKern(into: &pairs, classSubtables: &classSubtables, features: features, restrictTo: activeFeatures, normalized: normalized)
         if pairs.isEmpty, classSubtables.isEmpty, includeLegacyKern {
             parseLegacyKern(into: &pairs)
         }
@@ -402,6 +406,7 @@ public struct Font: Equatable, Sendable {
     private func parseGPOSKern(
         into pairs: inout [UInt64: Int],
         classSubtables: inout [KerningClassSubtable],
+        features: Set<String>,
         restrictTo activeFeatures: Set<Int>? = nil,
         normalized: [Double]? = nil
     ) {
@@ -420,7 +425,7 @@ public struct Font: Equatable, Sendable {
             for featureIndex in 0 ..< featureCount {
                 if let activeFeatures, !activeFeatures.contains(featureIndex) { continue }
                 let record = featureList + 2 + featureIndex * 6
-                guard Self.tag(data, at: record) == "kern",
+                guard let tag = Self.tag(data, at: record), features.contains(tag),
                       let featureOffset = Self.u16(data, at: record + 4)
                 else {
                     continue
